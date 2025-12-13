@@ -17,32 +17,47 @@ import FormElements from "./pages/Forms/FormElements";
 import Blank from "./pages/Blank";
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
-import Home from "./pages/Dashboard/Home";
+import Evento from "./pages/Dashboard/Evento";
+import { AuthProvider } from "./context/AuthContext"; //  asegúrate de que la ruta sea correcta
+//import ProtectedRoute from "./routes/ProtectedRoute";
+import Boletos from "./pages/Dashboard/Boletos";
+import Reportes from "./pages/Dashboard/Reportes";
+import ProtectedRoute from "./routes/ProtectedRoute";
 
 export default function App() {
   return (
-    <>
+    <AuthProvider> {/* Aquí envolvemos toda la app para el uso de Provider */}
       <Router>
         <ScrollToTop />
         <Routes>
-          {/* Dashboard Layout */}
-            <Route index path="/" element={<Home  />} />
-          {/* Dashboard Layout */}
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard/home" element={<Home />} />
-              
-              {/* Otras rutas del dashboard */}
+          {/* Auth Pages */}
+          <Route index path="/" element={<SignIn />} />          
+          <Route path="/signin" element={<SignIn />} />
+          <Route path="/signup" element={<SignUp />} />
+
+          {/* === Protected Dashboard Layout === */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/dashboard/Evento" element={<Evento />} />
+            <Route path="/dashboard/Boletos" element={<Boletos />} />
+            <Route path="/dashboard/Reportes" element={<Reportes />} />
+          {/*
             <Route path="/profile" element={<UserProfiles />} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/blank" element={<Blank />} />
 
-            {/* Forms */}
+          Forms 
             <Route path="/form-elements" element={<FormElements />} />
 
-            {/* Tables */}
+            {/* Tables 
             <Route path="/basic-tables" element={<BasicTables />} />
 
-            {/* Ui Elements */}
+            {/* UI 
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/avatars" element={<Avatars />} />
             <Route path="/badge" element={<Badges />} />
@@ -50,20 +65,17 @@ export default function App() {
             <Route path="/images" element={<Images />} />
             <Route path="/videos" element={<Videos />} />
 
-            {/* Charts */}
-              <Route path="/line-chart" element={<LineChart />} />
+            {/* Charts 
+            <Route path="/line-chart" element={<LineChart />} />
             <Route path="/bar-chart" element={<BarChart />} />
+            */}
           </Route>
 
-          {/* Auth Layout */}
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
-
-          {/* Fallback Route */}
+          {/* === Fallback === 
           <Route path="*" element={<NotFound />} />
+          */}
         </Routes>
-      
       </Router>
-    </>
+    </AuthProvider>
   );
 }

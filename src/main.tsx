@@ -6,13 +6,22 @@ import "flatpickr/dist/flatpickr.css";
 import App from "./App.tsx";
 import { AppWrapper } from "./components/common/PageMeta.tsx";
 import { ThemeProvider } from "./context/ThemeContext.tsx";
+import { AuthProvider } from "./context/AuthContext.tsx";
+import { VentaProvider } from "./context/VentaContext.tsx";
+import { SaldoProvider } from "./context/SaldoContext.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider>
-      <AppWrapper>
-        <App />
-      </AppWrapper>
-    </ThemeProvider>
-  </StrictMode>,
+    <AuthProvider>
+      <VentaProvider>
+      <SaldoProvider>
+      <ThemeProvider>
+        <AppWrapper>
+          <App />
+        </AppWrapper>
+      </ThemeProvider>
+      </SaldoProvider>    
+      </VentaProvider>
+    </AuthProvider>
+  </StrictMode>
 );
