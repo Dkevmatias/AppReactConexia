@@ -34,6 +34,16 @@ export default function SelectInputs() {
             className="dark:bg-dark-900"
           />
         </div>
+
+         <div>
+          <Label>Select Input</Label>
+          <Select
+            options={options}
+            placeholder="Select Option"
+            onChange={handleSelectChange}
+            className="dark:bg-dark-900"
+          />
+        </div>
         <div>
           <MultiSelect
             label="Multiple Select Options"
