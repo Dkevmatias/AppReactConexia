@@ -31,17 +31,14 @@ export default function Boletos() {
     {setBoletos( location.state.boletos);}
   }, [location.state]);
 
-console.log("Usuario Conectado:", user?.cardCode);
 
 //Boletos desde la BD
  useEffect(() => {
    if (!user?.cardCode) return console.log("Usuario login:", user?.cardCode);
-   //console.log("Usuario login:", user?.cardCode);
+
     const fetchBoletos = async () => {
       try {
         const response = await getBoletosPorUsuario(user!.cardCode);
-
-        console.log("Boletos obtenidos:", response);
         setBoletos(response);
       } catch (error) {
         console.error("Error cargando boletos:", error);
@@ -70,7 +67,7 @@ console.log("Usuario Conectado:", user?.cardCode);
     setConfeti(true);
     const timer = setTimeout(() => setConfeti(false), 5000); // duracion de animación
     return () => clearTimeout(timer);
-  }, []); // <-- se ejecuta solo al montar la página
+  }, []); 
 
   if (loading && boletos.length === 0) {
     return <p>Cargando boletos...</p>;

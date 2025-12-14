@@ -38,20 +38,26 @@ export default function SignInForm() {
       }); 
     }
       //console.log("Login exitoso:", data);
-      const personas = await getPersonas(data.user.idPersona);      
-      const datacardcode = (Array.isArray(personas) ? personas : [])
+   const personas = await getPersonas(data.user.idPersona);      
+   const datacardcode = (Array.isArray(personas) ? personas : [])
                             .filter(p => p?.cardCode)
                             .map(p => p.cardCode)
                             .join(",");
-    
+    //Carcode
+    const datacardcodelocal='C000015';
+    const fechaInicio='2025-01-01';
+    const fechaFin='2025-05-31';
+   
   // Llamar a otro endpoint con esos cardCodes
-  const responsePeriodo = await getPeriodoEvaluar();
-  console.log("Periodo evaluar",responsePeriodo);  
-  const responseVentas = await getVentasCLientes( responsePeriodo.fechaInicio,responsePeriodo.fechaFin, datacardcode);
-  const responsesaldo= await getSaldoClientes(datacardcode);   
-    console.log("Saldo Clientes",responsesaldo.vencido);   
-    console.log("Datos finales:", responseVentas);
-     const _ventatotal = responseVentas?.[0]?.totalVentas ?? 0;
+    const responsePeriodo = await getPeriodoEvaluar();
+ 
+    //Peticion Local
+    const responseVentas = await getVentasCLientes( fechaInicio,fechaFin, datacardcodelocal);
+    //const responseVentas = await getVentasCLientes( responsePeriodo.fechaInicio,responsePeriodo.fechaFin, datacardcode);
+    const responsesaldo= await getSaldoClientes(datacardcode);   
+    //console.log("Saldo Clientes",responsesaldo.vencido);   
+    //console.log("Datos finales:", responseVentas);
+    const _ventatotal = responseVentas?.[0]?.totalVentas ?? 0;
      //const _ventatotal = 789000;
      //Convertir las Ventas a Puntos
      const puntosAcumulados =Math.round((_ventatotal/1.16)/1000.00); 

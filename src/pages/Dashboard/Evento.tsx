@@ -14,6 +14,7 @@ export default function Evento() {
   const {saldoVencido}= useVencido();
   const getdate = new Date();
  // const mesanterior= getdate.getMonth() - 1;
+ ///console.log("Saldos",saldoVencido);
   const fechaMesAnterior = new Date(getdate.getFullYear(), getdate.getMonth() - 1, 1);
   const nombreMeses = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -85,7 +86,7 @@ export default function Evento() {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-1">        
             <div className="space-y-6">
               <BoletosCards totalCompra={ventaTotal ?? 0 }
-                            vencido={!saldoVencido } />
+                            vencido={saldoVencido ?? false } />
           </div>       
         </div>
       </div>
