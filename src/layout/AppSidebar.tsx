@@ -109,7 +109,7 @@ const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const location = useLocation();
   const { user } = useAuth();
-  console.log("User Role in Sidebar:", user);
+  //console.log("User Role in Sidebar:", user);
 
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "others";

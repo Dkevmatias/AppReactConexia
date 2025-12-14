@@ -114,7 +114,7 @@ export const logout = async () => {
 
 export const getPeriodoEvaluar = async () => {
   const response = await api.get(`PeriodoBoletos/GetPeriodoEvaluar`);
-  console.log("datos",response.data)
+  //console.log("datos",response.data)
   return response.data;
 };
 
@@ -130,7 +130,7 @@ export const getSaldoClientes = async(clientes: string)=>{
       clientes
     }
   });
-
+  
   return {
     ...response.data,
     vencido: response.data.Vencido === 1
@@ -141,7 +141,7 @@ export const getSaldoClientes = async(clientes: string)=>{
 
 
 export const getVentasCLientes = async (fechaInicio: string,fechaFin: string,clientes: string) => {
- console.log("getVentasCLientes - parametros:", { fechaInicio, fechaFin, clientes });
+ //console.log("getVentasCLientes - parametros:", { fechaInicio, fechaFin, clientes });
   // Llamada a la API para obtener ventas de clientes
    const response = await api.get(`Clientes/GetVentasClientes`, {
        params: {
@@ -150,7 +150,7 @@ export const getVentasCLientes = async (fechaInicio: string,fechaFin: string,cli
       clientes
     }
   });
-     console.log("Ventas Clientes:", response.data);
+     //console.log("Ventas Clientes:", response.data);
   return response.data;
 
 

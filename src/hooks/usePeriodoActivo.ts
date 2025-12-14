@@ -15,8 +15,11 @@ export function usePeriodoActivo() {
   //const [tieneSaldoVencido, setTieneSaldoVencido] = useState(false);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-
-  useEffect(() => {
+useEffect(() => {
+  if (!user?.cardCode) {
+    setLoading(false);
+    return;
+  }
     const fetchPeriodo = async () => {
       try {
         const response = await api.get("/PeriodoBoletos/GetPeriodoActivo");
