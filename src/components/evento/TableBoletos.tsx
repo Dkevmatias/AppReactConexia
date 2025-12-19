@@ -5,12 +5,15 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
+import "../../utils/date"
 
 //import Badge from "../ui/badge/Badge";
 import { Key, ReactElement, JSXElementConstructor, ReactNode, ReactPortal } from "react";
+import { getMesPeriodo } from "../../utils/date";
 //import { useAuth } from "../../context/AuthContext";
 
 export default function TableBoletos({ res }: { res: any }) {
+ // console.log("Tabla",res);
     const data = Array.isArray(res) ? res : [];     
 
   return (
@@ -22,23 +25,19 @@ export default function TableBoletos({ res }: { res: any }) {
             <TableRow>
               <TableCell
                 isHeader
-                className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-              >
+                className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
                 Código de Boleto
               </TableCell>
-
               <TableCell
                 isHeader
-                className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-              >
-                Mes
+                className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+                Periodo
               </TableCell>
 
               <TableCell
                 isHeader
-                className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
-              >
-                Color
+                className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
+                Mes de Rendención
               </TableCell>
             </TableRow>
           </TableHeader>
@@ -56,21 +55,20 @@ export default function TableBoletos({ res }: { res: any }) {
               </TableRow>
             )}
 
-            {data.map((b: { idBoleto: Key | null | undefined; codigoBoleto: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; fecha: string | number | Date; color: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
+            {data.map((b: { idBoleto: Key | null | undefined; idPeriodo:number; codigoBoleto: string | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; fecha: string | number | Date; color: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
               <TableRow key={b.idBoleto}>
-                <TableCell className="px-5 py-4 text-start font-semibold">
+                <TableCell className="px-4 py-3 text-start text-gray-500">
                   {b.codigoBoleto}
                 </TableCell>
-
                 <TableCell className="px-4 py-3 text-start text-gray-500">
+                {getMesPeriodo(b.idPeriodo)}
+                </TableCell>
+
+                <TableCell className="px-4 py-3 text-start capitalize text-gray-500">
                   {new Date(b.fecha).toLocaleDateString("es-MX", {
                     year: "numeric",
                     month: "long",
                   })}
-                </TableCell>
-
-                <TableCell className="px-4 py-3 text-start capitalize text-gray-500">
-                  {b.color}
                 </TableCell>
               </TableRow>
             ))}

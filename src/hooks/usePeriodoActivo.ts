@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../services/apiServices";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 export function usePeriodoActivo() {
   const [periodo, setPeriodo] = useState<{
@@ -15,8 +15,11 @@ export function usePeriodoActivo() {
   //const [tieneSaldoVencido, setTieneSaldoVencido] = useState(false);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-
-  useEffect(() => {
+useEffect(() => {
+  if (!user?.cardCode) {
+    setLoading(false);
+    return;
+  }
     const fetchPeriodo = async () => {
       try {
         const response = await api.get("/PeriodoBoletos/GetPeriodoActivo");

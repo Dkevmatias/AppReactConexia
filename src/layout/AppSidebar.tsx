@@ -1,21 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import {
-  BoxCubeIcon,
-  CalenderIcon,
+  //BoxCubeIcon,
+  //CalenderIcon,
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
-  ListIcon,
-  PageIcon,
-  PieChartIcon,
-  PlugInIcon,
-  TableIcon,
-  UserCircleIcon,
+  //ListIcon,
+  //PageIcon,
+  //PieChartIcon,
+  //PlugInIcon,
+  //TableIcon,
+  //UserCircleIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 //import SidebarWidget from "./SidebarWidget";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 type NavItem = {
   name: string;
@@ -109,7 +109,7 @@ const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const location = useLocation();
   const { user } = useAuth();
-  console.log("User Role in Sidebar:", user);
+  //console.log("User Role in Sidebar:", user);
 
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "others";

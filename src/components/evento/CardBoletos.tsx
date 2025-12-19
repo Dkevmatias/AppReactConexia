@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 import { asignarBoletos } from "../../services/boletoServices";
 import ConfirmModal from "../../utils/ConfirmModal";
 import { useNavigate } from "react-router";
 import { usePeriodoActivo } from "../../hooks/usePeriodoActivo";
 import PeriodoAlert from "../../utils/PeriodoAlert";
+import Alert from "../ui/alert/Alert";
 type TicketOption = {
   id: string;
   label: string;
@@ -13,9 +14,17 @@ type TicketOption = {
   idBoleto: number;
 };
 
+export interface BoletoConfirmacion {
+  idBoleto: number;
+  label: string;
+  color: string;
+  cantidad: number;
+  precio: number;
+}
+
 const ticketOptions: TicketOption[] = [
-  { id: "Negro", label: "Boletos Camionetas", value: 50, color: "bg-black text-white", idBoleto: 1 },
-  { id: "Amarillo", label: "Boletos Motos", value: 25, color: "bg-yellow-400 text-black", idBoleto: 2 },
+  { id: "Amarillo", label: "Boletos Camionetas", value: 50, color: "bg-yellow-400 text-black", idBoleto: 1 },
+  { id: "Negro", label: "Boletos Motos", value: 25, color:"bg-black text-white" , idBoleto: 2 },
   { id: "Gris", label: "Boleto Computadoras", value: 10, color: "bg-gray-400 text-black", idBoleto: 3 },
 ];
 
@@ -24,12 +33,23 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
-  const { periodo,periodoActivo: periodoActivo,tieneBoletos, loading } = usePeriodoActivo();
+  const [showAlert, setShowAlert] = useState(false);
+  const { periodo,periodoActivo: periodoActivo,tieneBoletos, loading } = usePeriodoActivo();  
+  const precioMinimo = Math.min(...ticketOptions.map(t => t.value));
+  
 
+  //console.log('vencido componente:', vencido, 'tipo:', typeof vencido);
 
-  // --- Modal states ---
   const [openConfirm, setOpenConfirm] = useState(false);
-  const [confirmData, setConfirmData] = useState({ total: 0, boletos: {} });
+  //const [confirmData, setConfirmData] = useState({ total: 0, boletos: []});
+  const [confirmData, setConfirmData] = useState<{
+  total: number;
+  boletos: BoletoConfirmacion[];
+}>({
+
+  total: 0,
+  boletos: []
+});
   const [onConfirmCallback, setOnConfirmCallback] = useState<(() => void) | null>(null);
   const maxPorColor = (valor: number) => Math.floor(totalCompra / valor);
   const showConfirm = (data: any, onConfirm: () => void) => {
@@ -37,6 +57,8 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
     setOnConfirmCallback(() => onConfirm);
     setOpenConfirm(true);
   };
+
+
 
   const [selected, setSelected] = useState<Record<string, number>>({
     Negro: 0,
@@ -50,7 +72,7 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
   );
 
   const restante = totalCompra - totalSeleccionado;
-
+  const puedeComprarMas = restante >= precioMinimo;
   const addTicket = (id: string) => {
     if (!periodoActivo) return; // deshabilitar lógica si no hay periodo
     const ticket = ticketOptions.find(t => t.id === id)!;
@@ -70,6 +92,7 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
       [id]: prev[id] > 0 ? prev[id] - 1 : 0,
     }));
   };
+  const anySelected = Object.values(selected).some(count => count > 0);
 
   const guardar = () => {
     if (!periodoActivo) return;
@@ -84,8 +107,26 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
       return;
     }
 
+     const boletosParaConfirmar: BoletoConfirmacion[] =
+    Object.entries(selected)
+      .filter(([_, qty]) => qty > 0)
+      .flatMap(([id, qty]) => {
+        const ticket = ticketOptions.find(t => t.id === id)!;
+
+        return Array.from({ length: qty }).map(() => ({
+          idBoleto: ticket.idBoleto,
+          label: ticket.label,
+          color: ticket.id,
+          cantidad: qty,
+          precio: ticket.value,
+        }));
+      });
+
+      //console.log("Boletos confirmación:", boletosParaConfirmar);
+
     showConfirm(
-      { total: totalSeleccionado, boletos: selected },
+      { total: totalSeleccionado, 
+        boletos: boletosParaConfirmar },
       () => procesarGuardado()
     );
   };
@@ -106,8 +147,17 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
     try {
  
       const response = await asignarBoletos(user!.cardCode,periodo!.idPeriodo, boletosPayload);
-      alert("Boletos generados con éxito.");
-      navigate("/dashboard/boletos", { state: { boletos: response } });
+      //alert("Boletos generados con éxito.");
+
+      console.log("Validar Boletos", response)
+        setShowAlert(true);
+        setTimeout(() => {
+        setShowAlert(false);
+        navigate("/dashboard/boletos", { state: { boletos: response } });
+        }, 2500);
+
+
+      //navigate("/dashboard/boletos", { state: { boletos: response } });
     } catch (error) {
       console.error(error);
       alert("Error al guardar los boletos.");
@@ -116,17 +166,24 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
 
   // Cargando periodo
   if (loading) return <p className="text-center">Validando disponibilidad...</p>;
-  console.log("Validar Periodo:", periodo?.activo);
-  console.log("Validar PeriodoBoletos:", tieneBoletos);
-  console.log("Validar PeriodoBoletos:", vencido);
-  return (
+   return (
     <div className="max-w-xl mx-auto space-y-5">
-      <PeriodoAlert periodoActivo={periodoActivo} tieneBoletos={tieneBoletos} saldoVencido={vencido} />    
+      {showAlert && (
+        <Alert
+      variant="success"
+      title="Boletos generados correctamente"
+      message="Tus boletos fueron registrados con éxito. Serás redirigido al historial."
+    />
+  )}  
+
+      <PeriodoAlert periodoActivo={periodoActivo} tieneBoletos={tieneBoletos} saldoVencido={vencido} />
+     
+   
        {/* HEADER */}
-      <div className="text-center text-lg font-semibold">
-        Puntos Acumulados: <span className="text-blue-600">{(totalCompra ?? 0).toLocaleString()}</span>
+      <div className="text-center text-gray-700 dark:text-gray-300">
+        Puntos Acumulados del Mes Anterior: <span className="mb-4 text-gray-700 dark:text-gray-300">{(totalCompra ?? 0).toLocaleString()}</span>
         <br />
-        Puntos Restantes: <span className="text-green-600">{(restante).toLocaleString()}</span>
+        Puntos Restantes: <span className="mb-4 text-gray-700 dark:text-gray-300">{(tieneBoletos ? 0 : restante).toLocaleString()}</span>
       </div>
               {/* Mostrar máximos por color */}
     <div className="text-center text-sm text-gray-600">Puedes seleccionar hasta:<br/>
@@ -158,7 +215,7 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
       {/* Componente Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {ticketOptions.map(ticket => {
-          const disabled = !periodoActivo || tieneBoletos || vencido;
+          const disabled =( !periodoActivo || tieneBoletos) || vencido;
           //const disabled = !periodoActivo  || (ticket.value > restante && selected[ticket.id] === 0);
           return (
             <div
@@ -194,6 +251,13 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
           );
         })}
       </div>
+      {anySelected && puedeComprarMas && (
+          <div className="text-center text-sm text-yellow-700 bg-yellow-100 border border-yellow-300 rounded-lg p-3">
+            ⚠️ Aún puedes seleccionar más boletos.
+            <br />
+          Los puntos no utilizados <strong>no se acumulan</strong>.
+        </div>
+      )}
    
       <button
         onClick={guardar}
@@ -206,7 +270,6 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
       >
         {isSaving ? "Guardando..." : "Guardar Selección"}
       </button>
-
       <ConfirmModal
         open={openConfirm}
         onClose={() => setOpenConfirm(false)}
@@ -214,9 +277,12 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
           setOpenConfirm(false);
           onConfirmCallback?.();
         }}
+        restante={restante}
+        precioMinimo={precioMinimo}
         total={confirmData.total}
         boletos={confirmData.boletos}
       />
     </div>
+    
   );
 }
