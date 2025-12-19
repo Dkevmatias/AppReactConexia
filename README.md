@@ -1,3 +1,14 @@
+
+Proyecto frontend desarrollado en React para reutilizra los componentes y el template.
+
+## Base
+Este proyecto está basado en el template:
+- TailAdmin React - Free React Tailwind Admin Dashboard Template
+
+## Cambios realizados
+- Autenticación con JWT y cookies
+- Integración con API .NET
+
 # TailAdmin React - Free React Tailwind Admin Dashboard Template
 
 TailAdmin is a free and open-source admin dashboard template built on **React and Tailwind CSS**, providing developers
