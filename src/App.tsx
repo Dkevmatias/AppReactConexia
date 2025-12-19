@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
 import SignIn from "./pages/AuthPages/SignIn";
 import SignUp from "./pages/AuthPages/SignUp";
+/*
 import NotFound from "./pages/OtherPage/NotFound";
 import UserProfiles from "./pages/UserProfiles";
 import Videos from "./pages/UiElements/Videos";
@@ -15,18 +16,21 @@ import Calendar from "./pages/Calendar";
 import BasicTables from "./pages/Tables/BasicTables";
 import FormElements from "./pages/Forms/FormElements";
 import Blank from "./pages/Blank";
+*/
 import AppLayout from "./layout/AppLayout";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import Evento from "./pages/Dashboard/Evento";
-import { AuthProvider } from "./context/AuthContext"; //  asegúrate de que la ruta sea correcta
-//import ProtectedRoute from "./routes/ProtectedRoute";
 import Boletos from "./pages/Dashboard/Boletos";
 import Reportes from "./pages/Dashboard/Reportes";
 import ProtectedRoute from "./routes/ProtectedRoute";
+import ActivarCuenta from "./pages/ClientsPages/ActivarCuenta";
+
+
+
 
 export default function App() {
   return (
-    <AuthProvider> {/* Aquí envolvemos toda la app para el uso de Provider */}
+    
       <Router>
         <ScrollToTop />
         <Routes>
@@ -34,6 +38,9 @@ export default function App() {
           <Route index path="/" element={<SignIn />} />          
           <Route path="/signin" element={<SignIn />} />
           <Route path="/signup" element={<SignUp />} />
+
+            {/* Ruta de activación */}
+        <Route path="/activar-cuenta" element={<ActivarCuenta />} />
 
           {/* === Protected Dashboard Layout === */}
           <Route
@@ -76,6 +83,6 @@ export default function App() {
           */}
         </Routes>
       </Router>
-    </AuthProvider>
+    
   );
 }

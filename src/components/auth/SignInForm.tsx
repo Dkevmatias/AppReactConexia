@@ -1,72 +1,39 @@
-
-import { FormEvent, useState } from "react";
-import {  useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
-import { getPeriodoEvaluar, getSaldoClientes, getPersonas, getVentasCLientes,  login as loginService} from "../../services/authService";
-import { useAuth } from "../../context/AuthContext";
-import { useVenta } from "../../context/VentaContext";
-import { useVencido } from "../../context/SaldoContext";
-
+import { useAuth } from "../../context/useAuth";
+import { loginService } from "../../services/authService";
 
 export default function SignInForm() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [isChecked, setIsChecked] = useState(false);
-  const [username, setUsername] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [loading, setLoading] = useState(false);
-  const { setVentaTotal } = useVenta();
-  const {setSaldoVencido} = useVencido();
-  const navigate = useNavigate();
   const { login } = useAuth();
-  
+  const navigate = useNavigate();
+  const [isChecked, setIsChecked] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
+
     try {
-      const data = await  loginService(username, password);
-      if (data.isSuccess) {
-      login({
-        role: data.user.role,
-        idPersona: data.user.idPersona,
-        cardCode: data.user.cardCode,
-        fullname: data.user.fullname,
-      }); 
-    }
-      //console.log("Login exitoso:", data);
-      const personas = await getPersonas(data.user.idPersona);      
-      const datacardcode = (Array.isArray(personas) ? personas : [])
-                            .filter(p => p?.cardCode)
-                            .map(p => p.cardCode)
-                            .join(",");
-    
-  // Llamar a otro endpoint con esos cardCodes
-  const responsePeriodo = await getPeriodoEvaluar();
-  console.log("Periodo evaluar",responsePeriodo);  
-  const responseVentas = await getVentasCLientes( responsePeriodo.fechaInicio,responsePeriodo.fechaFin, datacardcode);
-  const responsesaldo= await getSaldoClientes(datacardcode);   
-    console.log("Saldo Clientes",responsesaldo.vencido);   
-    console.log("Datos finales:", responseVentas);
-     const _ventatotal = responseVentas?.[0]?.totalVentas ?? 0;
-     //const _ventatotal = 789000;
-     //Convertir las Ventas a Puntos
-     const puntosAcumulados =Math.round((_ventatotal/1.16)/1000.00); 
-     //const puntosAcumulados =Math.round(_ventatotal/1.16); 
-         setVentaTotal(puntosAcumulados);
-         setSaldoVencido(responsesaldo.vencido);
-        navigate("/dashboard/evento");
-    } catch (error) {
-      console.error("Error en login:", error);
-      alert("Credenciales incorrectas o error en servidor");
+      const { user } = await loginService(email, password);
+      login(user);
+      navigate("/dashboard/evento");
+    } catch {
+      setError("Credenciales incorrectas");
     } finally {
       setLoading(false);
     }
   };
-
+ 
   return (
     <div className="flex flex-col flex-1">
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
@@ -80,21 +47,21 @@ export default function SignInForm() {
             <div className="space-y-6">
               <div>
                 <Label>
-                  Usuario <span className="text-error-500">*</span>{" "}
+                  Usuario <span className="text-error-500">*</span>
                 </Label>
                 <Input
                   placeholder="info@gmail.com"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               <div>
                 <Label>
-                  Contraseña <span className="text-error-500">*</span>{" "}
+                  Contraseña <span className="text-error-500">*</span>
                 </Label>
                 <div className="relative">
                   <Input
-                    type={showPassword ? "text" : "password"}
+                    type={showPassword ? "text" : "password"} // ✅ CORREGIDO
                     placeholder="Ingresa tu contraseña"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -103,7 +70,7 @@ export default function SignInForm() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
                   >
-                    {showPassword ? (
+                    {showPassword ? ( // ✅ CORREGIDO
                       <EyeIcon className="fill-gray-500 dark:fill-gray-400 size-5" />
                     ) : (
                       <EyeCloseIcon className="fill-gray-500 dark:fill-gray-400 size-5" />
@@ -111,6 +78,9 @@ export default function SignInForm() {
                   </span>
                 </div>
               </div>
+              {error && (
+                <div className="text-sm text-red-600">{error}</div>
+              )}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <Checkbox checked={isChecked} onChange={setIsChecked} />
