@@ -5,34 +5,30 @@ import Confetti from "react-confetti";
 import PageMeta from "../../components/common/PageMeta";
 import TableBoletos from "../../components/evento/TableBoletos";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 import { getBoletosPorUsuario } from "../../services/boletoServices";
 
 
 
 
 export default function Boletos() {
+   //No debe de haber un if antes de un hook para no causar errores
   const { user } = useAuth();
   const location = useLocation();
-  //No debe de haber un if antes de un hook para no causar errores
-  //Hooks
   const [boletos, setBoletos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [confeti, setConfeti] = useState(false); 
   
-
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
     height: window.innerHeight,
   });
- //Boletos recien creados
+//Boleto Recien Creados
   useEffect(() => {
     if(location.state?.boletos)
     {setBoletos( location.state.boletos);}
   }, [location.state]);
-
-
-//Boletos desde la BD
+//BD Boletos
  useEffect(() => {
    if (!user?.cardCode) return console.log("Usuario login:", user?.cardCode);
 

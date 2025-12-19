@@ -78,7 +78,7 @@ export const getVentasCLientes = async (fechaInicio: string,fechaFin: string,cli
   };*/
 
   import { api } from "./apiServices";
-
+/*
 export interface User {
   idPersona: number;
   role: number;
@@ -111,7 +111,43 @@ export const checkAuthService = async () => {
 export const logout = async () => {
   await api.post("Acceso/Logout", {}, { withCredentials: true });
 };
+*/
+export interface User {
+  idPersona: number;
+  role: number;
+  cardCode: string;
+  fullname: string;
+}
 
+export interface LoginResponse {
+  isSuccess: boolean;
+  user: User;
+}
+
+// LOGIN
+export const loginService = async (email: string, password: string): Promise<LoginResponse> => {
+  const res = await api.post<LoginResponse>(
+    "Acceso/Login",
+    { email, password },
+    { withCredentials: true }
+  );
+  return res.data;
+};
+
+// CHECK AUTH (lee cookie HttpOnly)
+export const checkAuthService = async () => {
+  const res = await api.get("Acceso/checkAuth", {
+    validateStatus: status => status === 200 || status === 401
+  });
+  return res.data;
+};
+
+
+
+// LOGOUT
+export const logout = async () => {
+  await api.post("Acceso/Logout", {}, { withCredentials: true });
+};
 export const getPeriodoEvaluar = async () => {
   const response = await api.get(`PeriodoBoletos/GetPeriodoEvaluar`);
   //console.log("datos",response.data)
@@ -120,6 +156,7 @@ export const getPeriodoEvaluar = async () => {
 
 export const getPersonas = async (idpersona: number) => {
   const response = await api.get(`Personas/GetPersonasRelacion/${idpersona}`);
+  // console.log("Personas",response);
   return response.data;
 };
 

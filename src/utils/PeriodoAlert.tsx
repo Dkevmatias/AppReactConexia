@@ -31,10 +31,9 @@ export default function PeriodoAlert({ periodoActivo, tieneBoletos, saldoVencido
         Puedes Contactar a tu asesor para cualquier aclaración.
       </div>
     );
-
   }
 
-  //Periodo activo y NO tiene boletos → todo OK
+  //Periodo activo y No tiene boletos
   return (
     <div className="text-center p-4 bg-green-100 border border-green-300 text-green-700 rounded-xl">
       Puede seleccionar sus boletos para este periodo.
