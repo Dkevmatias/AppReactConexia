@@ -16,7 +16,7 @@ export default defineConfig({
   basicSsl(), // Solo para desarrollo
   ],
   server: {
-    port: 5173,
+    //port: 5173,
    /*allowedHosts: [
       'laser-lovely-kits-textiles.trycloudflare.com'
     ]*/
