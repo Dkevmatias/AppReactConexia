@@ -23,7 +23,7 @@ export default function ConfirmModal({
   open,
   onClose,
   onConfirm,
-  total,
+  //total,
   boletos,
   restante,
   precioMinimo
@@ -57,8 +57,8 @@ export default function ConfirmModal({
 
   
 
-  const listaBoletos = Array.isArray(boletos) ? boletos : [];
-  console.log("listaBoletos en modal:", listaBoletos);
+  //const listaBoletos = Array.isArray(boletos) ? boletos : [];
+  //console.log("listaBoletos en modal:", listaBoletos);
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
@@ -68,23 +68,9 @@ export default function ConfirmModal({
         <h2 className="text-2xl font-bold text-center text-gray-800">
           Confirmar selección
         </h2>
-
-        {/* CONTENIDO 
-        <div className="mt-4 text-sm text-gray-700 space-y-2">
-          <p>
-            Total seleccionado:
-            <span className="font-semibold text-blue-600">
-              ${total.toLocaleString()}
-            </span>
-          </p>
-
-          <div className="bg-gray-100 p-3 rounded-lg text-xs overflow-auto">
-            <pre>{JSON.stringify(boletos, null, 2)}</pre>
-          </div>
-        </div>*/}
         {boletosAgrupados.length > 0 ? (
       boletosAgrupados.map((boleto) => (
-      <div key={boleto.idBoleto} className={`border rounded-lg p-3 
+      <div key={boleto.idBoleto} className={`border rounded-lg p-3 mb-3
         ${colorClasses[boleto.color] ?? "bg-white text-black"}
       `}>      
       <div className="font-bold">{boleto.label}</div>      

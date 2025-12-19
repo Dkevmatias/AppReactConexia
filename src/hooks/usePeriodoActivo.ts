@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../services/apiServices";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/useAuth";
 
 export function usePeriodoActivo() {
   const [periodo, setPeriodo] = useState<{

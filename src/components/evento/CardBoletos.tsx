@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../context/useAuth";
 import { asignarBoletos } from "../../services/boletoServices";
 import ConfirmModal from "../../utils/ConfirmModal";
 import { useNavigate } from "react-router";
@@ -34,11 +34,11 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
-
-  const { periodo,periodoActivo: periodoActivo,tieneBoletos, loading } = usePeriodoActivo();
+  const { periodo,periodoActivo: periodoActivo,tieneBoletos, loading } = usePeriodoActivo();  
   const precioMinimo = Math.min(...ticketOptions.map(t => t.value));
   
-  
+
+  //console.log('vencido componente:', vencido, 'tipo:', typeof vencido);
 
   const [openConfirm, setOpenConfirm] = useState(false);
   //const [confirmData, setConfirmData] = useState({ total: 0, boletos: []});
@@ -46,6 +46,7 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
   total: number;
   boletos: BoletoConfirmacion[];
 }>({
+
   total: 0,
   boletos: []
 });
@@ -57,7 +58,7 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
     setOpenConfirm(true);
   };
 
-  //console.log("Validar Saldo en componente",vencido);
+
 
   const [selected, setSelected] = useState<Record<string, number>>({
     Negro: 0,
@@ -91,6 +92,7 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
       [id]: prev[id] > 0 ? prev[id] - 1 : 0,
     }));
   };
+  const anySelected = Object.values(selected).some(count => count > 0);
 
   const guardar = () => {
     if (!periodoActivo) return;
@@ -178,10 +180,10 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
      
    
        {/* HEADER */}
-      <div className="text-center text-lg font-semibold">
-        Puntos Acumulados: <span className="text-blue-600">{(totalCompra ?? 0).toLocaleString()}</span>
+      <div className="text-center text-gray-700 dark:text-gray-300">
+        Puntos Acumulados del Mes Anterior: <span className="mb-4 text-gray-700 dark:text-gray-300">{(totalCompra ?? 0).toLocaleString()}</span>
         <br />
-        Puntos Restantes: <span className="text-green-600">{(restante).toLocaleString()}</span>
+        Puntos Restantes: <span className="mb-4 text-gray-700 dark:text-gray-300">{(tieneBoletos ? 0 : restante).toLocaleString()}</span>
       </div>
               {/* Mostrar máximos por color */}
     <div className="text-center text-sm text-gray-600">Puedes seleccionar hasta:<br/>
@@ -249,13 +251,13 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
           );
         })}
       </div>
-      {puedeComprarMas && (
+      {anySelected && puedeComprarMas && (
           <div className="text-center text-sm text-yellow-700 bg-yellow-100 border border-yellow-300 rounded-lg p-3">
             ⚠️ Aún puedes seleccionar más boletos.
             <br />
           Los puntos no utilizados <strong>no se acumulan</strong>.
         </div>
-)}
+      )}
    
       <button
         onClick={guardar}
