@@ -10,7 +10,7 @@ interface VentasResponse {
 }
 
 export const login = async (email: string, password: string): Promise<VentasResponse> => {
-  const response = await axios.post<VentasResponse>(`${API_URL}GetVentas/Ventas`, { email, password });
+  const response = await axios.post<VentasResponse>(`${API_URL}/api/GetVentas/Ventas`, { email, password });
    if (response.data.token) {
     localStorage.setItem("token", response.data.token);
   }

@@ -6,6 +6,7 @@ import { useVenta } from "../../context/VentaContext";
 import { useVencido } from "../../context/SaldoContext";
 import { useAuth } from "../../context/useAuth";
 import { getPersonas,getVentasCLientes,getSaldoClientes,getPeriodoEvaluar } from "../../services/authService";
+import { data } from "react-router";
 
 const formatDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -17,7 +18,7 @@ interface Persona {
 
 export default function Evento() {
   const { user } = useAuth();
-  const { ventaTotal, ventaMesActual, setVentaTotal, setVentaMesActual } = useVenta();
+  const { ventaTotal, ventaMesActual,mesAnterior, setMesAnterior, setVentaTotal, setVentaMesActual } = useVenta();
   const {saldoVencido, setSaldoVencido } = useVencido();
   const [confeti, setConfeti] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -26,15 +27,7 @@ export default function Evento() {
     height: window.innerHeight,
   });
 
-  //Mes anterior
-  const hoy = new Date();
-  const fechaMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
-  const nombreMeses = [
-    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-  ];
-  const mesAnterior = nombreMeses[fechaMesAnterior.getMonth()];
-
+ 
   //Cargar datos protegidos
   useEffect(() => {
     if (!user) return;
@@ -47,27 +40,46 @@ export default function Evento() {
           .filter(p => p?.cardCode)
           .map(p => p.cardCode)
           .join(",");
-
-
+        
 
     const periodo = await getPeriodoEvaluar();
 
-    const ventasPeriodo = await getVentasCLientes(periodo.fechaInicio,periodo.fechaFin,cardCodes);
-   
+    const Mes = new Date(periodo.fechaFin);
+    const fechaMesAnterior = new Date(Mes.getFullYear(), Mes.getMonth() - 1, 1);
+    const nombreMeses = [
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const mesAnterior = nombreMeses[fechaMesAnterior.getMonth()];
+    setMesAnterior(mesAnterior);
 
         // Mes actual
         const inicioMesActual = new Date(periodo.fechaFin);
         inicioMesActual.setDate(1);
         inicioMesActual.setMonth(inicioMesActual.getMonth() + 1);
-
         const finMesActual = new Date(inicioMesActual);
         finMesActual.setMonth(finMesActual.getMonth() + 1);
         finMesActual.setDate(0);
+      
+        const fiperiodo= new Date(periodo.fechaInicio)
+        fiperiodo.setFullYear(fiperiodo.getFullYear() -1);
+        const ffperiodo= new Date(periodo.fechaFin)
+        ffperiodo.setFullYear(ffperiodo.getFullYear() -1);
 
-        const ventasMesActual = await getVentasCLientes(formatDate(inicioMesActual),formatDate(finMesActual),cardCodes);
+        //año anterior para pruebas
+        const fechaIañoanterior = new Date(inicioMesActual);
+        fechaIañoanterior.setFullYear(inicioMesActual.getFullYear() - 1);
+        const fechaFañoanterior = new Date(finMesActual);
+        fechaFañoanterior.setFullYear(finMesActual.getFullYear() - 1);
+
+        //const ventasPeriodo = await getVentasCLientes(periodo.fechaInicio,periodo.fechaFin,cardCodes);
+        const ventasPeriodo = await getVentasCLientes(formatDate(fiperiodo),formatDate(ffperiodo), cardCodes); 
+             
+        //const ventasMesActual = await getVentasCLientes(formatDate(inicioMesActual),formatDate(finMesActual),cardCodes);
+        const ventasMesActual = await getVentasCLientes(formatDate(fechaIañoanterior),formatDate(fechaFañoanterior), cardCodes); 
         const saldo = await getSaldoClientes(cardCodes);     
-        const totalVentas = ventasPeriodo?.[0]?.totalVentas ?? 0;
-        const totalMesActual = ventasMesActual?.[0]?.totalVentas ?? 0;      
+        //const totalVentas = ventasPeriodo?.[0]?.totalVentas ?? 0;
+        const totalVentas = 223425;
+         const totalMesActual = ventasMesActual?.[0]?.totalVentas ?? 0;     
     
         setVentaTotal(Math.round((totalVentas / 1.16) / 1000));
         setVentaMesActual(Math.round((totalMesActual / 1.16) / 1000));
@@ -140,7 +152,7 @@ export default function Evento() {
           </p>
 
           <p className="mb-4 text-gray-700 dark:text-gray-300">
-            Mes a redimir: <strong>{mesAnterior} {fechaMesAnterior.getFullYear()}</strong>
+            Mes a redimir: <strong>{mesAnterior}</strong>
           </p>
         </div>
         

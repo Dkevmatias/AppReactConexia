@@ -13,17 +13,16 @@ export default defineConfig(({ mode }) => ({
         namedExport: "ReactComponent",
       },
     }),
-    // HTTPS solo en desarrollo
-    mode === "development" && basicSsl(),
-  ].filter(Boolean),
+    //mode === "development" && basicSsl(),
+  ],//.filter(Boolean),
 
-  // Configuración solo para desarrollo
   server: {
-    // port: 5173,
-    // allowedHosts: ['tu-host.trycloudflare.com']
+ host: "0.0.0.0",   // 🔥 CLAVE
+    port: 5173,
+    strictPort: true,
+    allowedHosts: [".trycloudflare.com"],
   },
 
-  // Configuración de build para producción
   build: {
     sourcemap: false,
     minify: "terser",
@@ -31,6 +30,13 @@ export default defineConfig(({ mode }) => ({
       compress: {
         drop_console: true,
         drop_debugger: true,
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+        },
       },
     },
   },
