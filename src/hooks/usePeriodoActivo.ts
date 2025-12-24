@@ -22,7 +22,7 @@ useEffect(() => {
   }
     const fetchPeriodo = async () => {
       try {
-        const response = await api.get("/PeriodoBoletos/GetPeriodoActivo");
+        const response = await api.get("/api/PeriodoBoletos/GetPeriodoActivo");
         const periodoData = response.data ?? null;
 
         // Si NO hay periodo
@@ -33,13 +33,13 @@ useEffect(() => {
           return;
         }
 
-        // Sí hay periodo (DTO)
+        // Sí hay periodo
         setPeriodo(periodoData);
         setPeriodoActivo(periodoData.activo === true); // <-- este sí es boolean
 
         // Obtener boletos en ese periodo
         const responseBoletos = await api.get(
-          `Boletos/GetBoletosPeriodo/${user?.cardCode}/${response.data.idPeriodo}`
+          `/api/Boletos/GetBoletosPeriodo/${user?.cardCode}/${response.data.idPeriodo}`
         );
 
         setTieneBoletos(responseBoletos.data.total > 0);

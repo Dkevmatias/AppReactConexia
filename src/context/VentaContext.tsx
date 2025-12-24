@@ -3,6 +3,8 @@ import { createContext, useContext, useState } from "react";
 type VentaContextType = {
   ventaTotal: number | null;
   ventaMesActual: number  | null;
+  mesAnterior: string | null;
+  setMesAnterior: (value: string | null) => void;
   setVentaTotal: (value: number | null) => void;
   setVentaMesActual:(value: number | null) => void;
 };
@@ -12,9 +14,10 @@ const VentaContext = createContext<VentaContextType | undefined>(undefined);
 export function VentaProvider({ children }: { children: React.ReactNode }) {
   const [ventaTotal, setVentaTotal] = useState<number | null>(null);
   const [ventaMesActual, setVentaMesActual] = useState<number | null>(null);
+  const [mesAnterior, setMesAnterior] = useState<string | null>(null);
 
   return (
-    <VentaContext.Provider value={{ ventaTotal, setVentaTotal, ventaMesActual, setVentaMesActual }}>
+    <VentaContext.Provider value={{ ventaTotal, setVentaTotal, ventaMesActual, setVentaMesActual, mesAnterior, setMesAnterior }}>
       {children}
     </VentaContext.Provider>
   );

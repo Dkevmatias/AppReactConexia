@@ -7,7 +7,7 @@ let failedQueue: any[] = [];
 export const api: AxiosInstance = axios.create({
   baseURL: API_URL,
   withCredentials: true, // Necesario para enviar cookie HttpOnly
-   timeout: 15000, 
+  timeout: 15000, 
   validateStatus: () => true 
 });
 

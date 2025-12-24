@@ -13,18 +13,18 @@ export const asignarBoletos = async (cardCode: string,idPeriodo: number, boletos
     idPeriodo,
     boletos,
   };  
-  const response = await api.post("Boletos/Asignar", payload);
+  const response = await api.post("/api/Boletos/Asignar", payload);
   return response.data.boletos;
 };
 
 
 export const getBoletosPorUsuario = async (cardCode: string,) => {
-  const response = await api.get(`Boletos/GetBoletos/${cardCode}`);
+  const response = await api.get(`/api/Boletos/GetBoletos/${cardCode}`);
   return response.data.boletos;
    }
 
    export const getBoletosPeriodo = async (cardCode: string, idPeriodo: number) => {
-  const response = await api.get(`Boletos/GetBoletos/${cardCode}/${idPeriodo}`);
+  const response = await api.get(`/api/Boletos/GetBoletos/${cardCode}/${idPeriodo}`);
   return response.data.boletos;
    }
 
