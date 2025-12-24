@@ -15,7 +15,7 @@ export interface ActivarCuentaRequest {
 export const validarActivacionToken = async (
   token: string
 ): Promise<ValidarTokenResponse> => {
-  const response = await api.post("/Acceso/ValidaActivacionToken", { token });
+  const response = await api.post("/api/Acceso/ValidaActivacionToken", { token });
   return response.data;
 };
 

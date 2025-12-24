@@ -25,8 +25,8 @@ api.interceptors.response.use(
 
     // No interceptar refresh ni login
     if (
-      originalRequest.url?.includes("/Acceso/RefreshToken") ||
-      originalRequest.url?.includes("/Acceso/Login")
+      originalRequest.url?.includes("/api/Acceso/RefreshToken") ||
+      originalRequest.url?.includes("/api/Acceso/Login")
     ) {
       return Promise.reject(error);
     }
@@ -43,7 +43,7 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await api.post("/Acceso/RefreshToken", {}, { withCredentials: true });
+        await api.post("/api/Acceso/RefreshToken", {}, { withCredentials: true });
         processQueue();
         return api(originalRequest);
       } catch (refreshError) {
