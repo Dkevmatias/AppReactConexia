@@ -6,8 +6,8 @@ export default function SignIn() {
   return (
     <>
       <PageMeta
-        title="React.js SignIn Dashboard | Codialub"
-        description="This React  Tailwind CSS Admin Dashboard Template"
+        title="Portal Codialub"
+        description="Portal de acceso para clientes de Codialub"
       />
       <AuthLayout>
         <SignInForm />
