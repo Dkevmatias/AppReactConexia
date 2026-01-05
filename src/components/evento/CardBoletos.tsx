@@ -23,12 +23,12 @@ export interface BoletoConfirmacion {
 }
 
 const ticketOptions: TicketOption[] = [
-  { id: "Amarillo", label: "Boletos Camionetas", value: 50, color: "bg-yellow-400 text-black", idBoleto: 1 },
-  { id: "Negro", label: "Boletos Motos", value: 25, color:"bg-black text-white" , idBoleto: 2 },
-  { id: "Gris", label: "Boleto Computadoras", value: 10, color: "bg-gray-400 text-black", idBoleto: 3 },
+  { id: "Rojo", label: "Boletos Camionetas", value: 50, color: "bg-[var(--color-red-light)] text-black", idBoleto: 1 },
+  { id: "Azul", label: "Boletos Motos", value: 25, color: "bg-[var(--color-blue-light)] text-black", idBoleto: 2 },
+  { id: "Gris", label: "Boleto Computadoras", value: 10, color: "bg-[var(--color-gray-light)] text-black", idBoleto: 3 },
 ];
 
-export default function TicketSelector({ totalCompra,vencido }: { totalCompra: number, vencido: boolean }) {
+export default function TicketSelector({ totalCompra,vencido, mesRedencion }: { totalCompra: number, vencido: boolean, mesRedencion: string }) {
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -61,8 +61,8 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
 
 
   const [selected, setSelected] = useState<Record<string, number>>({
-    Negro: 0,
-    Amarillo: 0,
+    Rojo: 0,
+    Azul: 0,
     Gris: 0,
   });
 
@@ -181,7 +181,7 @@ export default function TicketSelector({ totalCompra,vencido }: { totalCompra: n
    
        {/* HEADER */}
       <div className="text-center text-gray-700 dark:text-gray-300">
-        Puntos Acumulados del Mes Anterior: <span className="mb-4 text-gray-700 dark:text-gray-300">{(totalCompra ?? 0).toLocaleString()}</span>
+        Puntos Acumulados del Mes de {mesRedencion}:<span className="mb-4 text-gray-700 dark:text-gray-300">{(totalCompra ?? 0).toLocaleString()}</span>
         <br />
         Puntos Restantes: <span className="mb-4 text-gray-700 dark:text-gray-300">{(tieneBoletos ? 0 : restante).toLocaleString()}</span>
       </div>

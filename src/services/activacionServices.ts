@@ -2,12 +2,14 @@ import { api } from "./apiServices";
 
 export interface ValidarTokenResponse {
   isValid: boolean;
-  email: string;
+  cardCode: string;
+  nombre: string;
   message: string;
 }
 
 export interface ActivarCuentaRequest {
   token: string;
+  email: string;
   newPassword: string;
   confirmPassword: string;
 }
@@ -20,6 +22,6 @@ export const validarActivacionToken = async (
 };
 
 export const activarCuenta = async (data: ActivarCuentaRequest) => {
-  const response = await api.post("/Acceso/ActivarCuenta", data);
+  const response = await api.post("/api/Acceso/ActivarCuenta", data);
   return response.data;
 };

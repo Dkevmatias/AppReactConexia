@@ -24,35 +24,60 @@ import Boletos from "./pages/Dashboard/Boletos";
 import Reportes from "./pages/Dashboard/Reportes";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import ActivarCuenta from "./pages/ClientsPages/ActivarCuenta";
+import { useAuth } from "./context/useAuth";
+import { Navigate } from "react-router-dom";
 
 
 
 
 export default function App() {
-  return (
-    
-      <Router>
-        <ScrollToTop />
-        <Routes>
-          {/* Auth Pages */}
-          <Route index path="/" element={<SignIn />} />          
-          <Route path="/signin" element={<SignIn />} />
-          <Route path="/signup" element={<SignUp />} />
+  const { user, loading } = useAuth();
 
-            {/* Ruta de activación */}
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        Cargando...
+      </div>
+    );
+  }
+
+  return (
+    <Router>
+      <ScrollToTop />
+      <Routes>
+        {/* Root */}
+        <Route
+          path="/"
+          element={
+            user ? (
+              <Navigate to="/dashboard/Evento" replace />
+            ) : (
+              <Navigate to="/signin" replace />
+            )
+          }
+        />
+
+        {/* Auth */}
+        <Route
+          path="/signin"
+          element={user ? <Navigate to="/dashboard/Evento" replace /> : <SignIn />}
+        />
+        <Route path="/signup" element={<SignUp />} />
+
+        {/* Activación */}
         <Route path="/activar-cuenta" element={<ActivarCuenta />} />
 
-          {/* === Protected Dashboard Layout === */}
-          <Route
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/dashboard/Evento" element={<Evento />} />
-            <Route path="/dashboard/Boletos" element={<Boletos />} />
-            <Route path="/dashboard/Reportes" element={<Reportes />} />
+        {/* Protected */}
+        <Route
+          element={
+            <ProtectedRoute>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/dashboard/Evento" element={<Evento />} />
+          <Route path="/dashboard/Boletos" element={<Boletos />} />
+          <Route path="/dashboard/Reportes" element={<Reportes />} />
           {/*
             <Route path="/profile" element={<UserProfiles />} />
             <Route path="/calendar" element={<Calendar />} />

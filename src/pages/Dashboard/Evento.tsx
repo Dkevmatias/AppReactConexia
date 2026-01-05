@@ -18,7 +18,7 @@ interface Persona {
 
 export default function Evento() {
   const { user } = useAuth();
-  const { ventaTotal, ventaMesActual,mesAnterior, setMesAnterior, setVentaTotal, setVentaMesActual } = useVenta();
+  const { ventaTotal, ventaMesActual,mesAnterior,mesActual, setMesAnterior, setVentaTotal, setVentaMesActual,setmesActual } = useVenta();
   const {saldoVencido, setSaldoVencido } = useVencido();
   const [confeti, setConfeti] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -50,8 +50,10 @@ export default function Evento() {
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     const mesAnterior = nombreMeses[fechaMesAnterior.getMonth()];
+    const mesActual= nombreMeses[Mes.getMonth()];
+    setmesActual(mesActual);  
     setMesAnterior(mesAnterior);
-
+        
         // Mes actual
         const inicioMesActual = new Date(periodo.fechaFin);
         inicioMesActual.setDate(1);
@@ -147,17 +149,14 @@ export default function Evento() {
             Por cada $1000 antes de impuestos recibes 1 punto.
           </p>
           <p className="mb-4 text-gray-700 dark:text-gray-300">
-          Monto del Mes Actual:{" "}
+          Monto del Mes en Curso {mesActual}:
           <strong>{ventaMesActual}</strong>
           </p>
-
-          <p className="mb-4 text-gray-700 dark:text-gray-300">
-            Mes a redimir: <strong>{mesAnterior}</strong>
-          </p>
-        </div>
+       </div>
         
                 <BoletosCards totalCompra={ventaTotal ?? 0 }
-                            vencido={saldoVencido ?? false } />
+                            vencido={saldoVencido ?? false }
+                            mesRedencion={mesAnterior ?? ""} />
 
       </div>
     </div>

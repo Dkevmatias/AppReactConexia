@@ -85,18 +85,23 @@ const AppHeader: React.FC = () => {
             {/* Cross Icon */}
           </button>
 
-          <Link to="/" className="lg:hidden">
-            <img
-              className="dark:hidden"
-              src="./images/logo/logocodlub.svg"
-              alt="Logo"
-            />
-            <img
-              className="hidden dark:block"
-              src="./images/logo/logocodlub.svg"
-              alt="Logo"
-            />
-          </Link>
+   <button
+  type="button"
+  onClick={() => window.location.reload()}
+  className="lg:hidden"
+>
+  <img
+    className="dark:hidden"
+    src="./images/logo/logocodlub.svg"
+    alt="Logo"
+  />
+  <img
+    className="hidden dark:block"
+    src="./images/logo/logocodlub.svg"
+    alt="Logo"
+  />
+</button>
+
 
           <button
             onClick={toggleApplicationMenu}
