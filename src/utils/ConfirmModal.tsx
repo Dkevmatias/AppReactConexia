@@ -31,9 +31,9 @@ export default function ConfirmModal({
   if (!open) return null;
   
   const colorClasses: Record<string, string> = {
-  Negro: "bg-black text-white border-black",
-  Amarillo: "bg-yellow-400 text-black border-yellow-500",
-  Gris: "bg-gray-400 text-black border-gray-500"
+  Rojo: "bg-[var(--color-red-light)] text-black border-white-500",
+  Azul: "bg-[var(--color-blue-light)] text-black border-white-500",
+  Gris: "bg-[var(--color-gray-light)] text-black border-white-500"
 };
   const boletosAgrupados: BoletoAgrupado[] = Object.values(
   boletos.reduce<Record<number, BoletoAgrupado>>((acc, boleto) => {
@@ -74,7 +74,7 @@ export default function ConfirmModal({
         ${colorClasses[boleto.color] ?? "bg-white text-black"}
       `}>      
       <div className="font-bold">{boleto.label}</div>      
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-black-500">
         Cantidad: {boleto.cantidad}
       </div>      
     </div>

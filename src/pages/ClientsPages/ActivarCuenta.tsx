@@ -18,15 +18,34 @@ export default function ActivarCuenta() {
   // Estados de validación
   const [loading, setLoading] = useState(true);
   const [tokenValid, setTokenValid] = useState(false);
-  const [email, setEmail] = useState("");
+  const [cardCode, setCardCode] = useState("");
   const [error, setError] = useState("");
 
   // Estados del formulario
+  const [email, setEmail] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [activating, setActivating] = useState(false);
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+
+
+const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const value = e.target.value;
+  setEmail(value);
+
+  if (!emailRegex.test(value)) {
+    setEmailError("Correo electrónico no válido");
+  } else {
+    setEmailError("");
+  }
+};
+
+  
 
   // Validación de fortaleza de contraseña
   const [passwordStrength, setPasswordStrength] = useState({
@@ -52,7 +71,8 @@ export default function ActivarCuenta() {
 
         if (result.isValid) {
           setTokenValid(true);
-          setEmail(result.email);
+          setCardCode(result.cardCode);
+          setNombre(result.nombre);
         } else {
           setError(result.message);
         }
@@ -84,6 +104,10 @@ export default function ActivarCuenta() {
     e.preventDefault();
 
     // Validaciones
+    if (!email) {
+      setError("El correo electrónico es obligatorio");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setError("Las contraseñas no coinciden");
       return;
@@ -106,7 +130,9 @@ export default function ActivarCuenta() {
       await activarCuenta({
         token: token!,
         newPassword,
-        confirmPassword,
+         confirmPassword,
+        email
+       
       });
 
       // Éxito - Mostrar modal o mensaje
@@ -209,7 +235,7 @@ export default function ActivarCuenta() {
             </div>
             <h1 className="text-2xl font-bold text-white">Activa tu Cuenta</h1>
             <p className="mt-2 text-sm text-green-100">
-              Configura tu contraseña para comenzar
+              Configura tu Correo y Contraseña para comenzar
             </p>
           </div>
 
@@ -219,14 +245,32 @@ export default function ActivarCuenta() {
             <div className="p-4 mb-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Activando cuenta para:
+              </p>              
+              <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                {nombre}                
               </p>
               <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                {email}
-              </p>
+                Código de Cliente: {cardCode}                
+              </p>             
             </div>
 
-            {/* Formulario */}
+            {/* Inicio de Formulario */}
             <form onSubmit={handleSubmit} className="space-y-6">
+              <div>
+                <Label>
+                  Correo Electrónico <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  type="email"
+                  placeholder="ejemplo@correo.com"
+                  value={email}
+                  onChange={handleEmailChange}
+                  className={emailError ? "border-red-500" : ""}
+                />
+                 {emailError && (
+                <p className="text-red-500 text-sm mt-1">{emailError}</p>
+                )}  
+              </div>
               {/* Nueva Contraseña */}
               <div>
                 <Label>
@@ -405,44 +449,58 @@ export default function ActivarCuenta() {
               )}
 
               {/* Botón de activación */}
-              <button
-                type="submit"
-                className="w-full"
-                disabled={
-                  activating ||
-                  !newPassword ||
-                  !confirmPassword ||
-                  newPassword !== confirmPassword ||
-                  newPassword.length < 8
-                }
-              >
-                {activating ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg
-                      className="w-5 h-5 animate-spin"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Activando cuenta...
-                  </span>
-                ) : (
-                  "✅ Activar mi Cuenta"
-                )}
-              </button>
+             <button
+  type="submit"
+  className="
+    w-full
+    flex items-center justify-center
+    rounded-lg
+    bg-sky-500
+    px-4 py-3
+    font-semibold text-white
+    transition-all duration-300
+    hover:bg-sky-600
+    focus:outline-none focus:ring-2 focus:ring-sky-300
+    disabled:cursor-not-allowed
+    disabled:bg-sky-300
+  "
+  disabled={
+    activating ||
+    !newPassword ||
+    !confirmPassword ||
+    newPassword !== confirmPassword ||
+    !email ||
+    newPassword.length < 8
+  }
+>
+  {activating ? (
+    <span className="flex items-center gap-2">
+      <svg
+        className="h-5 w-5 animate-spin text-white"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+        />
+      </svg>
+      Activando cuenta...
+    </span>
+  ) : (
+    "Activar mi cuenta"
+  )}
+</button>
+
             </form>
 
             {/* Footer */}

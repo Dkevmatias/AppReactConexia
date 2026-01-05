@@ -8,6 +8,9 @@ layer(base);
 @theme {
   --font-*: initial;
   --font-outfit: Outfit, sans-serif;
+  --color-blue-light: #2FB8AC;
+  --color-red-light: #C73E3A;
+  --color-gray-light: #9FA4A9;
 
   --breakpoint-*: initial;
   --breakpoint-2xsm: 375px;
@@ -66,6 +69,7 @@ layer(base);
   --color-blue-light-800: #065986;
   --color-blue-light-900: #0b4a6f;
   --color-blue-light-950: #062c41;
+  --color-blue-light-450: #2FB8AC;
 
   --color-gray-25: #fcfcfd;
   --color-gray-50: #f9fafb;
