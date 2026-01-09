@@ -191,7 +191,7 @@ export default function ActivarCuenta() {
       <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] w-full">          
         
         {/* COLUMNA IZQUIERDA */}
-        <div className="p-6 lg:p-10 bg-white relative overflow-y-auto max-h-screen">
+        <div className="p-6 lg:p-10 bg-white relative ">
           {/* Gradiente de fondo */}
           <div
             className="hidden lg:block absolute inset-0 bg-no-repeat bg-right bg-contain pointer-events-none "
@@ -394,19 +394,18 @@ export default function ActivarCuenta() {
         </div>
 
         {/* COLUMNA DERECHA */}
-                <div className="hidden lg:block relative w-full overflow-hidden">  
+          <div className="hidden lg:block relative w-full overflow-hidden">  
           {/* Imagen de fondo */}
           <img
             src="/images/page/principal.png"
             alt="Fondo"
             className="absolute inset-0 w-full h-full object-cover object-center"
           />                      
-        </div> 
-        
+        </div>         
       </div>
     </div>
   </div>
-</div>
+  </div>
 
   );
 }
