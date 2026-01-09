@@ -399,7 +399,7 @@ export default function ActivarCuenta() {
           <img
             src="/images/page/principal.png"
             alt="Fondo"
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover object-center"
           />                      
         </div> 
         
