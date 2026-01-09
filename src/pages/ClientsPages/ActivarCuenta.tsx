@@ -184,51 +184,53 @@ export default function ActivarCuenta() {
 
   // Formulario de activación
   return (
-    <div className="min-h-screen bg-[var(--color-gray-light)] flex items-center justify-center px-4 py-12 lg:py-20">
-      <div className="w-full max-w-7xl">
+  <div className="min-h-screen bg-[var(--color-gray-light)] flex items-center justify-center px-4 py-8 lg:py-12">
+  <div className="w-full max-w-7xl">
     {/* TARJETA */}
-    <div className="relative group bg-white rounded-3xl shadow-2xl min-h-auto lg:min-h-screen overflow-visible">
-        <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] w-full min-h-auto lg:min-h-screen overflow-hidden rounded-3xl">          
-          {/* COLUMNA IZQUIERDA */}
-          <div className="p-8 lg:p-12 bg-white relative">
-            {/* Decoración de líneas a cuadros verticales 
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-checkered-pattern hidden lg:block"></div>
-            */}
-            <div
-              className="absolute inset-0 bg-no-repeat bg-right bg-contain pointer-events-none"
-              style={{
+    <div className="relative group bg-white rounded-3xl shadow-2xl overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] w-full">          
+        
+        {/* COLUMNA IZQUIERDA */}
+        <div className="p-6 lg:p-10 bg-white relative overflow-y-auto max-h-screen">
+          {/* Gradiente de fondo */}
+          <div
+            className="hidden lg:block absolute inset-0 bg-no-repeat bg-right bg-contain pointer-events-none "
+            style={{
               backgroundImage: "url('/images/page/gradient.png')"
-              }}
-              />
-            {/* Logo y título */}
-          <div className="mb-8 flex flex-col items-center text-center">
-                  <img
-                  src="/images/page/logo-encabezado.png" 
-                  alt="Logo" 
-                  className="w-40 md:w-52 lg:w-64 h-auto mb-4"
+            }}
           />
-            <h1 className="text-xl font-semibold" style={{ fontFamily: "Conthrax" }}>
+          
+          {/* Contenido con z-index para que esté encima del gradiente */}
+          <div className="relative z-10">
+            {/* Logo y título */}
+            <div className="mb-6 flex flex-col items-center text-center">
+              <img
+                src="/images/page/logo-encabezado.png" 
+                alt="Logo" 
+                className="w-32 md:w-44 lg:w-52 h-auto mb-3"
+              />
+              <h1 className="text-lg lg:text-xl font-semibold" style={{ fontFamily: "Conthrax" }}>
                 Activa tu cuenta
-            </h1>
-            <p className="text-gray-600" style={{ fontFamily: "Conthrax" }}>
-            Configura tu correo y contraseña para comenzar
-            </p>
-          </div>
+              </h1>
+              <p className="text-sm text-gray-600" style={{ fontFamily: "Conthrax" }}>
+                Configura tu correo y contraseña para comenzar
+              </p>
+            </div>
 
             {/* Info del usuario */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg border-l-4 border-yellow-400">
-              <p className="text-sm text-gray-600 mb-1">Activando cuenta para:</p>
-              <p className="text-lg font-bold text-gray-900">{nombre}</p>
-              <p className="text-sm text-gray-600">
+            <div className="mb-5 p-3 bg-gray-50 rounded-lg border-l-4 border-yellow-400">
+              <p className="text-xs text-gray-600 mb-1">Activando cuenta para:</p>
+              <p className="text-base font-bold text-gray-900">{nombre}</p>
+              <p className="text-xs text-gray-600">
                 Código de Cliente: <span className="font-semibold">{cardCode}</span>
               </p>
             </div>
 
             {/* Formulario */}
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-4">
               {/* Email */}
               <div>
-                <Label className="text-gray-700 font-medium">
+                <Label className="text-gray-700 font-medium text-sm">
                   Correo Electrónico <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -239,13 +241,13 @@ export default function ActivarCuenta() {
                   className={`mt-1 ${emailError ? "border-red-500" : ""}`}
                 />
                 {emailError && (
-                  <p className="text-red-500 text-sm mt-1">{emailError}</p>
+                  <p className="text-red-500 text-xs mt-1">{emailError}</p>
                 )}
               </div>
 
               {/* Nueva Contraseña */}
               <div>
-                <Label className="text-gray-700 font-medium">
+                <Label className="text-gray-700 font-medium text-sm">
                   Nueva Contraseña <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative mt-1">
@@ -271,7 +273,7 @@ export default function ActivarCuenta() {
 
                 {/* Indicadores de fortaleza */}
                 {newPassword && (
-                  <div className="mt-3 space-y-1.5">
+                  <div className="mt-2 space-y-1">
                     <div className="flex items-center gap-2 text-xs">
                       <div className={`w-2 h-2 rounded-full ${passwordStrength.hasMinLength ? "bg-green-500" : "bg-gray-300"}`} />
                       <span className={passwordStrength.hasMinLength ? "text-green-600" : "text-gray-500"}>
@@ -296,7 +298,7 @@ export default function ActivarCuenta() {
 
               {/* Confirmar Contraseña */}
               <div>
-                <Label className="text-gray-700 font-medium">
+                <Label className="text-gray-700 font-medium text-sm">
                   Confirmar Contraseña <span className="text-red-500">*</span>
                 </Label>
                 <div className="relative mt-1">
@@ -322,7 +324,7 @@ export default function ActivarCuenta() {
 
                 {/* Indicador de coincidencia */}
                 {confirmPassword && (
-                  <div className="flex items-center gap-2 mt-2 text-xs">
+                  <div className="flex items-center gap-2 mt-1.5 text-xs">
                     {newPassword === confirmPassword ? (
                       <>
                         <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
@@ -344,15 +346,15 @@ export default function ActivarCuenta() {
 
               {/* Mensaje de error */}
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-600">{error}</p>
+                <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-xs text-red-600">{error}</p>
                 </div>
               )}
 
               {/* Botón de activación */}
               <button
                 type="submit"
-                className="w-full flex items-center justify-center rounded-lg bg-sky-500 px-4 py-3.5 font-semibold text-white transition-all duration-300 hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:cursor-not-allowed disabled:bg-sky-300 shadow-lg hover:shadow-xl"
+                className="w-full flex items-center justify-center rounded-lg bg-sky-500 px-4 py-3 font-semibold text-white transition-all duration-300 hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:cursor-not-allowed disabled:bg-sky-300 shadow-lg hover:shadow-xl text-sm"
                 disabled={
                   activating ||
                   !newPassword ||
@@ -377,8 +379,8 @@ export default function ActivarCuenta() {
             </form>
 
             {/* Footer */}
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
+            <div className="mt-4 text-center">
+              <p className="text-xs text-gray-600">
                 ¿Ya tienes cuenta activa?{" "}
                 <button
                   onClick={() => navigate("/signin")}
@@ -388,85 +390,23 @@ export default function ActivarCuenta() {
                 </button>
               </p>
             </div>
-
-            {/* Logos de marcas Anteriores - Footer 
-            <div className="mt-8 pt-6 border-gray-200">
-              <div className="flex flex-wrap items-center justify-center gap-4 ">
-                <img src="/images/page/marcas.png" alt="Marca 1" className="h-28  hover:grayscale-0 transition" />
-              </div>
-            </div>
-            */}
           </div>
-          {/*  COLUMNA DERECHA  */}
-         <div className="relative w-full h-[280px] sm:h-[340px] lg:h-full  overflow-hidden">  
-            {/* Imagen REAL */}
-            <img
-                src="/images/page/principal.png"
-                className="absolute inset-0 w-full h-full object-cover"/>                      
-          </div> 
-           {/* CONTENIDO QUE SE SALE */}
-  {/* CARRO FUERA DEL RECORTE 
-  <div
-    className="
-    absolute
-    lg:absolute
-    lg:right-[-6rem]
-    bottom-[-1rem]
-    z-30
-    flex
-    justify-center
-    transform
-    transition-all
-    duration-500
-    group-hover:scale-105
-    group-hover:-translate-y-1
-    pointer-events-none
-  "
-  >
-    <img
-      src="/images/page/carro.png"
-      alt="Carro clásico"
-      className="w-[700px] drop-shadow-2xl"
-      style={{
-        filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.3))'
-      }}
-    />
-  </div>
-*/}
-  
-         </div>
-         </div>
-      </div>
+        </div>
 
-      {/* CSS para animaciones personalizadas */}
-      <style>{`
-        @keyframes spin-slow {
-          from {
-            transform: rotate(0deg);
-          }
-          to {
-            transform: rotate(360deg);
-          }
-        }
+        {/* COLUMNA DERECHA */}
+        <div className="hidden lg:block relative w-full h-[300px] sm:h-[400px] lg:h-auto lg:min-h-[600px] overflow-hidden">  
+          {/* Imagen de fondo */}
+          <img
+            src="/images/page/principal.png"
+            alt="Fondo"
+            className="absolute inset-0 w-full h-full object-cover"
+          />                      
+        </div> 
         
-        .animate-spin-slow {
-          animation: spin-slow 3s linear infinite;
-        }
-
-        @keyframes shine {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
-        }
-        .animate-shine {
-          animation: shine 2s ease-in-out;
-        }
-
-    
-      `}</style>
+      </div>
     </div>
+  </div>
+</div>
+
   );
 }
