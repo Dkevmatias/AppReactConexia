@@ -168,7 +168,13 @@ layer(base);
   --z-index-99999: 99999;
   --z-index-999999: 999999;
 }
-
+@font-face {
+  font-family: "Conthrax";
+  src: url("/src/assets/fonts/conthrax-sb.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
 /*
   The default border color has changed to `currentColor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still
