@@ -32,20 +32,16 @@ export default function ActivarCuenta() {
   const [activating, setActivating] = useState(false);
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
 
-
-const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const value = e.target.value;
-  setEmail(value);
-
-  if (!emailRegex.test(value)) {
-    setEmailError("Correo electrónico no válido");
-  } else {
-    setEmailError("");
-  }
-};
-
-  
+    if (!emailRegex.test(value)) {
+      setEmailError("Correo electrónico no válido");
+    } else {
+      setEmailError("");
+    }
+  };
 
   // Validación de fortaleza de contraseña
   const [passwordStrength, setPasswordStrength] = useState({
@@ -103,7 +99,6 @@ const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validaciones
     if (!email) {
       setError("El correo electrónico es obligatorio");
       return;
@@ -130,12 +125,10 @@ const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       await activarCuenta({
         token: token!,
         newPassword,
-         confirmPassword,
+        confirmPassword,
         email
-       
       });
 
-      // Éxito - Mostrar modal o mensaje
       alert("🎉 ¡Cuenta activada exitosamente! Ahora puedes iniciar sesión.");
       navigate("/signin");
     } catch (err: any) {
@@ -165,7 +158,7 @@ const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     );
   }
 
-  // Pantalla de error (token inválido)
+  // Pantalla de error
   if (!tokenValid) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-pink-100 dark:from-gray-900 dark:to-gray-800 p-4">
@@ -173,38 +166,12 @@ const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8">
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 rounded-full">
-                <svg
-                  className="w-8 h-8 text-red-600 dark:text-red-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-
-              <h2 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">
-                Token Inválido
-              </h2>
-
+              <h2 className="mb-3 text-2xl font-bold text-gray-900 dark:text-white">Token Inválido</h2>
               <p className="mb-2 text-gray-600 dark:text-gray-400">{error}</p>
-
-              <div className="p-4 mt-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                  💡 <strong>Posibles causas:</strong>
-                </p>
-                <ul className="mt-2 text-xs text-left text-yellow-700 dark:text-yellow-400 list-disc list-inside">
-                  <li>El token ya fue utilizado</li>
-                  <li>El token expiró (válido por 48 horas)</li>
-                  <li>El enlace está incompleto o corrupto</li>
-                </ul>
-              </div>
-
               <Button className="w-full mt-6" onClick={() => navigate("/signin")}>
                 Ir al Login
               </Button>
@@ -215,49 +182,53 @@ const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     );
   }
 
-  // Pantalla principal (formulario de activación)
+  // Formulario de activación
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-green-500 to-emerald-600 p-6 text-center">
- 
-
-            <div className="inline-flex items-center justify-center w-16 h-16 mx-auto mb-3 bg-black rounded-full">
-             <img  className="dark:hidden"
-                src="/images/logo/logocodlub_1.svg"
-                alt="Logo"
-                width={80}
-                height={80}
-                
+    <div className="min-h-screen bg-[var(--color-gray-light)] flex items-center justify-center px-4 py-12 lg:py-20">
+      <div className="w-full max-w-7xl">
+    {/* TARJETA */}
+    <div className="relative group bg-white rounded-3xl shadow-2xl min-h-auto lg:min-h-screen overflow-visible">
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_3fr] w-full min-h-auto lg:min-h-screen overflow-hidden rounded-3xl">          
+          {/* COLUMNA IZQUIERDA */}
+          <div className="p-8 lg:p-12 bg-white relative">
+            {/* Decoración de líneas a cuadros verticales 
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-checkered-pattern hidden lg:block"></div>
+            */}
+            <div
+              className="absolute inset-0 bg-no-repeat bg-right bg-contain pointer-events-none"
+              style={{
+              backgroundImage: "url('/images/page/gradient.png')"
+              }}
               />
-            </div>
-            <h1 className="text-2xl font-bold text-white">Activa tu Cuenta</h1>
-            <p className="mt-2 text-sm text-green-100">
-              Configura tu Correo y Contraseña para comenzar
+            {/* Logo y título */}
+          <div className="mb-8 flex flex-col items-center text-center">
+                  <img
+                  src="/images/page/logo-encabezado.png" 
+                  alt="Logo" 
+                  className="w-40 md:w-52 lg:w-64 h-auto mb-4"
+          />
+            <h1 className="text-xl font-semibold" style={{ fontFamily: "Conthrax" }}>
+                Activa tu cuenta
+            </h1>
+            <p className="text-gray-600" style={{ fontFamily: "Conthrax" }}>
+            Configura tu correo y contraseña para comenzar
             </p>
           </div>
 
-          {/* Contenido */}
-          <div className="p-8">
-            {/* Email del usuario */}
-            <div className="p-4 mb-6 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Activando cuenta para:
-              </p>              
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                {nombre}                
+            {/* Info del usuario */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg border-l-4 border-yellow-400">
+              <p className="text-sm text-gray-600 mb-1">Activando cuenta para:</p>
+              <p className="text-lg font-bold text-gray-900">{nombre}</p>
+              <p className="text-sm text-gray-600">
+                Código de Cliente: <span className="font-semibold">{cardCode}</span>
               </p>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                Código de Cliente: {cardCode}                
-              </p>             
             </div>
 
-            {/* Inicio de Formulario */}
-            <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Formulario */}
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Email */}
               <div>
-                <Label>
+                <Label className="text-gray-700 font-medium">
                   Correo Electrónico <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -265,94 +236,57 @@ const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                   placeholder="ejemplo@correo.com"
                   value={email}
                   onChange={handleEmailChange}
-                  className={emailError ? "border-red-500" : ""}
+                  className={`mt-1 ${emailError ? "border-red-500" : ""}`}
                 />
-                 {emailError && (
-                <p className="text-red-500 text-sm mt-1">{emailError}</p>
-                )}  
+                {emailError && (
+                  <p className="text-red-500 text-sm mt-1">{emailError}</p>
+                )}
               </div>
+
               {/* Nueva Contraseña */}
               <div>
-                <Label>
+                <Label className="text-gray-700 font-medium">
                   Nueva Contraseña <span className="text-red-500">*</span>
                 </Label>
-                <div className="relative">
+                <div className="relative mt-1">
                   <Input
                     type={showPassword ? "text" : "password"}
                     placeholder="Mínimo 8 caracteres"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                  
                     className="pr-12"
                   />
-                  <span
+                  <button
+                    type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
+                    className="absolute right-4 top-1/2 -translate-y-1/2"
                   >
                     {showPassword ? (
-                      <EyeIcon className="fill-gray-500 dark:fill-gray-400 size-5" />
+                      <EyeIcon className="fill-gray-500 size-5" />
                     ) : (
-                      <EyeCloseIcon className="fill-gray-500 dark:fill-gray-400 size-5" />
+                      <EyeCloseIcon className="fill-gray-500 size-5" />
                     )}
-                  </span>
+                  </button>
                 </div>
 
                 {/* Indicadores de fortaleza */}
                 {newPassword && (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3 space-y-1.5">
                     <div className="flex items-center gap-2 text-xs">
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          passwordStrength.hasMinLength
-                            ? "bg-green-500"
-                            : "bg-gray-300"
-                        }`}
-                      />
-                      <span
-                        className={
-                          passwordStrength.hasMinLength
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-gray-500"
-                        }
-                      >
+                      <div className={`w-2 h-2 rounded-full ${passwordStrength.hasMinLength ? "bg-green-500" : "bg-gray-300"}`} />
+                      <span className={passwordStrength.hasMinLength ? "text-green-600" : "text-gray-500"}>
                         Mínimo 8 caracteres
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs">
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          passwordStrength.hasUpperCase &&
-                          passwordStrength.hasLowerCase
-                            ? "bg-green-500"
-                            : "bg-gray-300"
-                        }`}
-                      />
-                      <span
-                        className={
-                          passwordStrength.hasUpperCase &&
-                          passwordStrength.hasLowerCase
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-gray-500"
-                        }
-                      >
+                      <div className={`w-2 h-2 rounded-full ${passwordStrength.hasUpperCase && passwordStrength.hasLowerCase ? "bg-green-500" : "bg-gray-300"}`} />
+                      <span className={passwordStrength.hasUpperCase && passwordStrength.hasLowerCase ? "text-green-600" : "text-gray-500"}>
                         Mayúsculas y minúsculas
                       </span>
                     </div>
                     <div className="flex items-center gap-2 text-xs">
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          passwordStrength.hasNumber
-                            ? "bg-green-500"
-                            : "bg-gray-300"
-                        }`}
-                      />
-                      <span
-                        className={
-                          passwordStrength.hasNumber
-                            ? "text-green-600 dark:text-green-400"
-                            : "text-gray-500"
-                        }
-                      >
+                      <div className={`w-2 h-2 rounded-full ${passwordStrength.hasNumber ? "bg-green-500" : "bg-gray-300"}`} />
+                      <span className={passwordStrength.hasNumber ? "text-green-600" : "text-gray-500"}>
                         Al menos un número
                       </span>
                     </div>
@@ -362,28 +296,28 @@ const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
               {/* Confirmar Contraseña */}
               <div>
-                <Label>
+                <Label className="text-gray-700 font-medium">
                   Confirmar Contraseña <span className="text-red-500">*</span>
                 </Label>
-                <div className="relative">
+                <div className="relative mt-1">
                   <Input
                     type={showConfirmPassword ? "text" : "password"}
                     placeholder="Repite tu contraseña"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                
                     className="pr-12"
                   />
-                  <span
+                  <button
+                    type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
+                    className="absolute right-4 top-1/2 -translate-y-1/2"
                   >
                     {showConfirmPassword ? (
-                      <EyeIcon className="fill-gray-500 dark:fill-gray-400 size-5" />
+                      <EyeIcon className="fill-gray-500 size-5" />
                     ) : (
-                      <EyeCloseIcon className="fill-gray-500 dark:fill-gray-400 size-5" />
+                      <EyeCloseIcon className="fill-gray-500 size-5" />
                     )}
-                  </span>
+                  </button>
                 </div>
 
                 {/* Indicador de coincidencia */}
@@ -391,37 +325,17 @@ const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
                   <div className="flex items-center gap-2 mt-2 text-xs">
                     {newPassword === confirmPassword ? (
                       <>
-                        <svg
-                          className="w-4 h-4 text-green-500"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clipRule="evenodd"
-                          />
+                        <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-green-600 dark:text-green-400">
-                          Las contraseñas coinciden
-                        </span>
+                        <span className="text-green-600">Las contraseñas coinciden</span>
                       </>
                     ) : (
                       <>
-                        <svg
-                          className="w-4 h-4 text-red-500"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                            clipRule="evenodd"
-                          />
+                        <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                         </svg>
-                        <span className="text-red-600 dark:text-red-400">
-                          Las contraseñas no coinciden
-                        </span>
+                        <span className="text-red-600">Las contraseñas no coinciden</span>
                       </>
                     )}
                   </div>
@@ -430,101 +344,129 @@ const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 
               {/* Mensaje de error */}
               {error && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <svg
-                      className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-                  </div>
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-600">{error}</p>
                 </div>
               )}
 
               {/* Botón de activación */}
-             <button
-  type="submit"
-  className="
-    w-full
-    flex items-center justify-center
-    rounded-lg
-    bg-sky-500
-    px-4 py-3
-    font-semibold text-white
-    transition-all duration-300
-    hover:bg-sky-600
-    focus:outline-none focus:ring-2 focus:ring-sky-300
-    disabled:cursor-not-allowed
-    disabled:bg-sky-300
-  "
-  disabled={
-    activating ||
-    !newPassword ||
-    !confirmPassword ||
-    newPassword !== confirmPassword ||
-    !email ||
-    newPassword.length < 8
-  }
->
-  {activating ? (
-    <span className="flex items-center gap-2">
-      <svg
-        className="h-5 w-5 animate-spin text-white"
-        fill="none"
-        viewBox="0 0 24 24"
-      >
-        <circle
-          className="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          strokeWidth="4"
-        />
-        <path
-          className="opacity-75"
-          fill="currentColor"
-          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-        />
-      </svg>
-      Activando cuenta...
-    </span>
-  ) : (
-    "Activar mi cuenta"
-  )}
-</button>
-
+              <button
+                type="submit"
+                className="w-full flex items-center justify-center rounded-lg bg-sky-500 px-4 py-3.5 font-semibold text-white transition-all duration-300 hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:cursor-not-allowed disabled:bg-sky-300 shadow-lg hover:shadow-xl"
+                disabled={
+                  activating ||
+                  !newPassword ||
+                  !confirmPassword ||
+                  newPassword !== confirmPassword ||
+                  !email ||
+                  newPassword.length < 8
+                }
+              >
+                {activating ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="h-5 w-5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Activando cuenta...
+                  </span>
+                ) : (
+                  "Activar mi cuenta"
+                )}
+              </button>
             </form>
 
             {/* Footer */}
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600">
                 ¿Ya tienes cuenta activa?{" "}
                 <button
                   onClick={() => navigate("/signin")}
-                  className="font-medium text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                  className="font-semibold text-sky-600 hover:text-sky-700"
                 >
                   Inicia sesión
                 </button>
               </p>
             </div>
-          </div>
-        </div>
 
-        {/* Info adicional */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            🔒 Tu contraseña será encriptada y almacenada de forma segura
-          </p>
-        </div>
+            {/* Logos de marcas Anteriores - Footer 
+            <div className="mt-8 pt-6 border-gray-200">
+              <div className="flex flex-wrap items-center justify-center gap-4 ">
+                <img src="/images/page/marcas.png" alt="Marca 1" className="h-28  hover:grayscale-0 transition" />
+              </div>
+            </div>
+            */}
+          </div>
+          {/*  COLUMNA DERECHA  */}
+         <div className="relative w-full h-[280px] sm:h-[340px] lg:h-full  overflow-hidden">  
+            {/* Imagen REAL */}
+            <img
+                src="/images/page/principal.png"
+                className="absolute inset-0 w-full h-full object-cover"/>                      
+          </div> 
+           {/* CONTENIDO QUE SE SALE */}
+  {/* CARRO FUERA DEL RECORTE 
+  <div
+    className="
+    absolute
+    lg:absolute
+    lg:right-[-6rem]
+    bottom-[-1rem]
+    z-30
+    flex
+    justify-center
+    transform
+    transition-all
+    duration-500
+    group-hover:scale-105
+    group-hover:-translate-y-1
+    pointer-events-none
+  "
+  >
+    <img
+      src="/images/page/carro.png"
+      alt="Carro clásico"
+      className="w-[700px] drop-shadow-2xl"
+      style={{
+        filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.3))'
+      }}
+    />
+  </div>
+*/}
+  
+         </div>
+         </div>
       </div>
+
+      {/* CSS para animaciones personalizadas */}
+      <style>{`
+        @keyframes spin-slow {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        
+        .animate-spin-slow {
+          animation: spin-slow 3s linear infinite;
+        }
+
+        @keyframes shine {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        .animate-shine {
+          animation: shine 2s ease-in-out;
+        }
+
+    
+      `}</style>
     </div>
   );
 }

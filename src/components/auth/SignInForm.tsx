@@ -61,7 +61,7 @@ export default function SignInForm() {
                 </Label>
                 <div className="relative">
                   <Input
-                    type={showPassword ? "text" : "password"} // ✅ CORREGIDO
+                    type={showPassword ? "text" : "password"} // CORREGIDO
                     placeholder="Ingresa tu contraseña"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -94,6 +94,12 @@ export default function SignInForm() {
                   {loading ? "Ingresando..." : "Ingresar"}
                 </Button>
               </div>
+              {/* Logos de marcas - Footer */}
+            <div className="mt-8 pt-6 border-gray-200">
+              <div className="flex flex-wrap items-center justify-center gap-4 ">
+                <img src="/images/page/marcas.png" alt="Marca 1" className="h-30  hover:grayscale-0 transition" />
+              </div>
+            </div>            
             </div>
           </form>
         </div>
