@@ -184,7 +184,7 @@ export default function ActivarCuenta() {
 
   // Formulario de activación
   return (
-  <div className="min-h-screen bg-[var(--color-gray-light)] flex items-center justify-center p-4 overflow-x-hidden">
+  <div className="min-h-dvh bg-[var(--color-gray-light)] flex items-center justify-center p-4 overflow-x-hidden">
   <div className="w-full max-w-7xl">
     {/* TARJETA */}
     <div className="relative group bg-white rounded-3xl shadow-2xl overflow-hidden">
