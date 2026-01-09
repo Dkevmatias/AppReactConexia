@@ -184,7 +184,7 @@ export default function ActivarCuenta() {
 
   // Formulario de activación
   return (
-  <div className="min-h-screen bg-[var(--color-gray-light)] flex items-center justify-center px-4 py-8 lg:py-12 overflow-x-hidden">
+  <div className="min-h-screen bg-[var(--color-gray-light)] flex items-center justify-center p-4 overflow-x-hidden">
   <div className="w-full max-w-7xl">
     {/* TARJETA */}
     <div className="relative group bg-white rounded-3xl shadow-2xl overflow-hidden">
@@ -394,7 +394,7 @@ export default function ActivarCuenta() {
         </div>
 
         {/* COLUMNA DERECHA */}
-        <div className="hidden lg:block relative w-full h-[300px] sm:h-[400px] lg:h-auto lg:min-h-[600px] overflow-hidden">  
+                <div className="hidden lg:block relative w-full overflow-hidden">  
           {/* Imagen de fondo */}
           <img
             src="/images/page/principal.png"
