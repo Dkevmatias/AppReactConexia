@@ -105,10 +105,9 @@ export default function SignInForm() {
                   {loading ? "Ingresando..." : "Ingresar"}
                 </Button>
               </div>
-
               
               {/* Logos de marcas - Footer */}
-            <div className="mt-8 pt-6 border-gray-200">
+               <div className="mt-8 pt-6 border-gray-200">
               <div className="flex items-center gap-4">
                  <img
                   src="/images/page/marcas.png"
@@ -120,8 +119,7 @@ export default function SignInForm() {
                     <ThemeTogglerTwo />
                   </div>
                 </div>
-              </div>
-                              
+              </div>                              
             </div>
           </form>
         </div>
