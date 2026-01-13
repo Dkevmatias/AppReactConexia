@@ -20,6 +20,9 @@ export default function ActivarCuenta() {
   const [tokenValid, setTokenValid] = useState(false);
   const [cardCode, setCardCode] = useState("");
   const [error, setError] = useState("");
+  //Modal Terminos y Condiciones
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [openLegalModal, setOpenLegalModal] = useState(false);
 
   // Estados del formulario
   const [email, setEmail] = useState("");
@@ -350,11 +353,17 @@ export default function ActivarCuenta() {
                   <p className="text-xs text-red-600">{error}</p>
                 </div>
               )}
+             
 
               {/* Botón de activación */}
               <button
                 type="submit"
-                className="w-full flex items-center justify-center rounded-lg bg-sky-500 px-4 py-3 font-semibold text-white transition-all duration-300 hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-300 disabled:cursor-not-allowed disabled:bg-sky-300 shadow-lg hover:shadow-xl text-sm"
+                className="w-full flex items-center justify-center rounded-lg 
+                !bg-black px-4 py-3 font-semibold text-white transition-all duration-300 
+                hover:!bg-gray-900 
+                focus:outline-none focus:ring-2 focus:ring-sky-300 
+                disabled:cursor-not-allowed disabled:bg-gray-700 shadow-lg hover:shadow-xl text-sm"
+                
                 disabled={
                   activating ||
                   !newPassword ||
@@ -376,6 +385,33 @@ export default function ActivarCuenta() {
                   "Activar mi cuenta"
                 )}
               </button>
+
+               {/* Terminos y Condiciones */}
+              <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-1"
+                />    
+                  <span>
+                    Acepto los{" "}                
+                  <button
+                      type="button"
+                      onClick={() => setOpenLegalModal(true)}
+                      className="text-sky-600 font-semibold hover:underline"
+                    >
+                          Términos y Condiciones
+                  </button>{" "} y el{" "}
+                  <button
+                      type="button"
+                      onClick={() => setOpenLegalModal(true)}
+                      className="text-sky-600 font-semibold hover:underline"
+                    >
+                      Aviso de Privacidad
+                  </button>
+                </span>
+              </div>
             </form>
 
             {/* Footer */}

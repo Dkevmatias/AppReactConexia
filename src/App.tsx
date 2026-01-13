@@ -23,7 +23,7 @@ import Evento from "./pages/Dashboard/Evento";
 import Boletos from "./pages/Dashboard/Boletos";
 import Reportes from "./pages/Dashboard/Reportes";
 import ProtectedRoute from "./routes/ProtectedRoute";
-import ActivarCuenta from "./pages/ClientsPages/ActivarCuenta";
+import ActivarCuenta from "./pages/Clientes/ActivarCuenta";
 import { useAuth } from "./context/useAuth";
 import { Navigate } from "react-router-dom";
 

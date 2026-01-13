@@ -9,8 +9,10 @@ layer(base);
   --font-*: initial;
   --font-outfit: Outfit, sans-serif;
   --color-blue-light: #2FB8AC;
-  --color-red-light: #C73E3A;
+  --color-red-light:  #C73E3A;
   --color-gray-light: #9FA4A9;
+  --color-black-deep: #111111;
+  --color-yellow-cod: #E1CD00;
 
   --breakpoint-*: initial;
   --breakpoint-2xsm: 375px;
