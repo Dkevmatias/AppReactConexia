@@ -386,7 +386,7 @@ export default function ActivarCuenta() {
                 )}
               </button>
 
-               {/* Terminos y Condiciones */}
+               {/* Terminos y Condiciones 
               <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
                 <input
                   type="checkbox"
@@ -412,6 +412,7 @@ export default function ActivarCuenta() {
                   </button>
                 </span>
               </div>
+*/}
             </form>
 
             {/* Footer */}
