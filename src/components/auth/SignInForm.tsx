@@ -7,6 +7,7 @@ import Checkbox from "../form/input/Checkbox";
 import Button from "../ui/button/Button";
 import { useAuth } from "../../context/useAuth";
 import { loginService } from "../../services/authService";
+import ThemeTogglerTwo from "../common/ThemeTogglerTwo";
 
 export default function SignInForm() {
   const { login } = useAuth();
@@ -37,9 +38,19 @@ export default function SignInForm() {
   return (
     <div className="flex flex-col flex-1">
       <div className="flex flex-col justify-center flex-1 w-full max-w-md mx-auto">
+             {/* Logo Encabezado */}
+            <div className="mt-2 pt-6 border-gray-200">
+              <div className="flex flex-wrap items-center justify-center gap-4 ">
+                <img src="/images/page/encabezadologin.png" alt=" encabezado" 
+                className="block mx-auto max-w-full h-auto transition block dark:hidden" />
+
+                <img src="/images/page/encabezadodark.png" alt=" encabezado" 
+                className="block mx-auto max-w-full h-auto transition hidden dark:block" />
+              </div>
+            </div> 
         <div>
-          <div className="mb-5 sm:mb-8">
-            <h1 className="mb-2 font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md">
+          <div className="mb-5 sm:mb-8 justify-center flex">         
+            <h1 className="mb-2  font-semibold text-gray-800 text-title-sm dark:text-white/90 sm:text-title-md" style={{ fontFamily: "Conthrax" }}>
               Bienvenido
             </h1>
           </div>
@@ -70,7 +81,7 @@ export default function SignInForm() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute z-30 -translate-y-1/2 cursor-pointer right-4 top-1/2"
                   >
-                    {showPassword ? ( // ✅ CORREGIDO
+                    {showPassword ? ( //CORREGIDO
                       <EyeIcon className="fill-gray-500 dark:fill-gray-400 size-5" />
                     ) : (
                       <EyeCloseIcon className="fill-gray-500 dark:fill-gray-400 size-5" />
@@ -94,12 +105,23 @@ export default function SignInForm() {
                   {loading ? "Ingresando..." : "Ingresar"}
                 </Button>
               </div>
+
+              
               {/* Logos de marcas - Footer */}
             <div className="mt-8 pt-6 border-gray-200">
-              <div className="flex flex-wrap items-center justify-center gap-4 ">
-                <img src="/images/page/marcas.png" alt="Marca 1" className="h-30  hover:grayscale-0 transition" />
+              <div className="flex items-center gap-4">
+                 <img
+                  src="/images/page/marcas.png"
+                  alt="Marca 1"
+                  className="h-30 hover:grayscale-0 transition"
+                />
+                  {/* TOGGLER A LA DERECHA */}
+                  <div className="ml-auto hidden sm:block sticky top-20 z-70">
+                    <ThemeTogglerTwo />
+                  </div>
+                </div>
               </div>
-            </div>            
+                              
             </div>
           </form>
         </div>
