@@ -47,6 +47,13 @@ export const getPersonas = async (idpersona: number) => {
   return response.data;
 };
 
+//Acumulado de Ventas por mes 
+export const getPeriodosActivos = async () => {
+  const response = await api.get(`/api/PeriodoBoletos/GetPeriodosActivos`);
+  //console.log("datos",response.data)
+  return response.data;
+};
+
 //Validamos si el cliente tiene deudas
 export const getSaldoClientes = async(clientes: string)=>{
   const response = await api.get(`/api/Personas/GetSaldosClientes`,{
@@ -54,6 +61,8 @@ export const getSaldoClientes = async(clientes: string)=>{
       clientes
     }
   });
+
+  
   
   return {
     ...response.data,

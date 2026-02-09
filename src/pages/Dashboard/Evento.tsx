@@ -72,7 +72,7 @@ export default function Evento() {
         fechaIañoanterior.setFullYear(inicioMesActual.getFullYear() - 1);
         const fechaFañoanterior = new Date(finMesActual);
         fechaFañoanterior.setFullYear(finMesActual.getFullYear() - 1);
-
+          
         //const ventasPeriodo = await getVentasCLientes(periodo.fechaInicio,periodo.fechaFin,cardCodes);
         const ventasPeriodo = await getVentasCLientes(formatDate(fiperiodo),formatDate(ffperiodo), cardCodes); 
              

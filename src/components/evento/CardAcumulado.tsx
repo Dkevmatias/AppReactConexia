@@ -7,14 +7,17 @@ import {
 } from "../ui/table";
 import "../../utils/date"
 
-//import Badge from "../ui/badge/Badge";
 import { Key, ReactElement, JSXElementConstructor, ReactNode, ReactPortal } from "react";
 import { getMesPeriodo } from "../../utils/date";
-//import { useAuth } from "../../context/AuthContext";
 
-export default function Acumlado({ res }: { res: any }) {
- // console.log("Tabla",res);
-    const data = Array.isArray(res) ? res : [];     
+interface AcumuladoItem {
+  mes: number;
+  totalVentas: number;
+  puntos: number;
+}
+export default function Acumulado({ res }: { res: any }) {
+  console.log("Tablass",res.data);
+    const data = Array.isArray(res.data) ? res.data : [];     
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
@@ -44,31 +47,29 @@ export default function Acumlado({ res }: { res: any }) {
 
           {/* Body */}
           <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+            
             {data.length === 0 && (
               <TableRow>
                <TableCell
-                isHeader
                 className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400"
+                isHeader
               >
-                No hay boletos asignados.
+                Sin datos que mostrar.
               </TableCell>
               </TableRow>
             )}
 
-            {data.map((b: { idBoleto: Key | null | undefined; idPeriodo:number; codigoBoleto: string | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; fecha: string | number | Date; color: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
-              <TableRow key={b.idBoleto}>
+            {data.map((b: AcumuladoItem) => (
+              <TableRow key={data.length}>
                 <TableCell className="px-4 py-3 text-start text-gray-500">
-                  {b.codigoBoleto}
+                   {getMesPeriodo(b.mes)}
                 </TableCell>
                 <TableCell className="px-4 py-3 text-start text-gray-500">
-                {getMesPeriodo(b.idPeriodo)}
+                ${b.totalVentas}
                 </TableCell>
 
                 <TableCell className="px-4 py-3 text-start capitalize text-gray-500">
-                  {new Date(b.fecha).toLocaleDateString("es-MX", {
-                    year: "numeric",
-                    month: "long",
-                  })}
+                  {b.puntos}
                 </TableCell>
               </TableRow>
             ))}

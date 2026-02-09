@@ -91,13 +91,13 @@ const AppHeader: React.FC = () => {
   className="lg:hidden"
 >
   <img
-    className="dark:hidden"
-    src="./images/logo/logocodlub.svg"
+    className="h-10 w-auto object-contain dark:hidden"
+    src="/images/logo/logocodlub.svg"
     alt="Logo"
   />
   <img
-    className="hidden dark:block"
-    src="./images/logo/logocodlub.svg"
+    className="h-10 w-auto object-contain hidden dark:block"
+    src="/images/logo/logocodlub.svg"
     alt="Logo"
   />
 </button>

@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import Confetti from "react-confetti";
 import PageMeta from "../../components/common/PageMeta";
-import { useVenta } from "../../context/VentaContext";
-import { useVencido } from "../../context/SaldoContext";
 import { useAuth } from "../../context/useAuth";
-import { getPersonas,getVentasCLientes,getSaldoClientes,getPeriodoEvaluar } from "../../services/authService";
+import { getPersonas, getPeriodosActivos,getVentasCLientes } from "../../services/authService";
 import CardAcumulado from "../../components/evento/CardAcumulado";
+import { useVenta } from "../../context/VentaContext";
 
 
 const formatDate = (d: Date) =>
@@ -15,11 +14,27 @@ interface Persona {
   idPersona: number;
   cardCode?: string | null;
 }
+interface Periodo {
+  idPeriodo: number;
+  fechaInicio: string;
+  fechaFin: string;
+  activo: boolean;
+  evaluar: boolean;
+};
+
+interface VentaPeriodo {
+  mes: number;
+  totalVentas: number;
+  puntos: number;
+}
 
 export default function Acumulado() {
-  const { user } = useAuth();
-  const { ventaTotal, ventaMesActual,mesAnterior,mesActual, setMesAnterior, setVentaTotal, setVentaMesActual,setmesActual } = useVenta();
-  const {saldoVencido, setSaldoVencido } = useVencido();
+  const { user } = useAuth(); 
+  const [ventaACumulado, setAcumulado] = useState<{
+   data: VentaPeriodo[];
+ }>({ 
+   data: []
+ }); 
   const [confeti, setConfeti] = useState(false);
   const [loading, setLoading] = useState(true);
   const [windowSize, setWindowSize] = useState({
@@ -40,56 +55,30 @@ export default function Acumulado() {
           .filter(p => p?.cardCode)
           .map(p => p.cardCode)
           .join(",");
-        
+    const periodo: Periodo[] = await getPeriodosActivos();
+    const rango = obtenerRangoFechas(periodo);
+    if (!rango) return;
 
-    const periodo = await getPeriodoEvaluar();
+    console.log("Fecha inicio:", rango.fechaInicio);
+    console.log("Fecha fin:", rango.fechaFin);
+    const fechaInicio = "2025-01-01";
+    const fechaFin = "2025-02-28";
 
-    const Mes = new Date(periodo.fechaFin);
-    const fechaMesAnterior = new Date(Mes.getFullYear(), Mes.getMonth() - 1, 1);
-    const nombreMeses = [
-    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-    const mesAnterior = nombreMeses[fechaMesAnterior.getMonth()];
-    const mesActual= nombreMeses[Mes.getMonth()];
-    setmesActual(mesActual);  
-    setMesAnterior(mesAnterior);
-        
-        // Mes actual
-        const inicioMesActual = new Date(periodo.fechaFin);
-        inicioMesActual.setDate(1);
-        inicioMesActual.setMonth(inicioMesActual.getMonth() + 1);
-        const finMesActual = new Date(inicioMesActual);
-        finMesActual.setMonth(finMesActual.getMonth() + 1);
-        finMesActual.setDate(0);
-      
-        const fiperiodo= new Date(periodo.fechaInicio)
-        fiperiodo.setFullYear(fiperiodo.getFullYear() -1);
-        const ffperiodo= new Date(periodo.fechaFin)
-        ffperiodo.setFullYear(ffperiodo.getFullYear() -1);
+    const ventasPeriodo = await getVentasCLientes(fechaInicio, fechaFin, cardCodes); 
+    //const periodo = await getPeriodosActivos();
+    const acumulado= ventasPeriodo.map((v: VentaPeriodo) =>({
+      mes: v.mes,
+      totalVentas: v.totalVentas,
+      puntos:calcularPuntos(v.totalVentas)
+    }));
 
-        //año anterior para pruebas
-        const fechaIañoanterior = new Date(inicioMesActual);
-        fechaIañoanterior.setFullYear(inicioMesActual.getFullYear() - 1);
-        const fechaFañoanterior = new Date(finMesActual);
-        fechaFañoanterior.setFullYear(finMesActual.getFullYear() - 1);
+    setAcumulado({data: acumulado});
 
-        //const ventasPeriodo = await getVentasCLientes(periodo.fechaInicio,periodo.fechaFin,cardCodes);
-        const ventasPeriodo = await getVentasCLientes(formatDate(fiperiodo),formatDate(ffperiodo), cardCodes); 
-             
-        //const ventasMesActual = await getVentasCLientes(formatDate(inicioMesActual),formatDate(finMesActual),cardCodes);
-        const ventasMesActual = await getVentasCLientes(formatDate(fechaIañoanterior),formatDate(fechaFañoanterior), cardCodes); 
-        const saldo = await getSaldoClientes(cardCodes);     
-        //const totalVentas = ventasPeriodo?.[0]?.totalVentas ?? 0;
-        const totalVentas = 223425;
-         const totalMesActual = ventasMesActual?.[0]?.totalVentas ?? 0;     
-    
-        setVentaTotal(Math.round((totalVentas / 1.16) / 1000));
-        setVentaMesActual(Math.round((totalMesActual / 1.16) / 1000));
-        setSaldoVencido(saldo[0]?.vencido ?? false);
+    console.log("Acumulado de Ventas:", acumulado);   
 
       } catch (error) {
           if (import.meta.env.DEV) {
-          console.error("Error cargando datos del evento", error);
+          console.error("Error cargando datos de los Puntos", error);
         }
         
       } finally {
@@ -138,13 +127,30 @@ export default function Acumulado() {
       <div className="grid grid-cols-1 gap-6">
         <h1 className="mb-4 text-3xl font-bold text-center text-gray-700 dark:text-gray-300">
           Puntos Acumulados
-        </h1>
+        </h1>       
 
-       
-
-                <CardAcumulado res={undefined} />
+                <CardAcumulado res={ventaACumulado} />
 
       </div>
     </div>
   );
 }
+const obtenerRangoFechas = (periodos: Periodo[]) => {
+  if (!periodos || periodos.length === 0) return null;
+  const ordenados = [...periodos].sort(
+    (a, b) =>
+      new Date(a.fechaInicio).getTime() -
+      new Date(b.fechaInicio).getTime()
+  );
+
+  return {
+    fechaInicio: ordenados[0].fechaInicio,
+    fechaFin: ordenados[ordenados.length - 1].fechaFin,
+  };
+};
+
+function calcularPuntos(totalVentas: number) {  
+  return (Math.round((totalVentas / 1.16) / 1000));
+}
+
+
