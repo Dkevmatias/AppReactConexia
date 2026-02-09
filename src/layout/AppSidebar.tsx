@@ -32,6 +32,8 @@ const navItems: NavItem[] = [
     subItems: [
       {name: "Evento", path: "/dashboard/evento", pro: false },
       {name: "Mis Boletos", path: "/dashboard/boletos", pro: false },
+    //  {name: "Acumulado", path: "/clientes/acumulado", pro: false },
+      //  {name: "Sorteo", path: "/sorteo", pro: false },
      // {name: "Reportes BI", path: "/dashboard/reportes", pro: false },
     ],
     //Configuración de Menu
@@ -339,32 +341,29 @@ const AppSidebar: React.FC = () => {
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
-        <Link to="/">
+        <Link to="/" className="flex items-center justify-center w-full">
           {isExpanded || isHovered || isMobileOpen ? (
             <>
               <img
-                className="dark:hidden"
+                className="h-10 w-auto object-contain dark:hidden"
                 src="/images/logo/logocodlub.svg"
                 alt="Logo"
-                width={150}
-                height={80}
+               
               />
               <img
-                className="hidden dark:block"
+                className="h-10 w-auto object-contain hidden dark:block"
                 src="/images/logo/logocodlub.svg"
                 alt="Logo"
-                width={150}
-                height={40}
+              
               />
             </>
           ) : (
             <img
-              src="/images/logo/logocodlub.svg"
-              alt="Logo"
-              width={150}
-              height={80}
-            />
-          )}
+        src="/images/logo/logocodlub.svg"
+        alt="Logo"
+        className="h-8 w-auto object-contain"
+      />
+    )}
         </Link>
       </div>
 

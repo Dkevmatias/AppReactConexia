@@ -26,6 +26,8 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import ActivarCuenta from "./pages/Clientes/ActivarCuenta";
 import { useAuth } from "./context/useAuth";
 import { Navigate } from "react-router-dom";
+import Acumulado from "./pages/Clientes/Acumulado";
+import RealizarSorteo from "./pages/Sorteo/RealizarSorteo";
 
 
 
@@ -50,7 +52,7 @@ export default function App() {
           path="/"
           element={
             user ? (
-              <Navigate to="/dashboard/Evento" replace />
+              <Navigate to="/clientes/Evento" replace />
             ) : (
               <Navigate to="/signin" replace />
             )
@@ -75,8 +77,10 @@ export default function App() {
             </ProtectedRoute>
           }
         >
+          <Route path="/sorteo" element={<RealizarSorteo />} />
           <Route path="/dashboard/Evento" element={<Evento />} />
           <Route path="/dashboard/Boletos" element={<Boletos />} />
+          <Route path="/clientes/Acumulado" element={<Acumulado />} />
           <Route path="/dashboard/Reportes" element={<Reportes />} />
           {/*
             <Route path="/profile" element={<UserProfiles />} />
