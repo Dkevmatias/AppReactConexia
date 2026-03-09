@@ -28,3 +28,4 @@ export const getBoletosPorUsuario = async (cardCode: string,) => {
   return response.data.boletos;
    }
 
+

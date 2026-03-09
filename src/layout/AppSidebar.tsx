@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
+import AppLogo from "../components/logo/AppLogo";
+
 import {
   //BoxCubeIcon,
   //CalenderIcon,
+  Inicio,
+  TerminosIcon,
+  PromocionesIcon,
   ChevronDownIcon,
+  CanjearHicon,
   GridIcon,
   HorizontaLDots,
+  Logo50A,
   //ListIcon,
   //PageIcon,
   //PieChartIcon,
@@ -21,24 +28,47 @@ type NavItem = {
   name: string;
   icon: React.ReactNode;
   path?: string;
-  subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
+  subItems?: { name: string; path: string; icon:React.ReactNode; pro?: boolean; new?: boolean }[];
 };
 
 // === MENÚ PRINCIPAL ===
 const navItems: NavItem[] = [
   {
-    icon: <GridIcon />,
+    icon: <Inicio  />,
     name: "Inicio",
+    path: "/dashboard/home",
+    /*
     subItems: [
-      {name: "Evento", path: "/dashboard/evento", pro: false },
-      {name: "Mis Boletos", path: "/dashboard/boletos", pro: false },
+      // {name: "Inicio", path: "/dashboard/home", icon:<HiOutlineShoppingCart />, pro: false },
+       {name: "Canjear", path: "/dashboard/evento",icon:<HiOutlineShoppingCart />, pro: false },
+      // {name: "Historial", path: "/dashboard/historial", pro: false },
+      // {name: "Términos y Condiciones", path: "/dashboard/terminos", pro: false },
+      // {name: "Aviso de Privacidad", path: "/dashboard/aviso", pro: false },
+      //{name: "Mis Boletos", path: "/dashboard/boletos", pro: false },
+     
     //  {name: "Acumulado", path: "/clientes/acumulado", pro: false },
       //  {name: "Sorteo", path: "/sorteo", pro: false },
      // {name: "Reportes BI", path: "/dashboard/reportes", pro: false },
-    ],
+    ],*/
     //Configuración de Menu
-    /*
+    
   },
+   {
+    icon: <CanjearHicon />,
+    name: "Canjear",
+    path: "/dashboard/evento",
+  },
+   {
+    icon: <TerminosIcon />,
+    name: "Terminos y Condiciones",
+    path: "/dashboard/terminos",
+  },
+  {
+    icon: <PromocionesIcon />,
+    name: "Promociones",
+    path: "/dashboard/promociones",
+  },
+  /*
   {
     icon: <CalenderIcon />,
     name: "Calendar",
@@ -67,8 +97,8 @@ const navItems: NavItem[] = [
       { name: "404 Error", path: "/error-404", pro: false },
     ],
   },
-*/
-}
+
+}*/
 ];
 
 // === OTROS MENÚS ===
@@ -117,6 +147,7 @@ const AppSidebar: React.FC = () => {
     type: "main" | "others";
     index: number;
   } | null>(null);
+
 
   const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -198,7 +229,7 @@ const AppSidebar: React.FC = () => {
   };
 
   const renderMenuItems = (items: NavItem[], menuType: "main" | "others") => (
-    <ul className="flex flex-col gap-4">
+    <ul className="flex flex-col gap-6">
       {items.map((nav, index) => (
         <li key={nav.name}>
           {nav.subItems ? (
@@ -285,7 +316,12 @@ const AppSidebar: React.FC = () => {
                           : "menu-dropdown-item-inactive"
                       }`}
                     >
-                      {subItem.name}
+                      
+                     {/*Anteriormente no tenía Icono {subItem.name}*/} 
+                      <div className="flex items-center gap-2">
+                      {subItem.icon}
+                      <span>{subItem.name}</span>
+                    </div>
                       <span className="flex items-center gap-1 ml-auto">
                         {subItem.new && (
                           <span
@@ -323,7 +359,7 @@ const AppSidebar: React.FC = () => {
 
   return (
     <aside
-      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
+      className={`fixed mt-16 flex flex-col lg:mt-0 top-0 px-5 left-0 bg-white dark:bg-black dark:border-neutral-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-50 border-r border-gray-200 
         ${
           isExpanded || isMobileOpen
             ? "w-[290px]"
@@ -342,32 +378,15 @@ const AppSidebar: React.FC = () => {
         }`}
       >
         <Link to="/" className="flex items-center justify-center w-full">
-          {isExpanded || isHovered || isMobileOpen ? (
-            <>
-              <img
-                className="h-10 w-auto object-contain dark:hidden"
-                src="/images/logo/logocodlub.svg"
-                alt="Logo"
-               
-              />
-              <img
-                className="h-10 w-auto object-contain hidden dark:block"
-                src="/images/logo/logocodlub.svg"
-                alt="Logo"
-              
-              />
-            </>
-          ) : (
-            <img
-        src="/images/logo/logocodlub.svg"
-        alt="Logo"
-        className="h-8 w-auto object-contain"
-      />
-    )}
-        </Link>
+            {isExpanded || isHovered || isMobileOpen ? (
+              <AppLogo size="h-30" />
+            ) : (
+              <AppLogo size="h-22" />
+            )}
+      </Link>
       </div>
 
-      <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
+      <div className="flex flex-col  h-full overflow-y-auto duration-300 ease-linear no-scrollbar">
         <nav className="mb-6">
           <div className="flex flex-col gap-4">
             <div>
@@ -405,6 +424,25 @@ const AppSidebar: React.FC = () => {
             </div>)}
           </div>
         </nav>
+        <div className="mt-auto pb-6 flex flex-col items-center text-center px-4">
+  {/* Imagen modo claro */}
+  <img
+    src="/images/page/footerSB-white.png"
+    className="block dark:hidden max-w-[150px] mb-3"  
+  />
+
+  {/* Imagen modo oscuro */}
+  <img
+    src="/images/page/footerSBar-dark.png"
+    className="hidden dark:block max-w-[150px] mb-3"
+  />
+  {/* Texto */}
+  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+    © 2026 CODIALUB - Programa de Recompensas.<br />
+    Todos los derechos reservados.
+  </p>
+
+</div>
         {/* {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null} */}
       </div>
     </aside>

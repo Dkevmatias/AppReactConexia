@@ -213,16 +213,16 @@ export default function ActivarCuenta() {
                 className="w-32 md:w-44 lg:w-52 h-auto mb-3"
               />
               <h1 className="text-lg lg:text-xl font-semibold" style={{ fontFamily: "Conthrax" }}>
-                Activa tu cuenta
+                Comienza tu camino hacia los premios
               </h1>
               <p className="text-sm text-gray-600" style={{ fontFamily: "Conthrax" }}>
-                Configura tu correo y contraseña para comenzar
+                registrate para empezar a acumular puntos con tus compras
               </p>
             </div>
 
             {/* Info del usuario */}
             <div className="mb-5 p-3 bg-gray-50 rounded-lg border-l-4 border-yellow-400">
-              <p className="text-xs text-gray-600 mb-1">Activando cuenta para:</p>
+              <p className="text-xs text-gray-600 mb-1">Bienvenido:</p>
               <p className="text-base font-bold text-gray-900">{nombre}</p>
               <p className="text-xs text-gray-600">
                 Código de Cliente: <span className="font-semibold">{cardCode}</span>
@@ -386,7 +386,7 @@ export default function ActivarCuenta() {
                 )}
               </button>
 
-               {/* Terminos y Condiciones 
+               {/* Terminos y Condiciones */}
               <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
                 <input
                   type="checkbox"
@@ -399,20 +399,20 @@ export default function ActivarCuenta() {
                   <button
                       type="button"
                       onClick={() => setOpenLegalModal(true)}
-                      className="text-sky-600 font-semibold hover:underline"
+                      className="text-yellow-600 font-semibold hover:underline"
                     >
                           Términos y Condiciones
                   </button>{" "} y el{" "}
                   <button
                       type="button"
                       onClick={() => setOpenLegalModal(true)}
-                      className="text-sky-600 font-semibold hover:underline"
+                      className="text-yellow-600 font-semibold hover:underline"
                     >
                       Aviso de Privacidad
                   </button>
                 </span>
               </div>
-*/}
+
             </form>
 
             {/* Footer */}

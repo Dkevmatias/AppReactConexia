@@ -28,6 +28,10 @@ import { useAuth } from "./context/useAuth";
 import { Navigate } from "react-router-dom";
 import Acumulado from "./pages/Clientes/Acumulado";
 import RealizarSorteo from "./pages/Sorteo/RealizarSorteo";
+import Home from "./pages/Dashboard/Home";
+import Terminos from "./pages/Dashboard/Terminos";
+import Aviso from "./pages/Dashboard/Aviso";
+
 
 
 
@@ -52,7 +56,7 @@ export default function App() {
           path="/"
           element={
             user ? (
-              <Navigate to="/clientes/Evento" replace />
+              <Navigate to="/dashboard/Home" replace />
             ) : (
               <Navigate to="/signin" replace />
             )
@@ -62,7 +66,7 @@ export default function App() {
         {/* Auth */}
         <Route
           path="/signin"
-          element={user ? <Navigate to="/dashboard/Evento" replace /> : <SignIn />}
+          element={user ? <Navigate to="/dashboard/Home" replace /> : <SignIn />}
         />
         <Route path="/signup" element={<SignUp />} />
 
@@ -79,9 +83,13 @@ export default function App() {
         >
           <Route path="/sorteo" element={<RealizarSorteo />} />
           <Route path="/dashboard/Evento" element={<Evento />} />
+           <Route path="/dashboard/Home" element={<Home />} />
           <Route path="/dashboard/Boletos" element={<Boletos />} />
-          <Route path="/clientes/Acumulado" element={<Acumulado />} />
           <Route path="/dashboard/Reportes" element={<Reportes />} />
+          <Route path="/dashboard/Terminos" element={<Terminos />} />
+          <Route path="/dashboard/Aviso" element={<Aviso />} />
+          <Route path="/clientes/Acumulado" element={<Acumulado />} />
+          
           {/*
             <Route path="/profile" element={<UserProfiles />} />
             <Route path="/calendar" element={<Calendar />} />

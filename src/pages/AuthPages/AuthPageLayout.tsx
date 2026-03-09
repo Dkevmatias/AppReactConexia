@@ -14,11 +14,15 @@ export default function AuthLayout({
         {children}
     {/*     <div className="items-center hidden w-full h-full lg:w-1/2 bg-brand-950 dark:bg-white/5 lg:grid">*/}
       
-        <div
-            className="relative hidden w-full h-full lg:w-1/2 lg:flex items-center justify-center bg-cover bg-center"
-            style={{
-            backgroundImage: "url('/images/page/pagelogin.png')",
-            }}>
+      <div
+  className="
+    relative hidden w-full h-full lg:w-1/2 lg:flex 
+    items-center justify-center 
+    bg-cover bg-center
+    bg-[url('/images/page/pagelogin.png')]
+    dark:bg-[url('/images/page/pagelogin-dark.png')]
+  "
+>
 
         {/* <!-- ===== Se comento el Grid Shape  por cambios de Diseño===== --> 
           <div className="relative flex items-center justify-center z-1">

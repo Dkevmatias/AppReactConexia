@@ -21,7 +21,7 @@ function LayoutContent() {
 
 
   return (
-    <div className="min-h-screen xl:flex bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen xl:flex bg-gray-50 dark:bg-black">
       {/*  Sidebar + fondo móvil */}
       <AppSidebar />
       <Backdrop />

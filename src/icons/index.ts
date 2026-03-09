@@ -54,8 +54,27 @@ import { ReactComponent as ChatIcon } from "./chat.svg?react";
 import { ReactComponent as MoreDotIcon } from "./moredot.svg?react";
 import { ReactComponent as AlertHexaIcon } from "./alert-hexa.svg?react";
 import { ReactComponent as ErrorHexaIcon } from "./info-hexa.svg?react";
+import { ReactComponent as CanjearHicon } from "./Icon-Canjear.svg?react";
+import { ReactComponent as TerminosIcon } from "./Icon-Terminos.svg?react";
+import { ReactComponent as PromocionesIcon } from "./Icon-Promociones.svg?react";
+import { ReactComponent as Celular } from "./celu.svg?react";
+import { ReactComponent as Mail } from "./mail.svg?react";
+import { ReactComponent as Inicio } from "./Icon-Inicio.svg?react";
+import { ReactComponent as Logo50A } from "./logo50A.svg?react";
+import { ReactComponent as Grafic } from "./Icongrafic.svg?react";
+import { ReactComponent as Puntos } from "./Iconpoints.svg?react";
+
 
 export {
+  Grafic,
+  Puntos,
+  Logo50A,
+  Inicio,
+  Mail,
+  Celular,
+  TerminosIcon,
+  CanjearHicon,
+  PromocionesIcon,
   ErrorHexaIcon,
   AlertHexaIcon,
   MoreDotIcon,
