@@ -9,19 +9,30 @@ import { ThemeProvider } from "./context/ThemeContext.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import { VentaProvider } from "./context/VentaContext.tsx";
 import { SaldoProvider } from "./context/SaldoContext.tsx";
+import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
+
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AuthProvider>
-      <VentaProvider>
-      <SaldoProvider>
-      <ThemeProvider>
-        <AppWrapper>
-          <App />
-        </AppWrapper>
-      </ThemeProvider>
-      </SaldoProvider>    
-      </VentaProvider>
-    </AuthProvider>
+    <GoogleReCaptchaProvider
+      reCaptchaKey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+      scriptProps={{
+        async: true,
+        defer: true,
+        appendTo: "head",
+      }}
+    >
+      <AuthProvider>
+        <VentaProvider>
+        <SaldoProvider>
+        <ThemeProvider>
+          <AppWrapper>
+            <App />
+          </AppWrapper>
+        </ThemeProvider>
+        </SaldoProvider>    
+        </VentaProvider>
+      </AuthProvider>
+    </GoogleReCaptchaProvider>
   </StrictMode>
 );

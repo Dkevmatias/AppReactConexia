@@ -23,9 +23,10 @@ export interface BoletoConfirmacion {
 }
 
 const ticketOptions: TicketOption[] = [
-  { id: "Rojo", label: "Boletos Camionetas", value: 50, color: "bg-[var(--color-red-light)] text-black", idBoleto: 1 },
-  { id: "Azul", label: "Boletos Motos", value: 25, color: "bg-[var(--color-blue-light)] text-black", idBoleto: 2 },
-  { id: "Gris", label: "Boleto Computadoras", value: 10, color: "bg-[var(--color-gray-light)] text-black", idBoleto: 3 },
+  { id: "Rojo", label:  "Camioneta", value: 2000, color: "bg-[var(--color-red-light)] text-black", idBoleto: 1 },
+  { id: "Azul", label:  "Motos", value: 440, color: "bg-[var(--color-blue-light)] text-black", idBoleto: 2 },
+  { id: "Gris", label:  "Laptops", value: 300, color: "bg-[var(--color-gray-light)] text-black", idBoleto: 3 },
+
 ];
 
 export default function TicketSelector({ totalCompra,vencido, mesRedencion }: { totalCompra: number, vencido: boolean, mesRedencion: string }) {
@@ -37,9 +38,6 @@ export default function TicketSelector({ totalCompra,vencido, mesRedencion }: { 
   const { periodo,periodoActivo: periodoActivo,tieneBoletos, loading } = usePeriodoActivo();  
   const precioMinimo = Math.min(...ticketOptions.map(t => t.value));
   
-
-  //console.log('vencido componente:', vencido, 'tipo:', typeof vencido);
-
   const [openConfirm, setOpenConfirm] = useState(false);
   //const [confirmData, setConfirmData] = useState({ total: 0, boletos: []});
   const [confirmData, setConfirmData] = useState<{
@@ -57,8 +55,6 @@ export default function TicketSelector({ totalCompra,vencido, mesRedencion }: { 
     setOnConfirmCallback(() => onConfirm);
     setOpenConfirm(true);
   };
-
-
 
   const [selected, setSelected] = useState<Record<string, number>>({
     Rojo: 0,
@@ -175,17 +171,19 @@ export default function TicketSelector({ totalCompra,vencido, mesRedencion }: { 
       message="Tus boletos fueron registrados con éxito. Serás redirigido al historial."
     />
   )}  
-
-      <PeriodoAlert periodoActivo={periodoActivo} tieneBoletos={tieneBoletos} saldoVencido={vencido} />
-     
-   
-       {/* HEADER */}
+     {/* <PeriodoAlert periodoActivo={periodoActivo} tieneBoletos={tieneBoletos} saldoVencido={vencido} />*/}
+      <PeriodoAlert periodoActivo={periodoActivo}  saldoVencido={vencido} />
+        
+       {/* HEADER 
       <div className="text-center text-gray-700 dark:text-gray-300">
         Puntos Acumulados del Mes de {mesRedencion}:<span className="mb-4 text-gray-700 dark:text-gray-300">{(totalCompra ?? 0).toLocaleString()}</span>
         <br />
         Puntos Restantes: <span className="mb-4 text-gray-700 dark:text-gray-300">{(tieneBoletos ? 0 : restante).toLocaleString()}</span>
       </div>
-              {/* Mostrar máximos por color */}
+      */}
+
+
+      {/* Se comenta todo por cambios de dinamica 
     <div className="text-center text-sm text-gray-600">Puedes seleccionar hasta:<br/>
 
   <div className="flex justify-center gap-2 flex-wrap mt-1">
@@ -194,7 +192,7 @@ export default function TicketSelector({ totalCompra,vencido, mesRedencion }: { 
         <span>
           {t.label}:{maxPorColor(t.value)} boletos   
         </span>
-        {/* Agregar la "O" SOLO si no es la última opción */}
+       
         {index < ticketOptions.length - 1 && (
           <span className="mx-2 font-bold text-gray-800">Ó</span>
         )}        
@@ -204,13 +202,13 @@ export default function TicketSelector({ totalCompra,vencido, mesRedencion }: { 
      <div className="text-center text-sm text-gray-600">Una combinación de ellos:
        <br/>
      </div>
-  </div>
+  </div> 
    
     <div className="text-center text-sm text-gray-600">
       *Recuerda que el total de puntos Sobrantes  no acumulan para el siguiente mes.
       <br/>
   </div>
-</div>
+</div>*/}
          
       {/* Componente Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

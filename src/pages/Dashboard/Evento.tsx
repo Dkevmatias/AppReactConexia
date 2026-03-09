@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
 import Confetti from "react-confetti";
 import PageMeta from "../../components/common/PageMeta";
-import BoletosCards from "../../components/evento/CardBoletos";
+import PremiosComponente from "../../components/evento/PremiosComponente";
+import SidebarEvento from "../../components/evento/SidebarEvento";
 import { useVenta } from "../../context/VentaContext";
 import { useVencido } from "../../context/SaldoContext";
 import { useAuth } from "../../context/useAuth";
-import { getPersonas,getVentasCLientes,getSaldoClientes,getPeriodoEvaluar } from "../../services/authService";
-import { data } from "react-router";
+
+import {
+  getPersonas,
+  getVentasCLientes,
+  getSaldoClientes,
+  getPeriodoEvaluar,
+  AsignarPuntos
+} from "../../services/authService";
 
 const formatDate = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 
 interface Persona {
   idPersona: number;
@@ -18,80 +27,63 @@ interface Persona {
 
 export default function Evento() {
   const { user } = useAuth();
-  const { ventaTotal, ventaMesActual,mesAnterior,mesActual, setMesAnterior, setVentaTotal, setVentaMesActual,setmesActual } = useVenta();
-  const {saldoVencido, setSaldoVencido } = useVencido();
+  const { ventaTotal, setVentaTotal } = useVenta();
+  const { saldoVencido, setSaldoVencido } = useVencido();
+
   const [confeti, setConfeti] = useState(false);
   const [loading, setLoading] = useState(true);
+
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
-    height: window.innerHeight,
+    height: window.innerHeight
   });
 
- 
-  //Cargar datos protegidos
+  // ================================
+  // CARGAR DATOS
+  // ================================
+
   useEffect(() => {
     if (!user) return;
 
     const cargarDatos = async () => {
       try {
-          setLoading(true);
-    const personas: Persona[] = await getPersonas(user.idPersona);
-    const cardCodes = personas
+        setLoading(true);
+
+        const personas: Persona[] = await getPersonas(user.idPersona);
+
+        const cardCodes = personas
           .filter(p => p?.cardCode)
           .map(p => p.cardCode)
           .join(",");
-        
 
-    const periodo = await getPeriodoEvaluar();
+        const periodo = await getPeriodoEvaluar();
 
-    const Mes = new Date(periodo.fechaFin);
-    const fechaMesAnterior = new Date(Mes.getFullYear(), Mes.getMonth() - 1, 1);
-    const nombreMeses = [
-    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-    const mesAnterior = nombreMeses[fechaMesAnterior.getMonth()];
-    const mesActual= nombreMeses[Mes.getMonth()];
-    setmesActual(mesActual);  
-    setMesAnterior(mesAnterior);
-        
-        // Mes actual
-        const inicioMesActual = new Date(periodo.fechaFin);
-        inicioMesActual.setDate(1);
-        inicioMesActual.setMonth(inicioMesActual.getMonth() + 1);
-        const finMesActual = new Date(inicioMesActual);
-        finMesActual.setMonth(finMesActual.getMonth() + 1);
-        finMesActual.setDate(0);
-      
-        const fiperiodo= new Date(periodo.fechaInicio)
-        fiperiodo.setFullYear(fiperiodo.getFullYear() -1);
-        const ffperiodo= new Date(periodo.fechaFin)
-        ffperiodo.setFullYear(ffperiodo.getFullYear() -1);
+        const inicio = new Date(periodo.fechaInicio);
+        const fin = new Date(periodo.fechaFin);
 
-        //año anterior para pruebas
-        const fechaIañoanterior = new Date(inicioMesActual);
-        fechaIañoanterior.setFullYear(inicioMesActual.getFullYear() - 1);
-        const fechaFañoanterior = new Date(finMesActual);
-        fechaFañoanterior.setFullYear(finMesActual.getFullYear() - 1);
-          
-        //const ventasPeriodo = await getVentasCLientes(periodo.fechaInicio,periodo.fechaFin,cardCodes);
-        const ventasPeriodo = await getVentasCLientes(formatDate(fiperiodo),formatDate(ffperiodo), cardCodes); 
-             
-        //const ventasMesActual = await getVentasCLientes(formatDate(inicioMesActual),formatDate(finMesActual),cardCodes);
-        const ventasMesActual = await getVentasCLientes(formatDate(fechaIañoanterior),formatDate(fechaFañoanterior), cardCodes); 
-        const saldo = await getSaldoClientes(cardCodes);     
-        //const totalVentas = ventasPeriodo?.[0]?.totalVentas ?? 0;
-        const totalVentas = 223425;
-         const totalMesActual = ventasMesActual?.[0]?.totalVentas ?? 0;     
-    
-        setVentaTotal(Math.round((totalVentas / 1.16) / 1000));
-        setVentaMesActual(Math.round((totalMesActual / 1.16) / 1000));
-        setSaldoVencido(saldo[0]?.vencido ?? false);
+        inicio.setFullYear(inicio.getFullYear() - 1);
+        fin.setFullYear(fin.getFullYear() - 1);
 
+        const ventas = await getVentasCLientes(
+          formatDate(inicio),
+          formatDate(fin),
+          cardCodes
+        );
+
+        const saldo = await getSaldoClientes(cardCodes);
+
+        const totalVentas = ventas?.[0]?.totalVentas ?? 0;
+
+        const puntos = Math.round(totalVentas / 5000);
+
+        await AsignarPuntos(1, puntos, 0, user.cardCode!);
+
+        setVentaTotal(Math.round(totalVentas / 1.16 / 5000));
+        setSaldoVencido(saldo?.[0]?.vencido ?? false);
       } catch (error) {
-          if (import.meta.env.DEV) {
+        if (import.meta.env.DEV) {
           console.error("Error cargando datos del evento", error);
         }
-        
       } finally {
         setLoading(false);
       }
@@ -100,32 +92,46 @@ export default function Evento() {
     cargarDatos();
   }, [user]);
 
-  
+  // ================================
+  // CONFETTI
+  // ================================
+
   useEffect(() => {
     setConfeti(true);
     const timer = setTimeout(() => setConfeti(false), 5000);
     return () => clearTimeout(timer);
   }, []);
 
+  // ================================
+  // WINDOW SIZE
+  // ================================
 
   useEffect(() => {
     const handleResize = () =>
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   if (loading) {
-    return <div className="text-center p-10">Cargando información...</div>;
+    return (
+      <div className="text-center p-10">
+        Cargando información...
+      </div>
+    );
   }
 
   return (
-    <div>
+    <>
       <PageMeta
         title="Evento"
         description="Página de evento protegida"
       />
+
       {confeti && (
         <Confetti
           width={windowSize.width}
@@ -135,30 +141,42 @@ export default function Evento() {
         />
       )}
 
-      <div className="grid grid-cols-1 gap-6">
-        <h1 className="mb-4 text-3xl font-bold text-center text-gray-700 dark:text-gray-300">
-          🎉 ¡Bienvenido, Suerte con tu Elección! 🎉
+      {/* HEADER */}
+      <div className="mb-10 text-center space-y-3">
+        <h1
+          className="text-3xl font-bold text-gray-700 dark:text-gray-300"
+          style={{ fontFamily: "Conthrax" }}
+        >
+          Bienvenido a tus recompensas 🎉
         </h1>
 
-        <div className="p-6 bg-white border rounded-lg shadow-sm dark:bg-gray-800 dark:border-gray-700">
-          <p className="mb-4 text-gray-700 dark:text-gray-300">
-            Gracias por ser parte de nuestros 50 aniversarios.
-          </p>
+        <p className="text-gray-600 dark:text-gray-300">
+          Tus puntos acumulados te han abierto la puerta a beneficios exclusivos.
+        </p>
 
-          <p className="mb-4 text-gray-700 dark:text-gray-300">
-            Por cada $1000 antes de impuestos recibes 1 punto.
-          </p>
-          <p className="mb-4 text-gray-700 dark:text-gray-300">
-          Monto del Mes en Curso {mesActual}:
-          <strong>{ventaMesActual}</strong>
-          </p>
-       </div>
+        <p className="text-gray-600 dark:text-gray-300">
+          Canjéalos y disfruta todo lo que tenemos preparado para ti.
+        </p>
+      </div>
+
+      {/* LAYOUT */}
+      <div className="grid grid-cols-12 gap-8">
+
+        {/* PREMIOS */}
+        <div className="col-span-12 lg:col-span-9">
+          <PremiosComponente
+            totalPuntos={ventaTotal ?? 0}
+            vencido={saldoVencido ?? false}
+          />
+        </div>
+
+        {/* SIDEBAR */}
+          <div className="col-span-12 lg:col-span-3">
+            <SidebarEvento puntos={ventaTotal ?? 0} />
+          </div>
         
-                <BoletosCards totalCompra={ventaTotal ?? 0 }
-                            vencido={saldoVencido ?? false }
-                            mesRedencion={mesAnterior ?? ""} />
 
       </div>
-    </div>
+    </>
   );
 }
