@@ -163,7 +163,7 @@ export default function TicketSelector({ totalCompra,vencido, mesRedencion }: { 
       message="Tus boletos fueron registrados con éxito. Serás redirigido al historial."
     />
   )}  
-      <PeriodoAlert periodoActivo={periodoActivo} tieneBoletos={tieneBoletos} saldoVencido={vencido} />
+      <PeriodoAlert periodoActivo={periodoActivo}  saldoVencido={vencido} />
           
       {/* Componente Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
