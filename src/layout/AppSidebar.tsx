@@ -424,24 +424,25 @@ const AppSidebar: React.FC = () => {
             </div>)}
           </div>
         </nav>
-        <div className="mt-auto pb-6 flex flex-col items-center text-center px-4">
-  {/* Imagen modo claro */}
-  <img
-    src="/images/page/footerSB-white.png"
-    className="block dark:hidden max-w-[150px] mb-3"  
-  />
+        <div  className={`mt-auto pb-6 flex flex-col items-center text-center px-4
+    ${isExpanded || isHovered || isMobileOpen ? "flex" : "hidden"}  // si isOpen false → oculto`}
+>
+          {/* Imagen modo claro */}
+          <img
+            src="/images/page/footerSB-white.png"
+            className="block dark:hidden max-w-[150px] mb-3"  
+          />
 
-  {/* Imagen modo oscuro */}
-  <img
-    src="/images/page/footerSBar-dark.png"
-    className="hidden dark:block max-w-[150px] mb-3"
-  />
-  {/* Texto */}
-  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-    © 2026 CODIALUB - Programa de Recompensas.<br />
-    Todos los derechos reservados.
-  </p>
-
+          {/* Imagen modo oscuro */}
+          <img
+            src="/images/page/footerSBar-dark.png"
+            className="hidden dark:block max-w-[150px] mb-3"
+          />
+          {/* Texto */}
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            © 2026 CODIALUB - Programa de Recompensas.<br />
+            Todos los derechos reservados.
+          </p>
 </div>
         {/* {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null} */}
       </div>
