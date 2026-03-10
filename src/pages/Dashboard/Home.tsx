@@ -180,6 +180,7 @@ const Home: React.FC = () => {
                   >
                     Bienvenido {user?.fullname}
                   </h2>
+                  <br></br>
                   <p className="font-semibold text-gray-800 dark:text-white/90 
                             text-base sm:text-sm xs:text-2xl text-left">
                     Gracias por ser parte de 50 Años de Trabajo, confianza y<br/>
@@ -271,11 +272,14 @@ const Home: React.FC = () => {
           />
               
             {/* Sección Derecha - Portafolio */}           
-            <div className="absolute top-4 center-4">
-            <h2  className="font-semibold text-gray-800  dark:text-white/90 
-                            text-base sm:text-sm xs:text-2xl text-center "
-                  style={{ fontFamily: "Conthrax" }}>Portafolio</h2>                 
-          </div>
+            <div className="absolute top-4 center">
+              <h2
+            className="font-bold text-3xl sm:text-4xl text-gray-800 dark:text-white/90 text-center tracking-wide"
+            style={{ fontFamily: "Conthrax" }}
+          >
+            Portafolio
+          </h2>               
+                    </div>
              </div>             
                     
                   {/* Sección Derecha - Redes */}  
