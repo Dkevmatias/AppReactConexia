@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -6,15 +7,22 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 const Terminos = () => {
+  const [file, setFile] = useState<Blob | null>(null);
+
+  useEffect(() => {
+    fetch("/legal/TerminosCondiciones.pdf")
+      .then((res) => res.blob())
+      .then((blob) => setFile(blob))
+      .catch((err) => console.error(err));
+  }, []);
+
   return (
     <div style={{ height: "100vh", overflow: "auto", textAlign: "center" }}>
-      <Document
-        file={{
-          url: "https://aniversario.codialub.com/legal/TerminosCondiciones.pdf",  
-        }}
-      >
-        <Page pageNumber={1} width={900} />
-      </Document>
+      {file && (
+        <Document file={file}>
+          <Page pageNumber={1} width={900} />
+        </Document>
+      )}
     </div>
   );
 };
