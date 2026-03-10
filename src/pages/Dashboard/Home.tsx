@@ -83,7 +83,7 @@ const Home: React.FC = () => {
       const { inicio: inicioMes, fin: finMes } = getRangoMes(fechaFin);
       const { inicio: inicioAnual, fin: finAnual } = getRangoAnual();
 
-      // 4️Año anterior (solo si es para pruebas)
+      // 4Año anterior (solo si es para pruebas)
       const inicioPeriodo = new Date(fechaInicio);
       inicioPeriodo.setFullYear(inicioPeriodo.getFullYear() - 1);
 
@@ -94,33 +94,30 @@ const Home: React.FC = () => {
       inicioMesAnterior.setFullYear(inicioMesAnterior.getFullYear() - 1);
 
       const finMesAnterior = new Date(finMes);
-      finMesAnterior.setFullYear(finMesAnterior.getFullYear() - 1);
-      
-  
-      console.log("Mes actual:", formatDate(inicioMes), "a", formatDate(finMes));
-      console.log("Anual:", formatDate(inicioAnual), "a", formatDate(finAnual));
-       
+      finMesAnterior.setFullYear(finMesAnterior.getFullYear() - 1);     
+        
       // Ejecutar en paralelo
       const [ventasPeriodo, ventasMes] = await Promise.all([
         getVentasCLientes(formatDate(inicioAnual), formatDate(finAnual), cardCodes),
         getVentasCLientes(formatDate(inicioMes), formatDate(finMes), cardCodes)
        
       ]);
-      console.log("Ventas periodo:", ventasPeriodo);
-      console.log("Ventas mes:", ventasMes);
-      console.log("CardCodes:", cardCodes);
-
+      console.log("ventasPeriodo", ventasPeriodo);
+      console.log("ventasMes", ventasMes);   
+      
       const totalPeriodo = ventasPeriodo?.[0]?.totalVentas ?? 0;
       const totalMes = ventasMes?.[0]?.totalVentas ?? 0;
 
       // Lógica de negocio separada
-      const puntosPeriodo = Math.round((totalPeriodo / 1.16) / 5000);
-      const puntosMes = Math.round((totalMes / 1.16) / 1000);
+      //const puntosPeriodo = Math.round((totalPeriodo / 1.16) / 5000);
+      //const puntosMes = Math.round((totalMes / 1.16) / 1000);
 
-      setVentaTotal(puntosPeriodo);
-      console.log("Puntos periodo:", puntosPeriodo);
+        const puntosPeriodo = 50;
+        const puntosMes = 7;
+
+      setVentaTotal(puntosPeriodo);   
       setVentaMesActual(puntosMes);
-      console.log("Puntos mes:", puntosMes);
+    
 
     } catch (error) {
       if (import.meta.env.DEV) {
