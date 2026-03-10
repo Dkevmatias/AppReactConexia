@@ -52,6 +52,7 @@ useEffect(() => {
   const [refresh, setRefresh] = useState(false);
   const [confeti, setConfeti] = useState(false);
   const { periodo,periodoActivo: periodoActivo } = usePeriodoActivo();
+  const [mostrarModal, setMostrarModal] = useState(false);
   
   const [premios, setPremios] = useState<Premio[]>([]);
   const [historial, setHistorial] = useState<Record<number, number>>({});
@@ -70,13 +71,15 @@ useEffect(() => {
       setConfeti(true);
       setTimeout(() => {
         setConfeti(false);
-      }, 4000);      
+      }, 4000);
+         
 
       // 🧹 Limpiar selección
       setSelected(prev => ({
         ...prev,
         [premio.idPremio]: 0,
       }));
+      setMostrarModal(true);
 
       console.log("Canje exitoso");
     } catch (error) {
@@ -224,6 +227,30 @@ useEffect(() => {
         );
       })}
     </div>
+    {mostrarModal && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
+    
+    <div className="bg-white rounded-xl p-6 shadow-lg w-80 text-center">
+      
+      <h2 className="text-lg font-semibold mb-2">
+        🎉 ¡Canje realizado!
+      </h2>
+
+      <p className="text-gray-600 text-sm mb-4">
+        Has canjeado tu premio correctamente.
+      </p>
+
+      <button
+        onClick={() => setMostrarModal(false)}
+        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+      >
+        Aceptar
+      </button>
+
+    </div>
+
+  </div>
+)}
       </div>
       );
     }
