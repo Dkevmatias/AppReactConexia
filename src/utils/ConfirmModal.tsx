@@ -55,11 +55,6 @@ export default function ConfirmModal({
   }, {})
 );
 
-  
-
-  //const listaBoletos = Array.isArray(boletos) ? boletos : [];
-  //console.log("listaBoletos en modal:", listaBoletos);
-
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl w-[90%] max-w-md p-6 animate-fadeIn scale-100">

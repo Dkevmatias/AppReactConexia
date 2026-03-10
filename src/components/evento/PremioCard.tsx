@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { BarraProgreso } from "./BarraProgreso";
 import { EstadoPremio } from "../../types/EstadoPremio";
+import { useState } from "react";
 
 type Premio = {
   idPremio: number;
@@ -39,6 +40,7 @@ const sinStock = premio.existencia <= 0;
 const limiteAlcanzado = yaCanjeados >= premio.limite;
 const tienePuntos = restante >= premio.puntos;
 
+
 let estado: EstadoPremio;
 
 if (sinStock) {
@@ -50,7 +52,6 @@ if (sinStock) {
 } else {
   estado = "disponible";
 }
-  const limiteSeleccion = yaCanjeados + qty >= premio.limite;
   const premioCanjeado = yaCanjeados >= premio.limite;
   
   return (
@@ -147,6 +148,7 @@ if (sinStock) {
           Canjear premio
         </button>
       )}
+      
 
       {/* Selector cantidad */}
       {premio.limite > 1 && (

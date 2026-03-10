@@ -192,7 +192,7 @@ const Home: React.FC = () => {
             <div className="stats-cards flex justify-center gap-6 mt-16 max-w-2xl mx-auto">
 
                   <div className="stat-card month w-80 p-8">
-                    <Grafic className="w-5 h-5 text-gray-800 dark:text-white" />
+                    <Grafic className="w-20 h-20 text-gray-800 dark:text-white" />
                     <div className="stat-info">
                       <span className="stat-title">Resumen de {mesActual}</span>
                       <span className="stat-value">{ventaMesActual} <small>pts</small></span>
@@ -201,7 +201,7 @@ const Home: React.FC = () => {
                   </div>
 
                   <div className="stat-card total w-80 p-8">
-                    <Puntos className="w-5 h-5 text-gray-800 dark:text-white" />
+                    <Puntos className="w-20 h-20 text-gray-800 dark:text-white" />
                     <div className="stat-info">
                       <span className="stat-title">Puntos acumulados</span>
                       <span className="stat-value">{ventaTotal} <small>pts</small></span>
@@ -271,9 +271,9 @@ const Home: React.FC = () => {
           />
               
             {/* Sección Derecha - Portafolio */}           
-            <div className="absolute top-4 left-4">
-            <h2  className="font-semibold text-gray-800 dark:text-white/90 
-                            text-base sm:text-sm xs:text-2xl text-left"
+            <div className="absolute top-4 center-4">
+            <h2  className="font-semibold text-gray-800  dark:text-white/90 
+                            text-base sm:text-sm xs:text-2xl text-center "
                   style={{ fontFamily: "Conthrax" }}>Portafolio</h2>                 
           </div>
              </div>             
@@ -382,11 +382,11 @@ const Home: React.FC = () => {
         </div>              
       </main>
       
-      <footer className="mt-6 w-full">
+      <footer className="mt-10 w-full">
           <img
         src="/images/page/meta.png"
         alt="Codialub"
-            className="w-full h-auto object-cover"
+        className="w-full h-[180px] object-cover"
       />        
       </footer>
     </div>
