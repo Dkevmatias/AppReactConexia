@@ -18,7 +18,7 @@
   "globalHeaders": {
     "content-security-policy": "default-src 'self' https: 'unsafe-inline' 'unsafe-eval'",
     "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
+    "X-Frame-Options": "SAMEORIGIN",
     "X-XSS-Protection": "1; mode=block"
   },
   "mimeTypes": {
