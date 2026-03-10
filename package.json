@@ -24,6 +24,7 @@
     "flatpickr": "^4.6.13",
     "framer-motion": "^12.34.1",
     "jwt-decode": "^4.0.0",
+    "pdfjs-dist": "^5.4.624",
     "react": "^19.0.0",
     "react-apexcharts": "^1.7.0",
     "react-confetti": "^6.4.0",
