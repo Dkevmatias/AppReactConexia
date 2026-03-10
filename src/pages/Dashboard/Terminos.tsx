@@ -8,9 +8,11 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 const Terminos = () => {
   return (
     <div style={{ height: "100vh", overflow: "auto", textAlign: "center" }}>
-      <Document file={{
-    url: "https://aniversario.codialub.com/legal/TerminosCondiciones.pdf",
-  }}>
+      <Document
+        file={{
+          url: "https://aniversario.codialub.com/legal/TerminosCondiciones.pdf",  
+        }}
+      >
         <Page pageNumber={1} width={900} />
       </Document>
     </div>
