@@ -658,14 +658,20 @@
   border-bottom-left-radius: 20px;
   border-bottom-right-radius: 20px;
 }
-
+.card-accent-canje {
+  height: 6px;                  /* altura de la línea */
+  width: 100%;                  /* ocupa todo el ancho del card */
+  background-color: #1dd1a1;    /* verde */
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+}
 /* Colores personalizados */
 .stat-card.month .card-accent {
-  background: #1dd1a1;
+  background: #ff4d4f;
 }
 
 .stat-card.total .card-accent {
-  background: #ff4d4f;
+  background: #1dd1a1; 
 }
 
 /* Responsive */

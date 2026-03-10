@@ -102,8 +102,7 @@ const Home: React.FC = () => {
         getVentasCLientes(formatDate(inicioMes), formatDate(finMes), cardCodes)
        
       ]);
-      console.log("ventasPeriodo", ventasPeriodo);
-      console.log("ventasMes", ventasMes);   
+     
       
       const totalPeriodo = ventasPeriodo?.[0]?.totalVentas ?? 0;
       const totalMes = ventasMes?.[0]?.totalVentas ?? 0;
@@ -285,7 +284,8 @@ const Home: React.FC = () => {
             <div className="bg-white dark:bg-gray-900 
                             border border-gray-200 dark:border-gray-700
                             rounded-2xl p-6 
-                            shadow-sm hover:shadow-md 
+                            shadow-sm hover:shadow-md
+                            w-full max-w-80 relative mx-auto  
                             transition-all duration-300">
 
               <h2 className="text-lg font-semibold text-center text-gray-800 dark:text-white mb-4">
@@ -342,7 +342,8 @@ const Home: React.FC = () => {
             <div className="bg-white dark:bg-gray-900 
                             border border-gray-200 dark:border-gray-700
                             rounded-2xl p-6 
-                            shadow-sm hover:shadow-md 
+                            shadow-sm hover:shadow-md
+                            w-full max-w-80 relative mx-auto  
                             transition-all duration-300">
 
               <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">

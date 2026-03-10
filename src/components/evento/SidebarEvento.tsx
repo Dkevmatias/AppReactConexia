@@ -1,4 +1,5 @@
 import { Celular, Mail,Puntos } from '../../icons';
+
 type Props = {
   puntos: number
 }
@@ -7,17 +8,19 @@ export default function SidebarEvento({ puntos }: Props) {
 
   return (
     <div className="col-span-12 lg:col-span-3 space-y-6 sticky top-6 h-fit">
-        <div className="bg-black text-white rounded-2xl p-5 shadow-md">
+        <div className="bg-black text-white rounded-2xl p-5 shadow-md w-full max-w-80 relative mx-auto">
          <p className="text-sm text-gray-300" style={{ fontFamily: "Conthrax" }}>Puntos disponibles</p>           
         <div className="flex justify-between mt-2">
             <Puntos className="w-8 h-8 text-gray-800 dark:text-white" />     
           <span className="text-2xl font-bold">
             {puntos} pts
           </span>
-          <span className="text-sm"></span>
+          <span className="text-sm"></span>          
         </div>
+        <div className="card-accent-canje absolute bottom-0 left-0"></div>
             </div>
-        <div className="bg-black rounded-2xl shadow-md overflow-hidden">
+           
+        <div className="bg-black rounded-2xl shadow-md overflow-hidden w-full max-w-80 relative mx-auto">
         <h3 className="font-semibold text-gray-800 text-white  text-center" style={{ fontFamily: "Conthrax" }}>
           Más recompensas
         </h3>
@@ -32,7 +35,8 @@ export default function SidebarEvento({ puntos }: Props) {
             <div className="bg-white dark:bg-gray-900 
                             border border-gray-200 dark:border-gray-700
                             rounded-2xl p-6 
-                            shadow-sm hover:shadow-md 
+                            shadow-sm hover:shadow-md
+                            w-full max-w-80 relative mx-auto  
                             transition-all duration-300">
 
               <h2 className="text-lg font-semibold text-center text-gray-800 dark:text-white mb-4">
@@ -86,7 +90,8 @@ export default function SidebarEvento({ puntos }: Props) {
         <div className="bg-white dark:bg-gray-900 
                             border border-gray-200 dark:border-gray-700
                             rounded-2xl p-6 
-                            shadow-sm hover:shadow-md 
+                            shadow-sm hover:shadow-md
+                            w-full max-w-80 relative mx-auto 
                             transition-all duration-300">
 
               <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
