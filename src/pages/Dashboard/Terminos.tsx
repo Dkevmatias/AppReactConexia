@@ -1,14 +1,16 @@
 const Terminos = () => {
   return (
     <div style={{ height: "100vh", width: "100%" }}>
-      <iframe
-        src="/legal/TerminosCondiciones.pdf"
-        title="Términos y Condiciones"
+       <object
+        data="/legal/TerminosCondiciones.pdf"
+        type="application/pdf"
         width="100%"
         height="100%"
-        style={{ border: "none" }}
-        
-      />
+      >
+        <a href="/legal/TerminosCondiciones.pdf">
+          Descargar PDF
+        </a>
+      </object>
     </div>
   );
 };
