@@ -78,7 +78,8 @@ export default function Evento() {
 
         await AsignarPuntos(1, puntos, 0, user.cardCode!);
 
-        setVentaTotal(Math.round(totalVentas / 1.16 / 5000));
+        //setVentaTotal(Math.round(totalVentas / 1.16 / 5000));
+        setVentaTotal(50);
         setSaldoVencido(saldo?.[0]?.vencido ?? false);
       } catch (error) {
         if (import.meta.env.DEV) {
