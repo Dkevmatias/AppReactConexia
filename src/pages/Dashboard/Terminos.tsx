@@ -1,6 +1,5 @@
 import { Document, Page, pdfjs } from "react-pdf";
 
-
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
   import.meta.url
@@ -9,7 +8,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 const Terminos = () => {
   return (
     <div style={{ height: "100vh", overflow: "auto", textAlign: "center" }}>
-      <Document file="/legal/TerminosCondiciones.pdf">
+      <Document file={{
+    url: "https://aniversario.codialub.com/legal/TerminosCondiciones.pdf",
+  }}>
         <Page pageNumber={1} width={900} />
       </Document>
     </div>
