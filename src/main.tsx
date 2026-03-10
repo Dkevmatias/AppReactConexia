@@ -10,6 +10,8 @@ import { AuthProvider } from "./context/AuthContext.tsx";
 import { VentaProvider } from "./context/VentaContext.tsx";
 import { SaldoProvider } from "./context/SaldoContext.tsx";
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
+import "react-pdf/dist/Page/AnnotationLayer.css";
+import "react-pdf/dist/Page/TextLayer.css";
 
 
 createRoot(document.getElementById("root")!).render(
