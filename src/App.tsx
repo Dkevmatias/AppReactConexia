@@ -1,36 +1,23 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router";
-import SignIn from "./pages/AuthPages/SignIn";
-import SignUp from "./pages/AuthPages/SignUp";
-/*
-import NotFound from "./pages/OtherPage/NotFound";
-import UserProfiles from "./pages/UserProfiles";
-import Videos from "./pages/UiElements/Videos";
-import Images from "./pages/UiElements/Images";
-import Alerts from "./pages/UiElements/Alerts";
-import Badges from "./pages/UiElements/Badges";
-import Avatars from "./pages/UiElements/Avatars";
-import Buttons from "./pages/UiElements/Buttons";
-import LineChart from "./pages/Charts/LineChart";
-import BarChart from "./pages/Charts/BarChart";
-import Calendar from "./pages/Calendar";
-import BasicTables from "./pages/Tables/BasicTables";
-import FormElements from "./pages/Forms/FormElements";
-import Blank from "./pages/Blank";
-*/
-import AppLayout from "./layout/AppLayout";
+import { lazy, Suspense } from "react";
+
+const SignIn = lazy(() => import("./pages/AuthPages/SignIn"));
+const SignUp = lazy(() => import("./pages/AuthPages/SignUp"));
+const AppLayout = lazy(() => import("./layout/AppLayout"));
+const Evento = lazy(() => import("./pages/Dashboard/Evento"));
+const Boletos = lazy(() => import("./pages/Dashboard/Boletos"));
+const Reportes = lazy(() => import("./pages/Dashboard/Reportes"));
+const Home = lazy(() => import("./pages/Dashboard/Home"));
+const Terminos = lazy(() => import("./pages/Dashboard/Terminos"));
+const Aviso = lazy(() => import("./pages/Dashboard/Aviso"));
+const ActivarCuenta = lazy(() => import("./pages/Clientes/ActivarCuenta"));
+const Acumulado = lazy(() => import("./pages/Clientes/Acumulado"));
+const RealizarSorteo = lazy(() => import("./pages/Sorteo/RealizarSorteo"));
+
 import { ScrollToTop } from "./components/common/ScrollToTop";
-import Evento from "./pages/Dashboard/Evento";
-import Boletos from "./pages/Dashboard/Boletos";
-import Reportes from "./pages/Dashboard/Reportes";
 import ProtectedRoute from "./routes/ProtectedRoute";
-import ActivarCuenta from "./pages/Clientes/ActivarCuenta";
-import { useAuth } from "./context/useAuth";
+import { useAuth } from "./hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import Acumulado from "./pages/Clientes/Acumulado";
-import RealizarSorteo from "./pages/Sorteo/RealizarSorteo";
-import Home from "./pages/Dashboard/Home";
-import Terminos from "./pages/Dashboard/Terminos";
-import Aviso from "./pages/Dashboard/Aviso";
 
 
 
@@ -50,76 +37,53 @@ export default function App() {
   return (
     <Router>
       <ScrollToTop />
-      <Routes>
-        {/* Root */}
-        <Route
-          path="/"
-          element={
-            user ? (
-              <Navigate to="/dashboard/Home" replace />
-            ) : (
-              <Navigate to="/signin" replace />
-            )
-          }
-        />
+      <Suspense fallback={
+        <div className="h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      }>
+        <Routes>
+          {/* Root */}
+          <Route
+            path="/"
+            element={
+              user ? (
+                <Navigate to="/dashboard/Home" replace />
+              ) : (
+                <Navigate to="/signin" replace />
+              )
+            }
+          />
 
-        {/* Auth */}
-        <Route
-          path="/signin"
-          element={user ? <Navigate to="/dashboard/Home" replace /> : <SignIn />}
-        />
-        <Route path="/signup" element={<SignUp />} />
+          {/* Auth */}
+          <Route
+            path="/signin"
+            element={user ? <Navigate to="/dashboard/Home" replace /> : <SignIn />}
+          />
+          <Route path="/signup" element={<SignUp />} />
 
-        {/* Activación */}
-        <Route path="/activar-cuenta" element={<ActivarCuenta />} />
+          {/* Activación */}
+          <Route path="/activar-cuenta" element={<ActivarCuenta />} />
 
-        {/* Protected */}
-        <Route
-          element={
-            <ProtectedRoute>
-              <AppLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/sorteo" element={<RealizarSorteo />} />
-          <Route path="/dashboard/Evento" element={<Evento />} />
-           <Route path="/dashboard/Home" element={<Home />} />
-          <Route path="/dashboard/Boletos" element={<Boletos />} />
-          <Route path="/dashboard/Reportes" element={<Reportes />} />
-          <Route path="/dashboard/Terminos" element={<Terminos />} />
-          <Route path="/dashboard/Aviso" element={<Aviso />} />
-          <Route path="/clientes/Acumulado" element={<Acumulado />} />
-          
-          {/*
-            <Route path="/profile" element={<UserProfiles />} />
-            <Route path="/calendar" element={<Calendar />} />
-            <Route path="/blank" element={<Blank />} />
-
-          Forms 
-            <Route path="/form-elements" element={<FormElements />} />
-
-            {/* Tables 
-            <Route path="/basic-tables" element={<BasicTables />} />
-
-            {/* UI 
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/avatars" element={<Avatars />} />
-            <Route path="/badge" element={<Badges />} />
-            <Route path="/buttons" element={<Buttons />} />
-            <Route path="/images" element={<Images />} />
-            <Route path="/videos" element={<Videos />} />
-
-            {/* Charts 
-            <Route path="/line-chart" element={<LineChart />} />
-            <Route path="/bar-chart" element={<BarChart />} />
-            */}
+          {/* Protected */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/sorteo" element={<RealizarSorteo />} />
+            <Route path="/dashboard/Evento" element={<Evento />} />
+            <Route path="/dashboard/Home" element={<Home />} />
+            <Route path="/dashboard/Boletos" element={<Boletos />} />
+            <Route path="/dashboard/Reportes" element={<Reportes />} />
+            <Route path="/dashboard/Terminos" element={<Terminos />} />
+            <Route path="/dashboard/Aviso" element={<Aviso />} />
+            <Route path="/clientes/Acumulado" element={<Acumulado />} />
           </Route>
-
-          {/* === Fallback === 
-          <Route path="*" element={<NotFound />} />
-          */}
         </Routes>
-      </Router>
-    
+      </Suspense>
+    </Router>
   );
 }

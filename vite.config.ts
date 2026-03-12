@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => ({
         namedExport: "ReactComponent",
       },
     }),
-    //mode === "development" && basicSsl(),
+    mode === "development" && basicSsl(),
   ],//.filter(Boolean),
 
   server: {
