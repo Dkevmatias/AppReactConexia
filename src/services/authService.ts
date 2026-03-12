@@ -1,4 +1,5 @@
 import { api } from "./apiServices";
+import { saveTokenFallback } from "../utils/tokenFallback";
 export interface User {
   idPersona: number;
   role: number;
@@ -21,7 +22,27 @@ export const loginService = async (email: string, password: string, recaptchaTok
       validateStatus: (status) => status < 500 
     }
   );  
+  
+  if (res.data.isSuccess) {
+    await saveTokenForSafariFallback();
+  }
+  
   return res.data;
+};
+
+const saveTokenForSafariFallback = async () => {
+  try {
+    const refreshRes = await api.post<{ accessToken: string }>(
+      "/api/Acceso/RefreshToken",
+      {},
+      { withCredentials: true }
+    );
+    if (refreshRes.data?.accessToken) {
+      saveTokenFallback(refreshRes.data.accessToken);
+    }
+  } catch (e) {
+    console.warn('No se pudo obtener token para fallback');
+  }
 };
 
 // CHECK AUTH (lee cookie HttpOnly)

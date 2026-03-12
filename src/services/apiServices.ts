@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from "axios";
+import { isSafariIOS, getTokenFallback, clearTokenFallback } from "../utils/tokenFallback";
 
 const API_URL = import.meta.env.VITE_API_URL;
 let isRefreshing = false;
@@ -6,9 +7,22 @@ let failedQueue: Array<{ resolve: (value: unknown) => void; reject: (reason?: un
 
 export const api: AxiosInstance = axios.create({
   baseURL: API_URL,
-  withCredentials: true, // Necesario para enviar cookie HttpOnly
+  withCredentials: true,
   timeout: 15000, 
-  validateStatus: () => true 
+  validateStatus: () => true,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+api.interceptors.request.use((config) => {
+  if (isSafariIOS()) {
+    const fallbackToken = getTokenFallback();
+    if (fallbackToken) {
+      config.headers.Authorization = `Bearer ${fallbackToken}`;
+    }
+  }
+  return config;
 });
 
 const processQueue = (error: any = null) => {
