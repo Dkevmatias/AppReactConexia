@@ -16,17 +16,11 @@ export const api: AxiosInstance = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  console.log('[API] Interceptor - URL:', config.url);
-  
   if (isSafariIOS()) {
     const fallbackToken = getTokenFallback();
-    console.log('[API] Fallback token:', fallbackToken ? `EXISTE (${fallbackToken.length})` : 'NULO');
     if (fallbackToken) {
       config.headers.Authorization = `Bearer ${fallbackToken}`;
-      console.log('[API] Authorization header agregado');
     }
-  } else {
-    console.log('[API] No es iOS, no se usa fallback');
   }
   return config;
 });

@@ -16,7 +16,6 @@ export interface LoginResponse {
 
 // LOGIN
 export const loginService = async (email: string, password: string, recaptchaToken?: string | null): Promise<LoginResponse> => {
-  console.log('[Auth] Iniciando login...');
   const res = await api.post<LoginResponse>(
     "/api/Acceso/Login",
     { email, password, recaptchaToken },
@@ -25,14 +24,8 @@ export const loginService = async (email: string, password: string, recaptchaTok
     }
   );  
   
-  console.log('[Auth] Login response:', res.data);
-  
   if (res.data.isSuccess && res.data.accessToken) {
-    console.log('[Auth] Guardando token, longitud:', res.data.accessToken.length);
     saveTokenFallback(res.data.accessToken);
-    console.log('[Auth] Token guardado en localStorage desde Login');
-  } else if (res.data.isSuccess) {
-    console.log('[Auth] Login exitoso pero NO hay accessToken en respuesta');
   }
   
   return res.data;
