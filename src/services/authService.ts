@@ -11,10 +11,12 @@ export interface LoginResponse {
   isSuccess: boolean;
   user: User;
   requireCaptcha?: boolean;
+  accessToken?: string;
 }
 
 // LOGIN
 export const loginService = async (email: string, password: string, recaptchaToken?: string | null): Promise<LoginResponse> => {
+  console.log('[Auth] Iniciando login...');
   const res = await api.post<LoginResponse>(
     "/api/Acceso/Login",
     { email, password, recaptchaToken },
@@ -23,26 +25,17 @@ export const loginService = async (email: string, password: string, recaptchaTok
     }
   );  
   
-  if (res.data.isSuccess) {
-    await saveTokenForSafariFallback();
+  console.log('[Auth] Login response:', res.data);
+  
+  if (res.data.isSuccess && res.data.accessToken) {
+    console.log('[Auth] Guardando token, longitud:', res.data.accessToken.length);
+    saveTokenFallback(res.data.accessToken);
+    console.log('[Auth] Token guardado en localStorage desde Login');
+  } else if (res.data.isSuccess) {
+    console.log('[Auth] Login exitoso pero NO hay accessToken en respuesta');
   }
   
   return res.data;
-};
-
-const saveTokenForSafariFallback = async () => {
-  try {
-    const refreshRes = await api.post<{ accessToken: string }>(
-      "/api/Acceso/RefreshToken",
-      {},
-      { withCredentials: true }
-    );
-    if (refreshRes.data?.accessToken) {
-      saveTokenFallback(refreshRes.data.accessToken);
-    }
-  } catch (e) {
-    console.warn('No se pudo obtener token para fallback');
-  }
 };
 
 // CHECK AUTH (lee cookie HttpOnly)
