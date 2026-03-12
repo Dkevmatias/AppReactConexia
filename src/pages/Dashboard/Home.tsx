@@ -274,7 +274,7 @@ const Home: React.FC = () => {
             {/* Sección Derecha - Portafolio */}           
             <div className="absolute top-4 center">
               <h2
-            className="font-bold text-3xl sm:text-4xl text-gray-800 dark:text-white/90 text-center tracking-wide"
+            className="font-bold text-3xl sm:text-2xl text-gray-800 dark:text-white/90 text-center tracking-wide"
             style={{ fontFamily: "Conthrax" }}
           >
             Portafolio

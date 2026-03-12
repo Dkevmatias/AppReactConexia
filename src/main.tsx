@@ -12,6 +12,7 @@ import { SaldoProvider } from "./context/SaldoContext.tsx";
 import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+import { ErrorBoundary } from "./components/common/ErrorBoundary.tsx";
 
 
 createRoot(document.getElementById("root")!).render(
@@ -24,17 +25,19 @@ createRoot(document.getElementById("root")!).render(
         appendTo: "head",
       }}
     >
-      <AuthProvider>
-        <VentaProvider>
-        <SaldoProvider>
-        <ThemeProvider>
-          <AppWrapper>
-            <App />
-          </AppWrapper>
-        </ThemeProvider>
-        </SaldoProvider>    
-        </VentaProvider>
-      </AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <VentaProvider>
+          <SaldoProvider>
+          <ThemeProvider>
+            <AppWrapper>
+              <App />
+            </AppWrapper>
+          </ThemeProvider>
+          </SaldoProvider>    
+          </VentaProvider>
+        </AuthProvider>
+      </ErrorBoundary>
     </GoogleReCaptchaProvider>
   </StrictMode>
 );
