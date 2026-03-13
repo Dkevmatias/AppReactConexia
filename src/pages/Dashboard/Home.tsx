@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from "../../context/useAuth";
-import { getPersonas,getVentasCLientes,getPeriodoEvaluar } from "../../services/authService";
+import { getPersonas,getVentasCLientes,getPeriodoEvaluar, procesarFacturas } from "../../services/authService";
 import { useVenta } from "../../context/VentaContext";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import '../../components/evento/RewardsPage.css';
@@ -22,7 +22,6 @@ const formatDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() +
   1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-type MenuOption = 'puntos' | 'canjear' | 'historial' | 'terminos' ;
 const Home: React.FC = () => {
   // Estados con tipos
   const { user } = useAuth();
@@ -97,22 +96,21 @@ const Home: React.FC = () => {
       finMesAnterior.setFullYear(finMesAnterior.getFullYear() - 1);     
         
       // Ejecutar en paralelo
-      const [ventasPeriodo, ventasMes] = await Promise.all([
+      const [ventasPeriodo, ventasMes,ventasProcesadas] = await Promise.all([
         getVentasCLientes(formatDate(inicioAnual), formatDate(finAnual), cardCodes),
-        getVentasCLientes(formatDate(inicioMes), formatDate(finMes), cardCodes)
-       
+        getVentasCLientes(formatDate(inicioMes), formatDate(finMes), cardCodes),
+        procesarFacturas(formatDate(inicioAnual), formatDate(finAnual), cardCodes,1),    
       ]);
-     
+      console.log("Ventas Procesadas:", ventasProcesadas);
       
-      const totalPeriodo = ventasPeriodo?.[0]?.totalVentas ?? 0;
-      const totalMes = ventasMes?.[0]?.totalVentas ?? 0;
-
-      // Lógica de negocio separada
-      //const puntosPeriodo = Math.round((totalPeriodo / 1.16) / 5000);
-      //const puntosMes = Math.round((totalMes / 1.16) / 1000);
-
-        const puntosPeriodo = 50;
-        const puntosMes = 7;
+      // Sumar puntos de cada factura (ahora es una lista de facturas)
+      const puntosPeriodo = Array.isArray(ventasPeriodo) 
+        ? ventasPeriodo.reduce((sum, fac) => sum + (fac.puntos || 0), 0)
+        : ventasPeriodo?.[0]?.puntosGenerados ?? 0;
+        
+      const puntosMes = Array.isArray(ventasMes) 
+        ? ventasMes.reduce((sum, fac) => sum + (fac.puntos || 0), 0)
+        : ventasMes?.[0]?.puntosGenerados ?? 0;
 
       setVentaTotal(puntosPeriodo);   
       setVentaMesActual(puntosMes);

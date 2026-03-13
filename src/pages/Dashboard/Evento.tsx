@@ -12,7 +12,8 @@ import {
   getVentasCLientes,
   getSaldoClientes,
   getPeriodoEvaluar,
-  AsignarPuntos
+  AsignarPuntos,
+  getPuntosAcumulados
 } from "../../services/authService";
 
 const formatDate = (d: Date) =>
@@ -69,17 +70,15 @@ export default function Evento() {
           formatDate(fin),
           cardCodes
         );
-
-        const saldo = await getSaldoClientes(cardCodes);
-
-        const totalVentas = ventas?.[0]?.totalVentas ?? 0;
-
-        const puntos = Math.round(totalVentas / 5000);
-
-        await AsignarPuntos(1, puntos, 0, user.cardCode!);
-
+        
+        const puntosAcumulados = await getPuntosAcumulados(cardCodes);       
+        const saldo = await getSaldoClientes(cardCodes); 
+        //console.log("Ventas:", ventas);
+        console.log("Puntos Acumulados:", puntosAcumulados[0]?.puntosDisponibles ?? 0);
+        console.log("Saldo Clientes:", saldo);      
+               
         //setVentaTotal(Math.round(totalVentas / 1.16 / 5000));
-        setVentaTotal(50);
+        setVentaTotal(puntosAcumulados.puntosDisponibles);
         setSaldoVencido(saldo?.[0]?.vencido ?? false);
       } catch (error) {
         if (import.meta.env.DEV) {
@@ -168,6 +167,7 @@ export default function Evento() {
           <PremiosComponente
             totalPuntos={ventaTotal ?? 0}
             vencido={saldoVencido ?? false}
+            onPuntosActualizados={(puntos) => setVentaTotal(puntos)}
           />
         </div>
 

@@ -80,7 +80,7 @@ export const getVentasCLientes = async (
   fechaFin: string,
   clientes: string) => {
    // Llamada a la API para obtener ventas de clientes
-   const response = await api.get(`/api/Clientes/GetVentasClientes`, {
+   const response = await api.get(`/api/Clientes/GetVentasClientesNetas`, {
     params: {
       fechaInicio,
       fechaFin,
@@ -91,7 +91,22 @@ export const getVentasCLientes = async (
   return response.data;
 
   };
- 
+export const procesarFacturas = async (
+  fechaInicio: string,
+  fechaFin: string,
+  clientes: string,
+  idPeriodo: number
+) => {
+  const response = await api.post(`/api/Puntos/ProcesarFacturasSAP`, {
+    FechaInicio: fechaInicio,
+    FechaFin: fechaFin,
+    CardCode: clientes,
+    IdPeriodo: idPeriodo
+  });
+     
+  return response.data;
+
+};
 export const AsignarPuntos = async (
   idPeriodo: number, 
   puntos: number,
@@ -108,4 +123,19 @@ export const AsignarPuntos = async (
     withCredentials: true
   });
   return response.data;
+};
+
+export const getPuntosAcumulados = async ( 
+  cardCode: string,
+) => {
+  const payload = {    
+    cardCode
+  };
+  const response = await api.get(`/api/Puntos/GetPuntosAcumuladosCliente/${cardCode}`, {
+    params: payload,
+    withCredentials: true
+  });
+  console.log("clientes:", cardCode);
+  console.log("Puntos Acumulados Response:", response.data?.puntos);
+  return response.data?.puntos ?? 0;
 };
