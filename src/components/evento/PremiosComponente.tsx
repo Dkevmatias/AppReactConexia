@@ -1,9 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination, Grid } from "swiper/modules";
-import { getPremios, getPremiosClientes, canjearPremio } from "../../services/premiosService";
-import { BarraProgreso } from "./BarraProgreso";
+import { getPremios, getPremiosClientes, canjearPremio, CanjeResponse } from "../../services/premiosService";
 import Confetti from "react-confetti";
 import { useAuth } from "../../context/useAuth";
 import PeriodoAlert from "../../utils/PeriodoAlert";
@@ -31,28 +27,19 @@ type HistorialPremio = {
 export default function PremiosCarousel({
   totalPuntos,
   vencido,
+  onPuntosActualizados,
 }: {
   totalPuntos: number;
   vencido: boolean;
+  onPuntosActualizados?: (puntos: number) => void;
 }) {
   const { user } = useAuth();
-  const [isMobile, setIsMobile] = useState(false);
 
-useEffect(() => {
-  const checkMobile = () => {
-    setIsMobile(window.innerWidth < 768);
-  };
-
-  checkMobile();
-  window.addEventListener("resize", checkMobile);
-
-  return () => window.removeEventListener("resize", checkMobile);
-}, []);
-  //const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(false);
   const [confeti, setConfeti] = useState(false);
   const { periodo,periodoActivo: periodoActivo } = usePeriodoActivo();
   const [mostrarModal, setMostrarModal] = useState(false);
+  const [mensajeModal, setMensajeModal] = useState("");
   
   const [premios, setPremios] = useState<Premio[]>([]);
   const [historial, setHistorial] = useState<Record<number, number>>({});
@@ -60,30 +47,47 @@ useEffect(() => {
   
  
   const canjear = async (premio: Premio) => {
-  const qty = selected[premio.idPremio] || 1;
+    const qty = selected[premio.idPremio] || 1;
+    const puntosRequeridos = premio.puntos * qty;
 
     if (!qty) return;
     try {
-      //Llamada a API
-     await canjearPremio(premio.idPremio, 1, premio.nombre, qty, user!.cardCode);
-     setRefresh(prev => !prev);
-      //Activar confeti      
-      setConfeti(true);
-      setTimeout(() => {
-        setConfeti(false);
-      }, 4000);
-         
+      const response: CanjeResponse = await canjearPremio(
+        user!.cardCode,
+        premio.idPremio,
+        periodo!.idPeriodo,
+        premio.nombre,
+        qty,
+        puntosRequeridos
+      );
+      
+      if (response.success) {
+        // Actualizar puntos si el backend los devuelve
+        if (response.puntosRestantes !== undefined && onPuntosActualizados) {
+          onPuntosActualizados(response.puntosRestantes);
+        }
+        
+        setMensajeModal(`¡Canjeado! Te quedan ${response.puntosRestantes?.toFixed(2)} puntos.`);
+        setRefresh(prev => !prev);
+        setConfeti(true);
+        setTimeout(() => {
+          setConfeti(false);
+        }, 4000);
+      } else {
+        setMensajeModal(response.message);
+      }
 
-      // 🧹 Limpiar selección
       setSelected(prev => ({
         ...prev,
         [premio.idPremio]: 0,
       }));
       setMostrarModal(true);
 
-      console.log("Canje exitoso");
+      console.log("Canje exitoso", response);
     } catch (error) {
       console.error("Error al canjear", error);
+      setMensajeModal("Error al procesar el canje.");
+      setMostrarModal(true);
     }
   };
   // Consumir API
@@ -237,7 +241,7 @@ useEffect(() => {
       </h2>
 
       <p className="text-gray-600 text-sm mb-4">
-        Has canjeado tu premio correctamente.
+        {mensajeModal}
       </p>
 
       <button
