@@ -190,9 +190,7 @@ export default function PremiosCarousel({
         />
       )}
 
-      {!periodoActivo && periodo?.fechaInicio && (
-      <PeriodoCountdown fechaInicio={periodo.fechaInicio} />
-      )}
+      <PeriodoCountdown />
 
         <PeriodoAlert periodoActivo={periodoActivo} saldoVencido={vencido} />
       {/* Header */}

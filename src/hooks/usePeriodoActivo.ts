@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { api } from "../services/apiServices";
 import { useAuth } from "../context/useAuth";
+
+const MES_REDENSION = 5; // Mayo
 
 export function usePeriodoActivo() {
   const [periodo, setPeriodo] = useState<{
@@ -12,20 +14,25 @@ export function usePeriodoActivo() {
 
   const [periodoActivo, setPeriodoActivo] = useState(false);
   const [tieneBoletos, setTieneBoletos] = useState(false);
-  //const [tieneSaldoVencido, setTieneSaldoVencido] = useState(false);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-useEffect(() => {
-  if (!user?.cardCode) {
-    setLoading(false);
-    return;
-  }
+
+  const esMesRedencion = useMemo(() => {
+    if (!periodo?.fechaInicio) return false;
+    const mes = new Date(periodo.fechaInicio).getMonth() + 1;
+    return mes === MES_REDENSION;
+  }, [periodo?.fechaInicio]);
+
+  useEffect(() => {
+    if (!user?.cardCode) {
+      setLoading(false);
+      return;
+    }
     const fetchPeriodo = async () => {
       try {
         const response = await api.get("/api/PeriodoBoletos/GetPeriodoActivo");
         const periodoData = response.data ?? null;
 
-        // Si NO hay periodo
         if (!periodoData) {
           setPeriodo(null);
           setPeriodoActivo(false);
@@ -33,16 +40,10 @@ useEffect(() => {
           return;
         }
 
-        // Sí hay periodo
         setPeriodo(periodoData);
-        setPeriodoActivo(periodoData.activo === true); // <-- este sí es boolean
+        const mesPeriodo = new Date(periodoData.fechaInicio).getMonth() + 1;
+        setPeriodoActivo(periodoData.activo === true && mesPeriodo === MES_REDENSION);
 
-        // Obtener boletos en ese periodo
-        const responseBoletos = await api.get(
-          `/api/Boletos/GetBoletosPeriodo/${user?.cardCode}/${response.data.idPeriodo}`
-        );
-
-        setTieneBoletos(responseBoletos.data.total > 0);
       } catch (error) {
         console.error("Error verificando periodo activo:", error);
         setPeriodo(null);
@@ -56,5 +57,5 @@ useEffect(() => {
     fetchPeriodo();
   }, []);
 
-  return { periodoActivo, periodo, tieneBoletos, loading };
+  return { periodoActivo, periodo, tieneBoletos, loading, esMesRedencion };
 }

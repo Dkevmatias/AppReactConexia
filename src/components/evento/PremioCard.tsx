@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { BarraProgreso } from "./BarraProgreso";
 import { EstadoPremio } from "../../types/EstadoPremio";
-import { useState } from "react";
 
 type Premio = {
   idPremio: number;
@@ -31,6 +30,7 @@ export default function PremioCard({
   restante,
   yaCanjeados,
   bloqueoGlobal,
+  puedeCanjear,
   onAdd,
   onRemove,
   onCanjear,
@@ -53,6 +53,7 @@ if (sinStock) {
   estado = "disponible";
 }
   const premioCanjeado = yaCanjeados >= premio.limite;
+  const puedeCanjearPremio = estado === "disponible" && puedeCanjear;
   
   return (
 <motion.div
@@ -140,7 +141,7 @@ if (sinStock) {
       </div>
 
       {/* Botón */}
-      {estado === "disponible" && (
+      {puedeCanjearPremio && (
         <button
           onClick={onCanjear}
           className="mt-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"

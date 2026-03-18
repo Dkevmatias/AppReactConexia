@@ -46,9 +46,7 @@ const Home: React.FC = () => {
   // Datos tipados para el carrusel
   const carouselImages: CarouselImage[] = [
     { id: 1, src: '/images/publicidad/portada.jpeg', alt: 'Aniversario 50 años' },
-    { id: 2, src: '/images/publicidad/publicidad.png', alt: 'Productos destacados' },
-    //{ id: 3, src: '/images/carousel/carousel-03.png', alt: 'Ofertas especiales' },
-    //{ id: 4, src: '/images/carousel/carousel-04.png', alt: 'Ofertas especiales' },
+    { id: 2, src: '/images/publicidad/publicidad.png', alt: 'Productos destacados' },   
   ];
     //Cargar datos protegidos
     useEffect(() => {
@@ -112,8 +110,8 @@ const Home: React.FC = () => {
         ? ventasMes.reduce((sum, fac) => sum + (fac.puntos || 0), 0)
         : ventasMes?.[0]?.puntosGenerados ?? 0;
 
-      setVentaTotal(puntosPeriodo);   
-      setVentaMesActual(puntosMes);
+      setVentaTotal(Math.round(puntosPeriodo*100)/100);   
+      setVentaMesActual(Math.round(puntosMes*100)/100);
     
 
     } catch (error) {

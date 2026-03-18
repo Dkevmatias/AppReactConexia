@@ -18,6 +18,7 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import { Navigate } from "react-router-dom";
+import Profile from "./pages/Clientes/Profile";
 
 
 
@@ -81,6 +82,7 @@ export default function App() {
             <Route path="/dashboard/Terminos" element={<Terminos />} />
             <Route path="/dashboard/Aviso" element={<Aviso />} />
             <Route path="/clientes/Acumulado" element={<Acumulado />} />
+            <Route path="/clientes/Profile" element={<Profile />} />
           </Route>
         </Routes>
       </Suspense>

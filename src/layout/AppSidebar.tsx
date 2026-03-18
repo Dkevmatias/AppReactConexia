@@ -68,6 +68,11 @@ const navItems: NavItem[] = [
     name: "Promociones",
     path: "/dashboard/promociones",
   },
+   {
+    icon: <PromocionesIcon />,
+    name: "Reportes BI",
+    path: "/dashboard/reportes",
+  },
   /*
   {
     icon: <CalenderIcon />,
@@ -189,18 +194,20 @@ const AppSidebar: React.FC = () => {
   }, [openSubmenu]);
 
   // === FILTRO DE MENÚ SEGÚN ROL ===
- const filteredNavItems = navItems.filter((item) => {
-  switch (user?.role) {
-    case 1: // Administrador
-      return true;
-    case 2: //Vendedor
-      return item.name !== "Pages";
-    case 3: // Cliente
-      return ["Dashboard"].includes(item.name);
-    default:
-      return false;
-  }
-});
+  const allowedForRol3 = ["Inicio", "Canjear", "Terminos y Condiciones", "Promociones"];
+  
+  const filteredNavItems = navItems.filter((item) => {
+    switch (user?.role) {
+      case 1: // Administrador
+        return true;
+      case 2: //Vendedor
+        return item.name !== "Pages";
+      case 3: // Cliente
+        return allowedForRol3.includes(item.name);
+      default:
+        return false;
+    }
+  });
 
  const filteredOthersItems = othersItems.filter((item) => {
   switch (user?.role) {

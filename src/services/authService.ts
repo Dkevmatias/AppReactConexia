@@ -50,7 +50,52 @@ export const getPeriodoEvaluar = async () => {
 
 export const getPersonas = async (idpersona: number) => {
   const response = await api.get(`/api/Personas/GetPersonasRelacion/${idpersona}`);
-  // console.log("Personas",response);
+  return response.data;
+};
+
+export interface DatosCliente {
+  idPersona: number;
+  nombre: string | null;
+  fullname: string | null;
+  cardCode: string;
+  activo: boolean | null;
+  sociedad: string | null;
+  email: string | null;
+  telefono: string | null;
+  unico: boolean;
+}
+
+export const getDatosCliente = async (idPersona: number) => {
+  const response = await api.get<{ persona: DatosCliente }>(`/api/Personas/GetDatosClientes?idPersona=${idPersona}`);
+  return response.data.persona;
+};
+
+export interface DocumentoCartera {
+  sociedad: string;
+  cardCode: string;
+  cardName: string;
+  docNum: number;
+  docDate: string;
+  docDueDate: string;
+  diasVencido: number;
+  totalDeuda: number;
+  porVencer: number;
+  rango0_30: number;
+  rango31_60: number;
+  rango61_90: number;
+  rango91_120: number;
+  mas120: number;
+  numAtCard: string;
+  docTotal: number;
+  paidToDate: number;
+  saldoDocumento: number;
+  pymntGroup: string;
+  u_BXP_RUTA: string;
+  slpName: string;
+}
+
+export const getCarteraCliente = async (cardCodes: string[]) => {
+  const response = await api.post<DocumentoCartera[]>(`/api/Clientes/GetCarteraPorClientes`, cardCodes);
   return response.data;
 };
 
