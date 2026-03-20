@@ -129,8 +129,8 @@ export default function PremiosCarousel({
       return acc + (premio?.puntos || 0) * qty;
     }, 0);
 
-//  const restante = totalPuntos - totalSeleccionado;
-  const restante = 50000 - totalSeleccionado; // Para pruebas, se puede reemplazar por totalPuntos
+  const restante = totalPuntos - totalSeleccionado;
+  //const restante = 50000 - totalSeleccionado; // Para pruebas, se puede reemplazar por totalPuntos
   const { bloqueoGlobal, puedeInteractuar } = useCanjeControl({
   periodoActivo,
   vencido,

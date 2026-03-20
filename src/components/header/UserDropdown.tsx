@@ -62,7 +62,7 @@ export default function UserDropdown() {
                   fill=""
                 />
               </svg>
-              Cuentas Relacionadas
+              Estados de Cuentas
             </DropdownItem> 
           </li>
           <li>

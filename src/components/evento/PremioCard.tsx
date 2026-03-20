@@ -99,7 +99,7 @@ if (sinStock) {
     />
 
     {/* Stock - Inferior derecha */}
-    <span className="absolute bottom-2 right-2 bg-yellow-300 text-xs font-semibold px-2 py-1 rounded-full shadow">
+    <span className="absolute bottom-2 right-2 bg-yellow-300 text-xs text-black font-semibold px-2 py-1 rounded-full shadow">
       Disponibles: {premio.existencia}
     </span>
   </div>
