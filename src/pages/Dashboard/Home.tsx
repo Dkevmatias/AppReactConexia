@@ -97,9 +97,8 @@ const Home: React.FC = () => {
       const [ventasPeriodo, ventasMes,ventasProcesadas] = await Promise.all([
         getVentasCLientes(formatDate(inicioAnual), formatDate(finAnual), cardCodes),
         getVentasCLientes(formatDate(inicioMes), formatDate(finMes), cardCodes),
-        procesarFacturas(formatDate(inicioAnual), formatDate(finAnual), cardCodes,1),    
+        procesarFacturas(formatDate(inicioAnual), formatDate(finAnual), cardCodes,user.idPersona),    
       ]);
-      console.log("Ventas Procesadas:", ventasProcesadas);
       
       // Sumar puntos de cada factura (ahora es una lista de facturas)
       const puntosPeriodo = Array.isArray(ventasPeriodo) 

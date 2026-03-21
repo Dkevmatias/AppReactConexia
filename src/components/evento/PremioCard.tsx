@@ -36,31 +36,31 @@ export default function PremioCard({
   onCanjear,
 }: Props) {
 
-const sinStock = premio.existencia <= 0;
-const limiteAlcanzado = yaCanjeados >= premio.limite;
-const tienePuntos = restante >= premio.puntos;
+  const sinStock = premio.existencia <= 0;
+  const limiteAlcanzado = yaCanjeados >= premio.limite;
 
+  let estado: EstadoPremio;
 
-let estado: EstadoPremio;
-
-if (sinStock) {
-  estado = "sin_stock";
-} else if (yaCanjeados >= premio.limite) {
-  estado = "limite_alcanzado";
-} else if (!tienePuntos) {
-  estado = "insuficiente_puntos";
-} else {
-  estado = "disponible";
-}
+  if (sinStock) {
+    estado = "sin_stock";
+  } else if (yaCanjeados >= premio.limite) {
+    estado = "limite_alcanzado";
+  } else if (!puedeCanjear) {
+    estado = "esperando_mayo";
+  } else {
+    estado = "disponible";
+  }
   const premioCanjeado = yaCanjeados >= premio.limite;
-  const puedeCanjearPremio = estado === "disponible" && puedeCanjear;
+  const puedeCanjearPremio = estado === "disponible";
+  
+  const cardDeshabilitado = sinStock || limiteAlcanzado;
   
   return (
 <motion.div
-  whileHover={{ scale: estado === "disponible" ? 1.03 : 1 }}
+  whileHover={{ scale: puedeCanjearPremio ? 1.03 : 1 }}
   className={`w-full max-w-[320px] rounded-xl shadow-md border bg-black overflow-hidden transition
     ${
-      estado !== "disponible"
+      cardDeshabilitado
         ? "opacity-50 grayscale pointer-events-none"
         : "hover:shadow-lg"
     }

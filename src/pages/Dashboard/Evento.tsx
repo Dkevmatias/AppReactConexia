@@ -71,11 +71,8 @@ export default function Evento() {
           cardCodes
         );
         
-        const puntosAcumulados = await getPuntosAcumulados(cardCodes);       
-        const saldo = await getSaldoClientes(cardCodes); 
-        //console.log("Ventas:", ventas);
-        console.log("Puntos Acumulados:", puntosAcumulados[0]?.puntosDisponibles ?? 0);
-        console.log("Saldo Clientes:", saldo);      
+        const puntosAcumulados = await getPuntosAcumulados(user.idPersona);       
+        const saldo = await getSaldoClientes(cardCodes);      
                
         //setVentaTotal(Math.round(totalVentas / 1.16 / 5000));
         setVentaTotal(puntosAcumulados.puntosDisponibles);
@@ -174,8 +171,7 @@ export default function Evento() {
         {/* SIDEBAR */}
           <div className="col-span-12 lg:col-span-3">
             <SidebarEvento puntos={ventaTotal ?? 0} />
-          </div>
-        
+          </div>       
 
       </div>
     </>

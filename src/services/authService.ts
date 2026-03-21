@@ -140,13 +140,13 @@ export const procesarFacturas = async (
   fechaInicio: string,
   fechaFin: string,
   clientes: string,
-  idPeriodo: number
+  idPersona: number
 ) => {
   const response = await api.post(`/api/Puntos/ProcesarFacturasSAP`, {
     FechaInicio: fechaInicio,
     FechaFin: fechaFin,
     CardCode: clientes,
-    IdPeriodo: idPeriodo
+    IdPersona: idPersona
   });
      
   return response.data;
@@ -171,16 +171,16 @@ export const AsignarPuntos = async (
 };
 
 export const getPuntosAcumulados = async ( 
-  cardCode: string,
+  idPersona: number,
 ) => {
   const payload = {    
-    cardCode
+    idPersona
   };
-  const response = await api.get(`/api/Puntos/GetPuntosAcumuladosCliente/${cardCode}`, {
+  const response = await api.get(`/api/Puntos/GetPuntosAcumuladosCliente/${idPersona}`, {
     params: payload,
     withCredentials: true
   });
-  console.log("clientes:", cardCode);
+  console.log("clientes:", idPersona);
   console.log("Puntos Acumulados Response:", response.data?.puntos);
   return response.data?.puntos ?? 0;
 };
