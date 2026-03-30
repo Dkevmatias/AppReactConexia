@@ -1,18 +1,13 @@
 import { Helmet } from "react-helmet-async";
 
-/** Nombre del archivo dentro de public/video/ (ej: promo.mp4) */
-//Pondre el video en el backend por el peso del tamaño
-const VIDEO_FILENAME = "50Codialub.mp4";
+const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed/epo3qzeveJY";
 
-/** Título opcional para la pestaña y para WhatsApp */
 const PAGE_TITLE = "Video";
 const PAGE_DESCRIPTION = "Mira el video aquí.";
 
 export default function Video() {
   const origin =
     import.meta.env.VITE_SITE_URL?.replace(/\/$/, "") ?? window.location.origin;
-  const videoPath = `/video/${VIDEO_FILENAME}`;
-  const videoAbsolute = `${origin}${videoPath}`;
   const pageUrl = `${origin}/video`;
 
   return (
@@ -24,9 +19,6 @@ export default function Video() {
         <meta property="og:description" content={PAGE_DESCRIPTION} />
         <meta property="og:url" content={pageUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:video" content={videoAbsolute} />
-        <meta property="og:video:type" content="video/mp4" />
-        <meta property="og:video:secure_url" content={videoAbsolute} />
         <meta name="twitter:card" content="player" />
       </Helmet>
 
@@ -36,17 +28,14 @@ export default function Video() {
             {PAGE_TITLE}
           </h1>
           <div className="rounded-xl overflow-hidden shadow-xl bg-black">
-            <video
-              className="w-full aspect-video"
-              controls
-              playsInline
-              preload="metadata"
-              poster={`/video/poster.jpg`}
-            >
-              <source src={videoPath} type="video/mp4" />
-              Tu navegador no reproduce video HTML5. Prueba con otro navegador o
-              descarga el archivo.
-            </video>
+            <iframe
+              src={YOUTUBE_EMBED_URL}
+              title={PAGE_TITLE}
+              className="w-full aspect-[9/16] max-h-[80vh] mx-auto"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
           </div>
         </div>
       </div>
