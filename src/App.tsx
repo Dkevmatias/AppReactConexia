@@ -11,7 +11,7 @@ const Home = lazy(() => import("./pages/Dashboard/Home"));
 const Terminos = lazy(() => import("./pages/Dashboard/Terminos"));
 const Aviso = lazy(() => import("./pages/Dashboard/Aviso"));
 const ActivarCuenta = lazy(() => import("./pages/Clientes/ActivarCuenta"));
-const PublicVideo = lazy(() => import("./pages/Video"));
+const Video = lazy(() => import("./pages/Video"));
 const Acumulado = lazy(() => import("./pages/Clientes/Acumulado"));
 const RealizarSorteo = lazy(() => import("./pages/Sorteo/RealizarSorteo"));
 
@@ -20,7 +20,6 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import Profile from "./pages/Clientes/Profile";
-import Video from "./pages/Video";
 
 export default function App() {
   const { user, loading } = useAuth();
