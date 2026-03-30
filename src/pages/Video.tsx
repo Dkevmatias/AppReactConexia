@@ -1,6 +1,7 @@
 import { Helmet } from "react-helmet-async";
 
 /** Nombre del archivo dentro de public/video/ (ej: promo.mp4) */
+//Pondre el video en el backend por el peso del tamaño
 const VIDEO_FILENAME = "50Codialub.mp4";
 
 /** Título opcional para la pestaña y para WhatsApp */
