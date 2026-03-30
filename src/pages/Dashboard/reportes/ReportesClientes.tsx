@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
 import { getReportesService, TopCliente, VentaPorGrupo, ComparativoAnual } from "../../../services/reportesService";
 import ReactApexChart from "react-apexcharts";
-
-const formatCurrency = (value: number | undefined) => 
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value || 0);
-
-const formatNumber = (value: number | undefined) => 
-  new Intl.NumberFormat('es-MX').format(value || 0);
-
-const formatPorcentaje = (value: number | undefined) => 
-  `${value ? value.toFixed(1) : '0.0'}%`;
+import { formatCurrency, formatNumber, formatPercent } from "../../../utils/format";
 
 interface ReportesClientesProps {
   fechaInicio: string;
@@ -23,27 +15,34 @@ export default function ReportesClientes({ fechaInicio, fechaFin }: ReportesClie
   const [comparativo, setComparativo] = useState<ComparativoAnual | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const cargarDatos = async () => {
+      setLoading(true);
+      try {
+        const [clientesData, grupoData, comparativoData] = await Promise.all([
+          getReportesService.getTopClientes(20, fechaInicio, fechaFin),
+          getReportesService.getVentasPorGrupo(fechaInicio, fechaFin),
+          getReportesService.getComparativoAnual(),
+        ]);
+
+        if (!cancelled) {
+          setTopClientes(clientesData || []);
+          setVentasPorGrupo(grupoData || []);
+          setComparativo(comparativoData || null);
+        }
+      } catch (error) {
+        console.error("Error cargando reportes de clientes:", error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
     cargarDatos();
+    return () => {
+      cancelled = true;
+    };
   }, [fechaInicio, fechaFin]);
-
-  const cargarDatos = async () => {
-    setLoading(true);
-    try {
-      const [clientesData, grupoData, comparativoData] = await Promise.all([
-        getReportesService.getTopClientes(20, fechaInicio, fechaFin),
-        getReportesService.getVentasPorGrupo(fechaInicio, fechaFin),
-        getReportesService.getComparativoAnual()
-      ]);
-
-      setTopClientes(clientesData || []);
-      setVentasPorGrupo(grupoData || []);
-      setComparativo(comparativoData || null);
-    } catch (error) {
-      console.error("Error cargando reportes de clientes:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -67,14 +66,16 @@ export default function ReportesClientes({ fechaInicio, fechaFin }: ReportesClie
           </div>
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
             <p className="text-sm text-gray-500">Crecimiento</p>
-            <p className={`text-2xl font-bold ${comparativo.Crecimiento >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`text-2xl font-bold ${comparativo.Crecimiento >= 0 ? "text-green-600" : "text-red-600"}`}>
               {formatCurrency(comparativo.Crecimiento)}
             </p>
           </div>
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
             <p className="text-sm text-gray-500">% Crecimiento</p>
-            <p className={`text-2xl font-bold ${comparativo.PorcentajeCrecimiento >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatPorcentaje(comparativo.PorcentajeCrecimiento)}
+            <p
+              className={`text-2xl font-bold ${comparativo.PorcentajeCrecimiento >= 0 ? "text-green-600" : "text-red-600"}`}
+            >
+              {formatPercent(comparativo.PorcentajeCrecimiento)}
             </p>
           </div>
         </div>
@@ -92,9 +93,9 @@ export default function ReportesClientes({ fechaInicio, fechaFin }: ReportesClie
               </tr>
             </thead>
             <tbody>
-              {topClientes.map((c, i) => (
-                <tr key={i} className="border-t dark:border-gray-700">
-                  <td className="px-3 py-2">{c.cardName || 'N/A'}</td>
+              {topClientes.map((c) => (
+                <tr key={c.cardCode} className="border-t dark:border-gray-700">
+                  <td className="px-3 py-2">{c.cardName || "N/A"}</td>
                   <td className="px-3 py-2 text-right">{formatNumber(c.documentos)}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(c.totalVenta)}</td>
                 </tr>
@@ -106,16 +107,16 @@ export default function ReportesClientes({ fechaInicio, fechaFin }: ReportesClie
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Ventas por Marca/Grupo</h3>
           {ventasPorGrupo.length > 0 ? (
-            <ReactApexChart 
+            <ReactApexChart
               options={{
-                chart: { type: 'pie', height: 350 },
-                labels: ventasPorGrupo.map(g => g.ItmsGrpNam),
-                legend: { position: 'bottom' },
-                dataLabels: { enabled: true }
-              }} 
-              series={ventasPorGrupo.map(g => Number((g.TotalVenta || 0).toFixed(2)))} 
-              type="pie" 
-              height={300} 
+                chart: { type: "pie", height: 350 },
+                labels: ventasPorGrupo.map((g) => g.ItmsGrpNam),
+                legend: { position: "bottom" },
+                dataLabels: { enabled: true },
+              }}
+              series={ventasPorGrupo.map((g) => Number((g.TotalVenta || 0).toFixed(2)))}
+              type="pie"
+              height={300}
             />
           ) : (
             <p className="text-center text-gray-500 py-10">No hay datos de grupos</p>

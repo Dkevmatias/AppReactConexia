@@ -89,125 +89,178 @@ export interface ComparativoMensual {
   Crecimiento: number;
 }
 
-const formatDate = (date: Date) => date.toISOString().split('T')[0];
+export interface Vendedor {
+  idUsuario: number;
+  nombre: string;
+  username: string;
+  email: string;
+  idRol: number;
+  idPersona: number;
+  cardCode: string;
+}
+
+export interface Marca {
+  idMarca: number;
+  firmName: string;
+  firmCode: number;
+}
+
+const formatDate = (date: Date) => date.toISOString().split("T")[0];
+
+const appendFechas = (
+  params: URLSearchParams,
+  fechaInicio?: string,
+  fechaFin?: string,
+) => {
+  if (fechaInicio) params.append("fechaInicio", fechaInicio);
+  if (fechaFin) params.append("fechaFin", fechaFin);
+};
 
 export const getReportesService = {
-  // Dashboard completo
   getDashboard: async (fechaInicio?: string, fechaFin?: string) => {
     const params = new URLSearchParams();
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    
-    const response = await api.get<DashboardData>(`/api/Reportes/DashboardHana?${params}`);
+    appendFechas(params, fechaInicio, fechaFin);
+    const response = await api.get<DashboardData>(
+      `/api/Reportes/DashboardHana?${params}`,
+    );
     return response.data;
   },
 
-  // Resumen de ventas
   getResumenVentas: async (fechaInicio?: string, fechaFin?: string) => {
     const params = new URLSearchParams();
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    
-    const response = await api.get<ResumenVentas>(`/api/Reportes/ResumenVentas?${params}`);
-    console.log("vENTAS N",response.data);
+    appendFechas(params, fechaInicio, fechaFin);
+    const response = await api.get<ResumenVentas>(
+      `/api/Reportes/ResumenVentas?${params}`,
+    );
     return response.data;
   },
 
-  // Ventas por vendedor
   getVentasPorVendedor: async (fechaInicio?: string, fechaFin?: string) => {
     const params = new URLSearchParams();
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    
-    const response = await api.get<VentaPorVendedor[]>(`/api/Reportes/VentasPorVendedorHana?${params}`);
+    appendFechas(params, fechaInicio, fechaFin);
+    const response = await api.get<VentaPorVendedor[]>(
+      `/api/Reportes/VentasPorVendedorHana?${params}`,
+    );
     return response.data;
   },
 
-  // Ventas por almacén
   getVentasPorAlmacen: async (fechaInicio?: string, fechaFin?: string) => {
     const params = new URLSearchParams();
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    
-    const response = await api.get<VentaPorAlmacen[]>(`/api/Reportes/VentasPorAlmacenHana?${params}`);
-    return response.data;
-  },
-  getVentasPorMarca: async (fechaInicio?: string, fechaFin?: string) => {
-    const params = new URLSearchParams();
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    
-    const response = await api.get<VentaPorMarca[]>(`/api/Reportes/VentasPorMarca?${params}`);
+    appendFechas(params, fechaInicio, fechaFin);
+    const response = await api.get<VentaPorAlmacen[]>(
+      `/api/Reportes/VentasPorAlmacenHana?${params}`,
+    );
     return response.data;
   },
 
-  // Top clientes
+  getVentasPorMarca: async (
+    fechaInicio?: string,
+    fechaFin?: string,
+    username?: string,
+    firmCode?: number | null,
+  ) => {
+    const params = new URLSearchParams();
+    appendFechas(params, fechaInicio, fechaFin);
+    if (username) params.append("username", username);
+    if (firmCode != null) params.append("firmCode", String(firmCode));
+    const response = await api.get<VentaPorMarca[]>(
+      `/api/Reportes/VentasPorMarca?${params}`,
+    );
+    return response.data;
+  },
+
   getTopClientes: async (top = 10, fechaInicio?: string, fechaFin?: string) => {
     const params = new URLSearchParams();
-    params.append('top', top.toString());
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    
-    const response = await api.get<TopCliente[]>(`/api/Reportes/TopClientes?${params}`);
+    params.append("top", String(top));
+    appendFechas(params, fechaInicio, fechaFin);
+    const response = await api.get<TopCliente[]>(
+      `/api/Reportes/TopClientes?${params}`,
+    );
     return response.data;
   },
 
-  // Top productos
-  getTopProductos: async (top = 10, fechaInicio?: string, fechaFin?: string) => {
+  getTopClientesVendedor: async (
+    top = 10,
+    fechaInicio?: string,
+    fechaFin?: string,
+    username?: string,
+  ) => {
     const params = new URLSearchParams();
-    params.append('top', top.toString());
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    
-    const response = await api.get<TopProducto[]>(`/api/Reportes/TopProductos?${params}`);
+    params.append("top", String(top));
+    appendFechas(params, fechaInicio, fechaFin);
+    if (username) params.append("username", username);
+    const response = await api.get<TopCliente[]>(
+      `/api/Reportes/TopClientesVendedor?${params}`,
+    );
     return response.data;
   },
 
-  // Ventas diarias
+  getTopProductos: async (
+    top = 10,
+    fechaInicio?: string,
+    fechaFin?: string,
+  ) => {
+    const params = new URLSearchParams();
+    params.append("top", String(top));
+    appendFechas(params, fechaInicio, fechaFin);
+    const response = await api.get<TopProducto[]>(
+      `/api/Reportes/TopProductos?${params}`,
+    );
+    return response.data;
+  },
+
   getVentasDiarias: async (fechaInicio?: string, fechaFin?: string) => {
     const params = new URLSearchParams();
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    
-    const response = await api.get<VentaDiaria[]>(`/api/Reportes/VentasDiarias?${params}`);
+    appendFechas(params, fechaInicio, fechaFin);
+    const response = await api.get<VentaDiaria[]>(
+      `/api/Reportes/VentasDiarias?${params}`,
+    );
     return response.data;
   },
 
-  // Ventas por grupo
   getVentasPorGrupo: async (fechaInicio?: string, fechaFin?: string) => {
     const params = new URLSearchParams();
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    
-    const response = await api.get<VentaPorGrupo[]>(`/api/Reportes/VentasPorGrupo?${params}`);
+    appendFechas(params, fechaInicio, fechaFin);
+    const response = await api.get<VentaPorGrupo[]>(
+      `/api/Reportes/VentasPorGrupo?${params}`,
+    );
     return response.data;
   },
 
-  // Ventas por ruta
   getVentasPorRuta: async (fechaInicio?: string, fechaFin?: string) => {
     const params = new URLSearchParams();
-    if (fechaInicio) params.append('fechaInicio', fechaInicio);
-    if (fechaFin) params.append('fechaFin', fechaFin);
-    
-    const response = await api.get<VentaPorRuta[]>(`/api/Reportes/VentasPorRuta?${params}`);
+    appendFechas(params, fechaInicio, fechaFin);
+    const response = await api.get<VentaPorRuta[]>(
+      `/api/Reportes/VentasPorRuta?${params}`,
+    );
     return response.data;
   },
 
-  // Comparativo anual
   getComparativoAnual: async (anio?: number) => {
-    const params = anio ? `?anio=${anio}` : '';
-    const response = await api.get<ComparativoAnual>(`/api/Reportes/ComparativoAnualHana${params}`);
+    const params = anio ? `?anio=${anio}` : "";
+    const response = await api.get<ComparativoAnual>(
+      `/api/Reportes/ComparativoAnualHana${params}`,
+    );
     return response.data;
   },
 
-  // Fechas automático (últimos 30 días)
   getFechasDefault: () => {
     const fin = new Date();
     const inicio = new Date();
     inicio.setDate(inicio.getDate() - 30);
     return {
       fechaInicio: formatDate(inicio),
-      fechaFin: formatDate(fin)
+      fechaFin: formatDate(fin),
     };
-  }
+  },
+
+  getVendedores: async () => {
+    const response = await api.get<Vendedor[]>(`/api/Usuarios/GetVendedores`);
+    return response.data;
+  },
+
+  getMarcas: async () => {
+    const response = await api.get<Marca[]>(`/api/Marcas/GetMarcas`);
+    return response.data;
+  },
 };

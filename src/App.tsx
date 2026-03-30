@@ -11,6 +11,7 @@ const Home = lazy(() => import("./pages/Dashboard/Home"));
 const Terminos = lazy(() => import("./pages/Dashboard/Terminos"));
 const Aviso = lazy(() => import("./pages/Dashboard/Aviso"));
 const ActivarCuenta = lazy(() => import("./pages/Clientes/ActivarCuenta"));
+const PublicVideo = lazy(() => import("./pages/Video"));
 const Acumulado = lazy(() => import("./pages/Clientes/Acumulado"));
 const RealizarSorteo = lazy(() => import("./pages/Sorteo/RealizarSorteo"));
 
@@ -19,10 +20,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import Profile from "./pages/Clientes/Profile";
-
-
-
-
+import Video from "./pages/Video";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -38,11 +36,13 @@ export default function App() {
   return (
     <Router>
       <ScrollToTop />
-      <Suspense fallback={
-        <div className="h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      }>
+      <Suspense
+        fallback={
+          <div className="h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        }
+      >
         <Routes>
           {/* Root */}
           <Route
@@ -59,12 +59,17 @@ export default function App() {
           {/* Auth */}
           <Route
             path="/signin"
-            element={user ? <Navigate to="/dashboard/Home" replace /> : <SignIn />}
+            element={
+              user ? <Navigate to="/dashboard/Home" replace /> : <SignIn />
+            }
           />
           <Route path="/signup" element={<SignUp />} />
 
           {/* Activación */}
           <Route path="/activar-cuenta" element={<ActivarCuenta />} />
+
+          {/* Video público (sin login) — compartir: dominio.com/video */}
+          <Route path="/video" element={<Video />} />
 
           {/* Protected */}
           <Route
