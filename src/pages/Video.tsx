@@ -1,6 +1,8 @@
 import { Helmet } from "react-helmet-async";
 
-const YOUTUBE_EMBED_URL = "https://www.youtube.com/embed/epo3qzeveJY";
+const YOUTUBE_VIDEO_ID = "epo3qzeveJY";
+const YOUTUBE_THUMBNAIL = `https://img.youtube.com/vi/${YOUTUBE_VIDEO_ID}/maxresdefault.jpg`;
+const YOUTUBE_URL = `https://www.youtube.com/watch?v=${YOUTUBE_VIDEO_ID}`;
 
 const PAGE_TITLE = "Video";
 const PAGE_DESCRIPTION = "Mira el video aquí.";
@@ -18,8 +20,15 @@ export default function Video() {
         <meta property="og:title" content={PAGE_TITLE} />
         <meta property="og:description" content={PAGE_DESCRIPTION} />
         <meta property="og:url" content={pageUrl} />
-        <meta property="og:type" content="website" />
-        <meta name="twitter:card" content="player" />
+        <meta property="og:type" content="video.other" />
+        <meta property="og:video" content={YOUTUBE_URL} />
+        <meta property="og:image" content={YOUTUBE_THUMBNAIL} />
+        <meta property="og:image:width" content="1280" />
+        <meta property="og:image:height" content="720" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={PAGE_TITLE} />
+        <meta name="twitter:description" content={PAGE_DESCRIPTION} />
+        <meta name="twitter:image" content={YOUTUBE_THUMBNAIL} />
       </Helmet>
 
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-4 sm:p-8">
@@ -29,7 +38,7 @@ export default function Video() {
           </h1>
           <div className="rounded-xl overflow-hidden shadow-xl bg-black">
             <iframe
-              src={YOUTUBE_EMBED_URL}
+              src={`https://www.youtube-nocookie.com/embed/${YOUTUBE_VIDEO_ID}`}
               title={PAGE_TITLE}
               className="w-full aspect-[9/16] max-h-[80vh] mx-auto"
               frameBorder="0"
