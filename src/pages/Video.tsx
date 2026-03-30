@@ -1,9 +1,8 @@
 import { Helmet } from "react-helmet-async";
-import { FaYoutube, FaPlay } from "react-icons/fa";
 
 const YOUTUBE_VIDEO_ID = "epo3qzeveJY";
 const YOUTUBE_THUMBNAIL = `https://img.youtube.com/vi/${YOUTUBE_VIDEO_ID}/maxresdefault.jpg`;
-const YOUTUBE_SHORT_URL = `https://youtube.com/shorts/${YOUTUBE_VIDEO_ID}`;
+const INVIDIOUS_EMBED = `https://yewtu.be/embed/${YOUTUBE_VIDEO_ID}`;
 
 const PAGE_TITLE = "Video";
 const PAGE_DESCRIPTION = "Mira el video aquí.";
@@ -36,24 +35,18 @@ export default function Video() {
           <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white text-center">
             {PAGE_TITLE}
           </h1>
-          <div className="relative rounded-xl overflow-hidden shadow-xl bg-black group cursor-pointer" onClick={() => window.open(YOUTUBE_SHORT_URL, '_blank')}>
-            <img
-              src={YOUTUBE_THUMBNAIL}
-              alt={PAGE_TITLE}
-              className="w-full aspect-[9/16] object-cover"
+          <div className="rounded-xl overflow-hidden shadow-xl bg-black">
+            <iframe
+              src={INVIDIOUS_EMBED}
+              title={PAGE_TITLE}
+              className="w-full aspect-[9/16] max-h-[80vh] mx-auto"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
             />
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/40 transition-colors">
-              <div className="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
-                <FaPlay className="text-white text-2xl ml-1" />
-              </div>
-            </div>
-            <div className="absolute bottom-3 right-3 bg-black/80 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
-              <FaYoutube className="text-red-500" />
-              <span>YouTube</span>
-            </div>
           </div>
           <p className="text-center text-gray-600 dark:text-gray-400 text-sm">
-            Toca la imagen para ver el video en YouTube
+            Video reproduciéndose en tu dominio
           </p>
         </div>
       </div>
