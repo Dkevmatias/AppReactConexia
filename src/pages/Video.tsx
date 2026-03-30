@@ -2,7 +2,7 @@ import { Helmet } from "react-helmet-async";
 
 const YOUTUBE_VIDEO_ID = "epo3qzeveJY";
 const YOUTUBE_THUMBNAIL = `https://img.youtube.com/vi/${YOUTUBE_VIDEO_ID}/maxresdefault.jpg`;
-const INVIDIOUS_EMBED = `https://yewtu.be/embed/${YOUTUBE_VIDEO_ID}`;
+const INVIDIOUS_EMBED = `https://pipedapi.kavin.rocks/embed/${YOUTUBE_VIDEO_ID}`;
 
 const PAGE_TITLE = "Video";
 const PAGE_DESCRIPTION = "Mira el video aquí.";
