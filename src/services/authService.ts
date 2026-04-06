@@ -59,7 +59,6 @@ export const getPersonas = async (idpersona: number) => {
 
 export const getPersonasTelefono = async () => {
   const response = await api.get(`/api/Personas/GetPersonas`);
-  console.log("Respuesta de getPersonasTelefono:", response.data);
   return response.data;
 };
 
