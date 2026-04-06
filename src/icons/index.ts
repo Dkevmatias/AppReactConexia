@@ -64,7 +64,6 @@ import { ReactComponent as Logo50A } from "./logo50A.svg?react";
 import { ReactComponent as Grafic } from "./Icongrafic.svg?react";
 import { ReactComponent as Puntos } from "./Iconpoints.svg?react";
 
-
 export {
   Grafic,
   Puntos,

@@ -20,6 +20,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import Profile from "./pages/Clientes/Profile";
+import RespuestaClientes from "./pages/ConfigPage/RespuestaClientes";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -87,6 +88,10 @@ export default function App() {
             <Route path="/dashboard/Aviso" element={<Aviso />} />
             <Route path="/clientes/Acumulado" element={<Acumulado />} />
             <Route path="/clientes/Profile" element={<Profile />} />
+            <Route
+              path="/ConfigPage/Respuesta"
+              element={<RespuestaClientes />}
+            />
           </Route>
         </Routes>
       </Suspense>

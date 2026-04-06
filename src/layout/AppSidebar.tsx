@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
+import { VscCommentDiscussionSparkle } from "react-icons/vsc";
 import AppLogo from "../components/logo/AppLogo";
 
 import {
   //BoxCubeIcon,
   //CalenderIcon,
+
   Inicio,
   TerminosIcon,
   PromocionesIcon,
   ChevronDownIcon,
   CanjearHicon,
-  GridIcon,
   HorizontaLDots,
-  Logo50A,
   //ListIcon,
   //PageIcon,
   //PieChartIcon,
@@ -28,13 +28,19 @@ type NavItem = {
   name: string;
   icon: React.ReactNode;
   path?: string;
-  subItems?: { name: string; path: string; icon:React.ReactNode; pro?: boolean; new?: boolean }[];
+  subItems?: {
+    name: string;
+    path: string;
+    icon: React.ReactNode;
+    pro?: boolean;
+    new?: boolean;
+  }[];
 };
 
 // === MENÚ PRINCIPAL ===
 const navItems: NavItem[] = [
   {
-    icon: <Inicio  />,
+    icon: <Inicio />,
     name: "Inicio",
     path: "/dashboard/home",
     /*
@@ -51,14 +57,13 @@ const navItems: NavItem[] = [
      // {name: "Reportes BI", path: "/dashboard/reportes", pro: false },
     ],*/
     //Configuración de Menu
-    
   },
-   {
+  {
     icon: <CanjearHicon />,
     name: "Canjear",
     path: "/dashboard/evento",
   },
-   {
+  {
     icon: <TerminosIcon />,
     name: "Terminos y Condiciones",
     path: "/dashboard/terminos",
@@ -68,10 +73,15 @@ const navItems: NavItem[] = [
     name: "Promociones",
     path: "/dashboard/promociones",
   },
-   {
+  {
     icon: <PromocionesIcon />,
     name: "Reportes BI",
     path: "/dashboard/reportes",
+  },
+  {
+    icon: <VscCommentDiscussionSparkle />,
+    name: "Respuesta Clientes",
+    path: "/ConfigPage/Respuesta",
   },
   /*
   {
@@ -108,7 +118,7 @@ const navItems: NavItem[] = [
 
 // === OTROS MENÚS ===
 const othersItems: NavItem[] = [
-      /*{
+  /*{
 
     icon: <PieChartIcon />,
     name: "Charts",
@@ -137,12 +147,9 @@ const othersItems: NavItem[] = [
       { name: "Sign Up", path: "/signup", pro: false },
     ],
   },*/
-
-
 ];
 
 const AppSidebar: React.FC = () => {
-
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const location = useLocation();
   const { user } = useAuth();
@@ -153,13 +160,14 @@ const AppSidebar: React.FC = () => {
     index: number;
   } | null>(null);
 
-
-  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>({});
+  const [subMenuHeight, setSubMenuHeight] = useState<Record<string, number>>(
+    {},
+  );
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const isActive = useCallback(
     (path: string) => location.pathname === path,
-    [location.pathname]
+    [location.pathname],
   );
 
   useEffect(() => {
@@ -194,8 +202,13 @@ const AppSidebar: React.FC = () => {
   }, [openSubmenu]);
 
   // === FILTRO DE MENÚ SEGÚN ROL ===
-  const allowedForRol3 = ["Inicio", "Canjear", "Terminos y Condiciones", "Promociones"];
-  
+  const allowedForRol3 = [
+    "Inicio",
+    "Canjear",
+    "Terminos y Condiciones",
+    "Promociones",
+  ];
+
   const filteredNavItems = navItems.filter((item) => {
     switch (user?.role) {
       case 1: // Administrador
@@ -209,18 +222,18 @@ const AppSidebar: React.FC = () => {
     }
   });
 
- const filteredOthersItems = othersItems.filter((item) => {
-  switch (user?.role) {
-    case 1: // Admin ve todo
-      return true;
-    case 2: // Vendedor 
-      return item.name === "Charts";
-    case 3: // Clientes Evento y Boletos
-     return ["Dashboard"].includes(item.name);
-    default:
-      return false;
-  }
-});
+  const filteredOthersItems = othersItems.filter((item) => {
+    switch (user?.role) {
+      case 1: // Admin ve todo
+        return true;
+      case 2: // Vendedor
+        return item.name === "Charts";
+      case 3: // Clientes Evento y Boletos
+        return ["Dashboard"].includes(item.name);
+      default:
+        return false;
+    }
+  });
 
   const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
     setOpenSubmenu((prevOpenSubmenu) => {
@@ -306,8 +319,7 @@ const AppSidebar: React.FC = () => {
               className="overflow-hidden transition-all duration-300"
               style={{
                 height:
-                  openSubmenu?.type === menuType &&
-                  openSubmenu?.index === index
+                  openSubmenu?.type === menuType && openSubmenu?.index === index
                     ? `${subMenuHeight[`${menuType}-${index}`]}px`
                     : "0px",
               }}
@@ -323,12 +335,11 @@ const AppSidebar: React.FC = () => {
                           : "menu-dropdown-item-inactive"
                       }`}
                     >
-                      
-                     {/*Anteriormente no tenía Icono {subItem.name}*/} 
+                      {/*Anteriormente no tenía Icono {subItem.name}*/}
                       <div className="flex items-center gap-2">
-                      {subItem.icon}
-                      <span>{subItem.name}</span>
-                    </div>
+                        {subItem.icon}
+                        <span>{subItem.name}</span>
+                      </div>
                       <span className="flex items-center gap-1 ml-auto">
                         {subItem.new && (
                           <span
@@ -371,8 +382,8 @@ const AppSidebar: React.FC = () => {
           isExpanded || isMobileOpen
             ? "w-[290px]"
             : isHovered
-            ? "w-[290px]"
-            : "w-[90px]"
+              ? "w-[290px]"
+              : "w-[90px]"
         }
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0`}
@@ -385,12 +396,12 @@ const AppSidebar: React.FC = () => {
         }`}
       >
         <Link to="/" className="flex items-center justify-center w-full">
-            {isExpanded || isHovered || isMobileOpen ? (
-              <AppLogo size="h-30" />
-            ) : (
-              <AppLogo size="h-22" />
-            )}
-      </Link>
+          {isExpanded || isHovered || isMobileOpen ? (
+            <AppLogo size="h-30" />
+          ) : (
+            <AppLogo size="h-22" />
+          )}
+        </Link>
       </div>
 
       <div className="flex flex-col  h-full overflow-y-auto duration-300 ease-linear no-scrollbar">
@@ -413,31 +424,33 @@ const AppSidebar: React.FC = () => {
               {renderMenuItems(filteredNavItems, "main")}
             </div>
             {filteredOthersItems.length > 0 && (
-            <div className="">
-              <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
-                  !isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "Others"
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(filteredOthersItems , "others")}
-            </div>)}
+              <div className="">
+                <h2
+                  className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
+                    !isExpanded && !isHovered
+                      ? "lg:justify-center"
+                      : "justify-start"
+                  }`}
+                >
+                  {isExpanded || isHovered || isMobileOpen ? (
+                    "Others"
+                  ) : (
+                    <HorizontaLDots />
+                  )}
+                </h2>
+                {renderMenuItems(filteredOthersItems, "others")}
+              </div>
+            )}
           </div>
         </nav>
-        <div  className={`mt-auto pb-6 flex flex-col items-center text-center px-4
+        <div
+          className={`mt-auto pb-6 flex flex-col items-center text-center px-4
     ${isExpanded || isHovered || isMobileOpen ? "flex" : "hidden"}  // si isOpen false → oculto`}
->
+        >
           {/* Imagen modo claro */}
           <img
             src="/images/page/footerSB-white.png"
-            className="block dark:hidden max-w-[150px] mb-3"  
+            className="block dark:hidden max-w-[150px] mb-3"
           />
 
           {/* Imagen modo oscuro */}
@@ -447,10 +460,11 @@ const AppSidebar: React.FC = () => {
           />
           {/* Texto */}
           <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-            © 2026 CODIALUB - Programa de Recompensas.<br />
+            © 2026 CODIALUB - Programa de Recompensas.
+            <br />
             Todos los derechos reservados.
           </p>
-</div>
+        </div>
         {/* {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null} */}
       </div>
     </aside>
