@@ -19,6 +19,7 @@ import { ScrollToTop } from "./components/common/ScrollToTop";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import { useAuth } from "./hooks/useAuth";
 import { Navigate } from "react-router-dom";
+import { resolvePostLoginPath } from "./config/postLoginRoutes";
 import Profile from "./pages/Clientes/Profile";
 import RespuestaClientes from "./pages/ConfigPage/RespuestaClientes";
 
@@ -49,7 +50,10 @@ export default function App() {
             path="/"
             element={
               user ? (
-                <Navigate to="/dashboard/Home" replace />
+                <Navigate
+                  to={resolvePostLoginPath(user.role, user.defaultRoute)}
+                  replace
+                />
               ) : (
                 <Navigate to="/signin" replace />
               )
@@ -60,7 +64,14 @@ export default function App() {
           <Route
             path="/signin"
             element={
-              user ? <Navigate to="/dashboard/Home" replace /> : <SignIn />
+              user ? (
+                <Navigate
+                  to={resolvePostLoginPath(user.role, user.defaultRoute)}
+                  replace
+                />
+              ) : (
+                <SignIn />
+              )
             }
           />
           <Route path="/signup" element={<SignUp />} />

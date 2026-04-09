@@ -9,6 +9,8 @@ export interface User {
   idPersona: number;
   cardCode: string;
   fullname: string;
+  /** Ruta inicial del rol (desde backend); opcional */
+  defaultRoute?: string | null;
 }
 
 export interface AuthContextType {

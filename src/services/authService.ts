@@ -5,6 +5,8 @@ export interface User {
   role: number;
   cardCode: string;
   fullname: string;
+  /** Ruta inicial definida en el rol (API); si falta, se usa el mapa local en postLoginRoutes */
+  defaultRoute?: string | null;
 }
 
 export interface LoginResponse {

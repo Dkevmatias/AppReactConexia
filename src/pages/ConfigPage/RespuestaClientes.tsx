@@ -5,6 +5,7 @@ import { getPersonasTelefono } from "../../services/authService";
 import {
   Conversacion,
   getConversaciones,
+  marcarRespuesta,
 } from "../../services/conversacionesService";
 import { FaWhatsapp } from "react-icons/fa";
 
@@ -44,6 +45,7 @@ export default function RespuestaClientes() {
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [marcandoId, setMarcandoId] = useState<number | null>(null);
 
   useEffect(() => {
     const cargarDatos = async () => {
@@ -92,6 +94,43 @@ export default function RespuestaClientes() {
       };
     });
   }, [conversaciones, personas]);
+
+  const handleWhatsappClick = async (
+    e: React.MouseEvent,
+    conv: ConversacionEnriquecida,
+  ) => {
+    e.preventDefault();
+    const num = getWhatsappNumber(conv.telefono);
+    if (!num) return;
+
+    if (!conv.respondido) {
+      setError(null);
+      setMarcandoId(conv.idConversacion);
+      try {
+        await marcarRespuesta(conv.idConversacion, user?.idPersona || 0);
+        setConversaciones((prev) =>
+          prev.map((c) =>
+            c.idConversacion === conv.idConversacion
+              ? { ...c, respondido: true }
+              : c,
+          ),
+        );
+      } catch (err) {
+        console.error(err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo marcar como respondido.",
+        );
+        setMarcandoId(null);
+        return;
+      } finally {
+        setMarcandoId(null);
+      }
+    }
+
+    window.open(`https://wa.me/${num}`, "_blank", "noopener,noreferrer");
+  };
 
   return (
     <div className="space-y-6">
@@ -179,15 +218,23 @@ export default function RespuestaClientes() {
 
                   <td className="px-3 py-2 text-center">
                     {getWhatsappNumber(conv.telefono) ? (
-                      <a
-                        href={`https://wa.me/${getWhatsappNumber(conv.telefono)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center rounded-full p-1.5 hover:bg-green-50 dark:hover:bg-green-900/30"
-                        title="Abrir conversación en WhatsApp"
+                      <button
+                        type="button"
+                        disabled={marcandoId === conv.idConversacion}
+                        onClick={(e) => handleWhatsappClick(e, conv)}
+                        className="inline-flex items-center justify-center rounded-full p-1.5 hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 disabled:pointer-events-none"
+                        title={
+                          conv.respondido
+                            ? "Abrir WhatsApp"
+                            : "Marcar respondido y abrir WhatsApp"
+                        }
                       >
-                        <FaWhatsapp className="h-5 w-5 text-green-500" />
-                      </a>
+                        {marcandoId === conv.idConversacion ? (
+                          <span className="inline-block h-5 w-5 animate-pulse rounded-full bg-green-200 dark:bg-green-800" />
+                        ) : (
+                          <FaWhatsapp className="h-5 w-5 text-green-500" />
+                        )}
+                      </button>
                     ) : (
                       <span className="text-gray-400 text-xs">
                         Sin teléfono
