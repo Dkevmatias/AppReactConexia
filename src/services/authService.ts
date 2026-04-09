@@ -198,3 +198,41 @@ export const getPuntosAcumulados = async (idPersona: number) => {
   console.log("Puntos Acumulados Response:", response.data?.puntos);
   return response.data?.puntos ?? 0;
 };
+
+export interface Modulo {
+  idModulo: number;
+  nombre: string;
+  clave: string;
+  ruta: string;
+  activo: boolean;
+  permisos: {
+    idPermiso: number;
+    nombre: string;
+    clave: string;
+    activo: boolean;
+  }[];
+}
+
+export interface MenuResponse {
+  idRol: number;
+  nombreRol: string;
+  modulos: Modulo[];
+}
+
+export const getMenuByRol = async (
+  idRol: number,
+): Promise<MenuResponse | null> => {
+  try {
+    const response = await api.get<MenuResponse>(
+      `/api/Menu/GetMenuByRol/${idRol}`,
+      {
+        withCredentials: true,
+      },
+    );
+    console.log("Menu response:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching menu:", error);
+    return null;
+  }
+};

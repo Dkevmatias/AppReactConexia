@@ -152,8 +152,7 @@ const othersItems: NavItem[] = [
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const location = useLocation();
-  const { user } = useAuth();
-  //console.log("User Role in Sidebar:", user);
+  const { menu, menuLoading } = useAuth();
 
   const [openSubmenu, setOpenSubmenu] = useState<{
     type: "main" | "others";
@@ -201,39 +200,36 @@ const AppSidebar: React.FC = () => {
     }
   }, [openSubmenu]);
 
-  // === FILTRO DE MENÚ SEGÚN ROL ===
-  const allowedForRol3 = [
-    "Inicio",
-    "Canjear",
-    "Terminos y Condiciones",
-    "Promociones",
-  ];
+  // === FILTRO DE MENÚ SEGÚN ROL DESDE BACKEND ===
+  // Sin menú cargado: no mostrar ítems (evita flash de “todos” y luego filtrar)
+  let filteredNavItems: NavItem[] = [];
 
-  const filteredNavItems = navItems.filter((item) => {
-    switch (user?.role) {
-      case 1: // Administrador
-        return true;
-      case 2: //Vendedor
-        return item.name !== "Pages";
-      case 3: // Cliente
-        return allowedForRol3.includes(item.name);
-      default:
-        return false;
-    }
-  });
+  if (menuLoading) {
+    filteredNavItems = [];
+  } else if (menu.length > 0) {
+    filteredNavItems = navItems.filter((item) => {
+      const menuClaveMap: Record<string, string> = {
+        Inicio: "Dashboard.Inicio",
+        Canjear: "Dashboard.Canjear",
+        "Terminos y Condiciones": "Dashboard.Terminos",
+        Promociones: "Dashboard.Promociones",
+        "Reportes BI": "Dashboard.Reportes",
+        "Respuesta Clientes": "Config.RespuestaClientes",
+      };
 
-  const filteredOthersItems = othersItems.filter((item) => {
-    switch (user?.role) {
-      case 1: // Admin ve todo
-        return true;
-      case 2: // Vendedor
-        return item.name === "Charts";
-      case 3: // Clientes Evento y Boletos
-        return ["Dashboard"].includes(item.name);
-      default:
-        return false;
-    }
-  });
+      const clave = menuClaveMap[item.name];
+      if (!clave) return true;
+
+      const moduloEncontrado = menu.find((m) => m.clave === clave);
+      return (
+        moduloEncontrado?.activo &&
+        moduloEncontrado.permisos?.some((p) => p.activo)
+      );
+    });
+  }
+
+  // othersItems vacío - el menú se controla desde el backend
+  const filteredOthersItems: typeof navItems = [];
 
   const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
     setOpenSubmenu((prevOpenSubmenu) => {
@@ -421,7 +417,23 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots className="size-6" />
                 )}
               </h2>
-              {renderMenuItems(filteredNavItems, "main")}
+              {menuLoading ? (
+                <ul className="flex flex-col gap-6">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <li key={i}>
+                      <div
+                        className={`menu-item group h-11 rounded-lg bg-gray-100 dark:bg-gray-800/80 animate-pulse ${
+                          !isExpanded && !isHovered
+                            ? "lg:justify-center"
+                            : "lg:justify-start"
+                        }`}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                renderMenuItems(filteredNavItems, "main")
+              )}
             </div>
             {filteredOthersItems.length > 0 && (
               <div className="">

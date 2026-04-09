@@ -52,7 +52,7 @@ export default function SignInForm() {
   }
   return;
 }    
-    login(response.user);
+    await login(response.user);
     navigate("/dashboard/evento");
 
   } catch (err: any) {

@@ -89,7 +89,7 @@ export default function App() {
             <Route path="/clientes/Acumulado" element={<Acumulado />} />
             <Route path="/clientes/Profile" element={<Profile />} />
             <Route
-              path="/ConfigPage/Respuesta"
+              path="/configPage/Respuesta"
               element={<RespuestaClientes />}
             />
           </Route>

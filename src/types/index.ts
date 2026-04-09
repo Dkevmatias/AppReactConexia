@@ -14,8 +14,11 @@ export interface User {
 export interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (user: User) => void;
+  /** true mientras se obtiene el menú del backend (evita mostrar todos los ítems y luego filtrar) */
+  menuLoading: boolean;
+  login: (user: User) => Promise<void>;
   logout: () => Promise<void>;
+  menu: Modulo[];
 }
 
 export interface ApiResponse<T = unknown> {
@@ -46,4 +49,20 @@ export interface Sorteo {
   nombre: string;
   fecha: string;
   estado: "activo" | "finalizado" | "pendiente";
+}
+
+export interface Permiso {
+  idPermiso: number;
+  nombre: string;
+  clave: string;
+  activo: boolean;
+}
+
+export interface Modulo {
+  idModulo: number;
+  nombre: string;
+  clave: string;
+  ruta: string;
+  activo: boolean;
+  permisos: Permiso[];
 }
