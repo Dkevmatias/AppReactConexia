@@ -22,6 +22,7 @@ import { Navigate } from "react-router-dom";
 import { resolvePostLoginPath } from "./config/postLoginRoutes";
 import Profile from "./pages/Clientes/Profile";
 import RespuestaClientes from "./pages/ConfigPage/RespuestaClientes";
+import Articulos from "./pages/Ventas/Articulos";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -99,6 +100,7 @@ export default function App() {
             <Route path="/dashboard/Aviso" element={<Aviso />} />
             <Route path="/clientes/Acumulado" element={<Acumulado />} />
             <Route path="/clientes/Profile" element={<Profile />} />
+            <Route path="/ventas/Articulos" element={<Articulos />} />
             <Route
               path="/configPage/Respuesta"
               element={<RespuestaClientes />}

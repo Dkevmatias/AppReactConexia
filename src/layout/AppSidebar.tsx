@@ -81,8 +81,14 @@ const navItems: NavItem[] = [
   {
     icon: <VscCommentDiscussionSparkle />,
     name: "Respuesta Clientes",
-    path: "/ConfigPage/Respuesta",
+    path: "/configPage/Respuesta",
   },
+  {
+    icon: <VscCommentDiscussionSparkle />,
+    name: "Buscador de Existencias",
+    path: "/ventas/articulos",
+  },
+
   /*
   {
     icon: <CalenderIcon />,
