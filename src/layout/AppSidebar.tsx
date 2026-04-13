@@ -83,6 +83,7 @@ const navItems: NavItem[] = [
     name: "Respuesta Clientes",
     path: "/configPage/Respuesta",
   },
+  //Se comenta por lanzamiento a produccion
   /*
   {
     icon: <VscCommentDiscussionSparkle />,
