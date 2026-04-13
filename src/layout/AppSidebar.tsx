@@ -83,11 +83,13 @@ const navItems: NavItem[] = [
     name: "Respuesta Clientes",
     path: "/configPage/Respuesta",
   },
+  /*
   {
     icon: <VscCommentDiscussionSparkle />,
     name: "Buscador de Existencias",
     path: "/ventas/articulos",
   },
+  */
 
   /*
   {
@@ -221,6 +223,7 @@ const AppSidebar: React.FC = () => {
         Promociones: "Dashboard.Promociones",
         "Reportes BI": "Dashboard.Reportes",
         "Respuesta Clientes": "Config.RespuestaClientes",
+        Ventas: "Ventas.Articulos",
       };
 
       const clave = menuClaveMap[item.name];
