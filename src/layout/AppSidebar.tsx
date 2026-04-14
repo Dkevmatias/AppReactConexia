@@ -215,7 +215,7 @@ const AppSidebar: React.FC = () => {
         Promociones: "Dashboard.Promociones",
         "Reportes BI": "Dashboard.Reportes",
         "Respuesta Clientes": "Config.RespuestaClientes",
-        Ventas: "Ventas.Articulos",
+        "Buscador de Existencias": "Ventas.Articulos",
       };
 
       const clave = menuClaveMap[item.name];

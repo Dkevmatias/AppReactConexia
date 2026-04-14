@@ -6,6 +6,7 @@ export const DEFAULT_POST_LOGIN_PATH = "/dashboard/Home";
  */
 const POST_LOGIN_BY_ROLE: Record<number, string> = {
   6: "/configPage/Respuesta",
+  2: "/ventas/articulos",
 };
 
 function getPostLoginPath(role: number): string {
