@@ -178,6 +178,7 @@ export default function SignInForm() {
                   {loading ? "Ingresando..." : "Ingresar"}
                 </Button>
               </div>
+
               {requireCaptcha && (
                 <div className="bg-yellow-100 text-yellow-800 p-3 rounded text-sm text-center">
                   Detectamos varios intentos fallidos. Por favor vuelve a

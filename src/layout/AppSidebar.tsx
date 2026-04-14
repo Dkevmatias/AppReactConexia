@@ -4,25 +4,17 @@ import { VscCommentDiscussionSparkle } from "react-icons/vsc";
 import AppLogo from "../components/logo/AppLogo";
 
 import {
-  //BoxCubeIcon,
-  //CalenderIcon,
-
   Inicio,
   TerminosIcon,
   PromocionesIcon,
   ChevronDownIcon,
   CanjearHicon,
   HorizontaLDots,
-  //ListIcon,
-  //PageIcon,
-  //PieChartIcon,
-  //PlugInIcon,
-  //TableIcon,
-  //UserCircleIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 //import SidebarWidget from "./SidebarWidget";
 import { useAuth } from "../context/useAuth";
+import { BoxIcon } from "lucide-react";
 
 type NavItem = {
   name: string;
@@ -84,13 +76,12 @@ const navItems: NavItem[] = [
     path: "/configPage/Respuesta",
   },
   //Se comenta por lanzamiento a produccion
-  /*
+
   {
-    icon: <VscCommentDiscussionSparkle />,
+    icon: <BoxIcon />,
     name: "Buscador de Existencias",
     path: "/ventas/articulos",
   },
-  */
 
   /*
   {
@@ -228,7 +219,7 @@ const AppSidebar: React.FC = () => {
       };
 
       const clave = menuClaveMap[item.name];
-      if (!clave) return true;
+      if (!clave) return false;
 
       const moduloEncontrado = menu.find((m) => m.clave === clave);
       return (
