@@ -116,7 +116,7 @@ export default function SignInForm() {
             <div className="space-y-6">
               <div>
                 <Label>
-                  Usuario <span className="text-error-500">*</span>
+                  Correo <span className="text-error-500">*</span>
                 </Label>
                 <Input
                   placeholder="info@gmail.com"

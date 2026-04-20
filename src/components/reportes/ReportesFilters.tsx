@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
-import { getReportesService, Marca, Vendedor } from "../../services/reportesService";
-
+import {
+  getReportesService,
+  Marca,
+  Vendedor,
+} from "../../services/reportesService";
 
 interface ReportesFiltersProps {
   fechaInicio: string;
@@ -41,7 +44,9 @@ export default function ReportesFilters({
   const [tempFechaInicio, setTempFechaInicio] = useState(fechaInicio);
   const [tempFechaFin, setTempFechaFin] = useState(fechaFin);
   const [tempAñoComparar, setTempAñoComparar] = useState(añoComparar);
-  const [tempVendedor, setTempVendedor] = useState<number | null>(vendedorSeleccionado);  
+  const [tempVendedor, setTempVendedor] = useState<number | null>(
+    vendedorSeleccionado,
+  );
   const [tempMarca, setTempMarca] = useState<number | null>(marcaSeleccionada);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
@@ -54,14 +59,20 @@ export default function ReportesFilters({
     setTempAñoComparar(añoComparar);
     setTempVendedor(vendedorSeleccionado);
     setTempMarca(marcaSeleccionada);
-  }, [fechaInicio, fechaFin, añoComparar, vendedorSeleccionado, marcaSeleccionada]);
+  }, [
+    fechaInicio,
+    fechaFin,
+    añoComparar,
+    vendedorSeleccionado,
+    marcaSeleccionada,
+  ]);
 
   useEffect(() => {
     const cargarDatos = async () => {
       try {
         const [vendedoresData, marcasData] = await Promise.all([
           getReportesService.getVendedores(),
-          getReportesService.getMarcas()
+          getReportesService.getMarcas(),
         ]);
         setVendedores(vendedoresData || []);
         setMarcas(marcasData || []);
@@ -75,11 +86,11 @@ export default function ReportesFilters({
   }, []);
 
   const handleFilter = () => {
-    const vendedor = vendedores.find(v => v.idUsuario === tempVendedor);
+    const vendedor = vendedores.find((v) => v.idUsuario === tempVendedor);
     const nombreVendedor = vendedor ? vendedor.username : null;
-    const marca = marcas.find(m => m.idMarca === tempMarca);
+    const marca = marcas.find((m) => m.idMarca === tempMarca);
     const nombreMarca = marca ? marca.firmCode : null;
-    console.log( "Vendedor seleccionado:", tempVendedor, nombreVendedor);
+    console.log("Vendedor seleccionado:", tempVendedor, nombreVendedor);
     console.log("Marca seleccionada:", tempMarca, nombreMarca);
     onFechaInicioChange(tempFechaInicio);
     onFechaFinChange(tempFechaFin);
@@ -136,7 +147,9 @@ export default function ReportesFilters({
           </label>
           <select
             value={tempVendedor ?? ""}
-            onChange={(e) => setTempVendedor(e.target.value ? Number(e.target.value) : null)}
+            onChange={(e) =>
+              setTempVendedor(e.target.value ? Number(e.target.value) : null)
+            }
             disabled={loadingVendedores}
             className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-w-[180px]"
           >
@@ -154,18 +167,20 @@ export default function ReportesFilters({
           </label>
           <select
             value={tempMarca ?? ""}
-            onChange={(e) => setTempMarca(e.target.value ? Number(e.target.value) : null)}
+            onChange={(e) =>
+              setTempMarca(e.target.value ? Number(e.target.value) : null)
+            }
             className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-w-[180px]"
           >
             <option value="">Todas las marcas</option>
             {marcas.map((m) => (
-              <option key={m.idMarca} value={m.idMarca}>
+              <option key={m.firmCode} value={m.firmCode}>
                 {m.firmName}
               </option>
             ))}
           </select>
         </div>
-        <button 
+        <button
           onClick={handleFilter}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
