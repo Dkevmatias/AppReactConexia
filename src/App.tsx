@@ -21,6 +21,7 @@ import { useAuth } from "./hooks/useAuth";
 import { Navigate } from "react-router-dom";
 import { resolvePostLoginPath } from "./config/postLoginRoutes";
 import Profile from "./pages/Clientes/Profile";
+import CambiarContrasena from "./pages/Clientes/CambiarContrasena";
 import RespuestaClientes from "./pages/ConfigPage/RespuestaClientes";
 import Articulos from "./pages/Ventas/Articulos";
 
@@ -82,6 +83,9 @@ export default function App() {
 
           {/* Video público (sin login) — compartir: dominio.com/video */}
           <Route path="/video" element={<Video />} />
+
+          {/* Cambio de contraseña (sin login requerido) */}
+          <Route path="/clientes/CambiarContrasena" element={<CambiarContrasena />} />
 
           {/* Protected */}
           <Route
