@@ -231,7 +231,6 @@ export const getMenuByRol = async (
         withCredentials: true,
       },
     );
-    console.log("Menu response:", response.data);
     return response.data;
   } catch (error) {
     console.error("Error fetching menu:", error);

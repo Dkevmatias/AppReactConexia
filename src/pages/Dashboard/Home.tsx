@@ -97,9 +97,11 @@ const Home: React.FC = () => {
 
         //Obtener personas
         const personas: Persona[] = await getPersonas(user.idPersona);
-        const cardCodes = personas
-          .filter((p) => p?.cardCode)
-          .map((p) => p.cardCode)
+        const cardCodes = [
+          user.cardCode, // agregas el principal
+          ...personas.filter((p) => p?.cardCode).map((p) => p.cardCode),
+        ]
+          .filter(Boolean) // limpia null/undefined
           .join(",");
 
         if (!cardCodes) return;
@@ -133,7 +135,7 @@ const Home: React.FC = () => {
         const finMesAnterior = new Date(finMes);
         finMesAnterior.setFullYear(finMesAnterior.getFullYear() - 1);
 
-        // Ejecutar en paralelo
+        //Ejecutar en paralelo
         const [ventasPeriodo, ventasMes, ventasProcesadas] = await Promise.all([
           getVentasCLientes(
             formatDate(inicioAnual),
