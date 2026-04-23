@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => ({
     sourcemap: false,
     minify: "terser",
     outDir: 'dist',
+    chunkSizeWarningLimit: 600,
     terserOptions: {
       compress: {
         drop_console: true,
@@ -37,6 +38,9 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          charts: ['apexcharts', 'react-apexcharts'],
+          icons: ['lucide-react', 'react-icons'],
         },
       },
     },
