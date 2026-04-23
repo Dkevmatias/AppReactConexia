@@ -64,6 +64,13 @@ export const getPersonasTelefono = async () => {
   return response.data;
 };
 
+export const getUsuario = async () => {
+  const response = await api.get(`api/Usuarios/GetUsuarios`, {
+    withCredentials: true,
+  });
+  return response.data;
+};
+
 export interface DatosCliente {
   idPersona: number;
   nombre: string | null;

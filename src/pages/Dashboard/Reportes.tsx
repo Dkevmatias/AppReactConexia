@@ -7,23 +7,32 @@ import ReportesDashboard from "./reportes/ReportesDashboard";
 import ReportesVendedores from "./reportes/ReportesVendedores";
 import ReportesClientes from "./reportes/ReportesClientes";
 import ReportesArticulos from "./reportes/ReportesArticulos";
+import ReportePlataforma from "./reportes/ReportePlataforma";
 
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: "📊" },
   { id: "vendedores", label: "Vendedores", icon: "👥" },
   { id: "clientes", label: "Clientes", icon: "🏢" },
   { id: "articulos", label: "Artículos", icon: "📦" },
+  { id: "plataforma", label: "Plataforma", icon: "💻" },
 ];
 
 export default function Reportes() {
-  const defaultFechas = useMemo(() => getReportesService.getFechasDefault(), []);
+  const defaultFechas = useMemo(
+    () => getReportesService.getFechasDefault(),
+    [],
+  );
   const [fechaInicio, setFechaInicio] = useState(defaultFechas.fechaInicio);
   const [fechaFin, setFechaFin] = useState(defaultFechas.fechaFin);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [añoComparar, setAñoComparar] = useState(new Date().getFullYear() - 1);
-  const [vendedorSeleccionado, setVendedorSeleccionado] = useState<number | null>(null);
+  const [vendedorSeleccionado, setVendedorSeleccionado] = useState<
+    number | null
+  >(null);
   const [username, setNombreVendedor] = useState<string | null>(null);
-  const [marcaSeleccionada, setMarcaSeleccionada] = useState<number | null>(null);
+  const [marcaSeleccionada, setMarcaSeleccionada] = useState<number | null>(
+    null,
+  );
   const [filterKey, setFilterKey] = useState(0);
 
   const handleVendedorChange = (id: number | null, nombre: string | null) => {
@@ -49,7 +58,9 @@ export default function Reportes() {
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <ReportesDashboard key={`dashboard-${filterKey}`} {...tabProps} />;
+        return (
+          <ReportesDashboard key={`dashboard-${filterKey}`} {...tabProps} />
+        );
       case "vendedores":
         return (
           <ReportesVendedores
@@ -58,22 +69,42 @@ export default function Reportes() {
             fechaFin={fechaFin}
             username={username}
             firmCode={marcaSeleccionada}
+            añoComparar={0}
           />
         );
       case "clientes":
         return <ReportesClientes key={`clientes-${filterKey}`} {...tabProps} />;
       case "articulos":
-        return <ReportesArticulos key={`articulos-${filterKey}`} fechaInicio={fechaInicio} fechaFin={fechaFin} />;
+        return (
+          <ReportesArticulos
+            key={`articulos-${filterKey}`}
+            fechaInicio={fechaInicio}
+            fechaFin={fechaFin}
+          />
+        );
+      case "plataforma":
+        return (
+          <ReportePlataforma key={`plataforma-${filterKey}`} {...tabProps} />
+        );
       default:
-        return <ReportesDashboard key={`dashboard-${filterKey}`} {...tabProps} />;
+        return (
+          <ReportesDashboard key={`dashboard-${filterKey}`} {...tabProps} />
+        );
     }
   };
 
   return (
     <div className="space-y-6">
-      <PageMeta title="Reportes | 50 Aniversario" description="Dashboard de reportes" />
+      <PageMeta
+        title="Reportes | 50 Aniversario"
+        description="Dashboard de reportes"
+      />
 
-      <ReportesTabs tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} />
+      <ReportesTabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+      />
 
       <ReportesFilters
         fechaInicio={fechaInicio}
