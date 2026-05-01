@@ -12,16 +12,17 @@ export function useCanjeControl({
   vencido,
   restante,
   historial,
+  mesescomprasanteriores,
 }: {
   periodoActivo: boolean;
   vencido: boolean;
   restante: number;
   historial: Record<number, number>;
+  mesescomprasanteriores?: boolean;
 }) {
-
   const bloqueoGlobal = useMemo(() => {
-    return !periodoActivo || vencido;
-  }, [periodoActivo, vencido]);
+    return !periodoActivo || vencido || !mesescomprasanteriores;
+  }, [periodoActivo, vencido, mesescomprasanteriores]);
 
   const puedeInteractuar = (premio: Premio, qty: number) => {
     if (bloqueoGlobal) return false;

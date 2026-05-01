@@ -155,6 +155,8 @@ const Home: React.FC = () => {
           ),
         ]);
 
+        console.log("Ventas procesadas:", ventasProcesadas);
+
         // Sumar puntos de cada factura (ahora es una lista de facturas)
         const puntosPeriodo = Array.isArray(ventasPeriodo)
           ? ventasPeriodo.reduce((sum, fac) => sum + (fac.puntos || 0), 0)
@@ -163,6 +165,7 @@ const Home: React.FC = () => {
         const puntosMes = Array.isArray(ventasMes)
           ? ventasMes.reduce((sum, fac) => sum + (fac.puntos || 0), 0)
           : (ventasMes?.[0]?.puntosGenerados ?? 0);
+        console.log("Puntos periodo:", puntosPeriodo);
 
         setVentaTotal(Math.round(puntosPeriodo * 100) / 100);
         setVentaMesActual(Math.round(puntosMes * 100) / 100);

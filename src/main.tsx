@@ -9,11 +9,11 @@ import { ThemeProvider } from "./context/ThemeContext.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import { VentaProvider } from "./context/VentaContext.tsx";
 import { SaldoProvider } from "./context/SaldoContext.tsx";
-import { GoogleReCaptchaProvider } from 'react-google-recaptcha-v3';
+import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { ErrorBoundary } from "./components/common/ErrorBoundary.tsx";
-
+import { ComprasProvider } from "./context/ComprasContext.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -28,16 +28,18 @@ createRoot(document.getElementById("root")!).render(
       <ErrorBoundary>
         <AuthProvider>
           <VentaProvider>
-          <SaldoProvider>
-          <ThemeProvider>
-            <AppWrapper>
-              <App />
-            </AppWrapper>
-          </ThemeProvider>
-          </SaldoProvider>    
+            <SaldoProvider>
+              <ComprasProvider>
+                <ThemeProvider>
+                  <AppWrapper>
+                    <App />
+                  </AppWrapper>
+                </ThemeProvider>
+              </ComprasProvider>
+            </SaldoProvider>
           </VentaProvider>
         </AuthProvider>
       </ErrorBoundary>
     </GoogleReCaptchaProvider>
-  </StrictMode>
+  </StrictMode>,
 );

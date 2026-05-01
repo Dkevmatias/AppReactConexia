@@ -137,9 +137,17 @@ export const getSaldoClientes = async (clientes: string) => {
     },
   });
 
+  const data = response.data as Record<string, unknown>;
+  const vencidoRaiz = data?.Vencido === 1 || data?.vencido === true;
+  const vencidoPorDetalle = Object.values(data).some((item) => {
+    if (!item || typeof item !== "object") return false;
+    const fila = item as { vencido?: boolean; Vencido?: number };
+    return fila.vencido === true || fila.Vencido === 1;
+  });
+
   return {
-    ...response.data,
-    vencido: response.data.Vencido === 1,
+    ...data,
+    vencido: vencidoRaiz || vencidoPorDetalle,
   };
 };
 
@@ -203,8 +211,7 @@ export const getPuntosAcumulados = async (idPersona: number) => {
       withCredentials: true,
     },
   );
-  console.log("clientes:", idPersona);
-  console.log("Puntos Acumulados Response:", response.data?.puntos);
+
   return response.data?.puntos ?? 0;
 };
 

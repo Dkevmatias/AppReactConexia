@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Confetti from "react-confetti";
 import PageMeta from "../../components/common/PageMeta";
 import PremiosComponente from "../../components/evento/PremiosComponente";
@@ -13,12 +13,14 @@ import {
   getSaldoClientes,
   getPeriodoEvaluar,
   AsignarPuntos,
-  getPuntosAcumulados
+  getPuntosAcumulados,
 } from "../../services/authService";
+import { useCompras } from "../../context/ComprasContext";
+import { getValidarClientesVentas } from "../../services/ventasService";
 
 const formatDate = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
+    d.getDate(),
   ).padStart(2, "0")}`;
 
 interface Persona {
@@ -30,18 +32,15 @@ export default function Evento() {
   const { user } = useAuth();
   const { ventaTotal, setVentaTotal } = useVenta();
   const { saldoVencido, setSaldoVencido } = useVencido();
+  const { mesesCompras, setMesesCompras } = useCompras();
 
   const [confeti, setConfeti] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
-    height: window.innerHeight
+    height: window.innerHeight,
   });
-
-  // ================================
-  // CARGAR DATOS
-  // ================================
 
   useEffect(() => {
     if (!user) return;
@@ -51,11 +50,14 @@ export default function Evento() {
         setLoading(true);
 
         const personas: Persona[] = await getPersonas(user.idPersona);
-
-        const cardCodes = personas
-          .filter(p => p?.cardCode)
-          .map(p => p.cardCode)
+        const cardCodes = [
+          user.cardCode, // agregas el principal
+          ...personas.filter((p) => p?.cardCode).map((p) => p.cardCode),
+        ]
+          .filter(Boolean) // limpia null/undefined
           .join(",");
+
+        console.log("CardCodes para API:", cardCodes);
 
         const periodo = await getPeriodoEvaluar();
 
@@ -68,15 +70,17 @@ export default function Evento() {
         const ventas = await getVentasCLientes(
           formatDate(inicio),
           formatDate(fin),
-          cardCodes
+          cardCodes,
         );
-        
-        const puntosAcumulados = await getPuntosAcumulados(user.idPersona);       
-        const saldo = await getSaldoClientes(cardCodes);      
-               
-        //setVentaTotal(Math.round(totalVentas / 1.16 / 5000));
+
+        const puntosAcumulados = await getPuntosAcumulados(user.idPersona);
+        const saldo = await getSaldoClientes(cardCodes);
+        const mesesCompras = await getValidarClientesVentas(cardCodes);
+        console.log("Saldo API:", saldo);
         setVentaTotal(puntosAcumulados.puntosDisponibles);
-        setSaldoVencido(saldo?.[0]?.vencido ?? false);
+        setSaldoVencido(saldo?.vencido);
+        console.log("Saldo vencido:", saldo?.vencido);
+        setMesesCompras(mesesCompras);
       } catch (error) {
         if (import.meta.env.DEV) {
           console.error("Error cargando datos del evento", error);
@@ -107,7 +111,7 @@ export default function Evento() {
     const handleResize = () =>
       setWindowSize({
         width: window.innerWidth,
-        height: window.innerHeight
+        height: window.innerHeight,
       });
 
     window.addEventListener("resize", handleResize);
@@ -115,19 +119,12 @@ export default function Evento() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="text-center p-10">
-        Cargando información...
-      </div>
-    );
+    return <div className="text-center p-10">Cargando información...</div>;
   }
 
   return (
     <>
-      <PageMeta
-        title="Evento"
-        description="Página de evento protegida"
-      />
+      <PageMeta title="Evento" description="Página de evento protegida" />
 
       {confeti && (
         <Confetti
@@ -148,7 +145,8 @@ export default function Evento() {
         </h1>
 
         <p className="text-gray-600 dark:text-gray-300">
-          Tus puntos acumulados te han abierto la puerta a beneficios exclusivos.
+          Tus puntos acumulados te han abierto la puerta a beneficios
+          exclusivos.
         </p>
 
         <p className="text-gray-600 dark:text-gray-300">
@@ -158,21 +156,20 @@ export default function Evento() {
 
       {/* LAYOUT */}
       <div className="grid grid-cols-12 gap-8">
-
         {/* PREMIOS */}
         <div className="col-span-12 lg:col-span-9">
           <PremiosComponente
             totalPuntos={ventaTotal ?? 0}
             vencido={saldoVencido ?? false}
+            mesescomprasanteriores={mesesCompras ?? false}
             onPuntosActualizados={(puntos) => setVentaTotal(puntos)}
           />
         </div>
 
         {/* SIDEBAR */}
-          <div className="col-span-12 lg:col-span-3">
-            <SidebarEvento puntos={ventaTotal ?? 0} />
-          </div>       
-
+        <div className="col-span-12 lg:col-span-3">
+          <SidebarEvento puntos={ventaTotal ?? 0} />
+        </div>
       </div>
     </>
   );

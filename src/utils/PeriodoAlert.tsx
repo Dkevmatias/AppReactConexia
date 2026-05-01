@@ -1,6 +1,5 @@
 interface PeriodoAlertProps {
   periodoActivo: boolean;
-
   //'tieneBoletos: boolean;
   saldoVencido: boolean;
   mesescomprasanteriores: boolean;
@@ -44,7 +43,7 @@ export default function PeriodoAlert({
   }
 
   //Compra meses anteriores
-  if (mesescomprasanteriores) {
+  if (!mesescomprasanteriores) {
     return (
       <div className="text-center p-4 bg-blue-100 border border-blue-300 text-blue-700 rounded-xl">
         Estimado cliente, debes contar con minimo 3 compras en los ultimos 3

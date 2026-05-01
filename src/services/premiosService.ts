@@ -1,6 +1,5 @@
 import { api } from "./apiServices";
 
-
 export type PremioCliente = {
   idPremio: number;
   cantidad: number;
@@ -15,34 +14,41 @@ export interface CanjeResponse {
 
 //Traemos los premios disponibles
 export const getPremios = async () => {
-  const response = await api.get(`/api/Premios/GetPremios`); 
+  const response = await api.get(`/api/Premios/GetPremios`);
   return response.data;
 };
 
 //Historial de canjes por cliente
-export const getPremiosClientes = async (cardCode: string): Promise<PremioCliente[]> => {
-  const response = await api.get(`/api/Premios/GetPremiosClientes/${cardCode}`); 
+export const getPremiosClientes = async (
+  cardCode: string,
+): Promise<PremioCliente[]> => {
+  const response = await api.get(`/api/Premios/GetPremiosClientes/${cardCode}`);
   return response.data;
 };
 
 // Canje unificado: descuenta puntos Y registra el premio
 export const canjearPremio = async (
   cardCode: string,
+  idpersona: number,
   idPremio: number,
   idPeriodo: number,
   nombrePremio: string,
   cantidad: number,
-  puntosRequeridos: number
+  puntosRequeridos: number,
 ): Promise<CanjeResponse> => {
   const payload = {
     cardCode,
     idPremio,
+    idpersona,
     idPeriodo,
     nombrePremio,
     cantidad,
-    puntosRequeridos
-  };  
+    puntosRequeridos,
+  };
   //const response = await api.post<CanjeResponse>("/api/Premios/CanjearPremio", payload);
-  const response = await api.post<CanjeResponse>("/api/Puntos/CanjearPremios", payload);
+  const response = await api.post<CanjeResponse>(
+    "/api/Puntos/CanjearPremios",
+    payload,
+  );
   return response.data;
 };
