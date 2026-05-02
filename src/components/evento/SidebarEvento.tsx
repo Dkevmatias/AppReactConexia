@@ -26,10 +26,11 @@ export default function SidebarEvento({ puntos }: Props) {
         >
           Más recompensas
         </h3>
+        {/* Sección Derecha - Redes 
         <img
           src="/images/publicidad/recompensas.jpg"
           className="w-full h-full object-cover"
-        />
+        />*/}
       </div>
       {/* Sección Derecha - Redes */}
       <div className="right-bottom grid gap-6">
