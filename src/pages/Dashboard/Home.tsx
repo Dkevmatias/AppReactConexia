@@ -66,7 +66,7 @@ const Home: React.FC = () => {
       src: "/images/publicidad/portada.jpeg",
       alt: "Aniversario 50 años",
     },
-    {
+    /*{
       id: 2,
       src: "/images/publicidad/sakura1.jpg",
       alt: "Productos destacados",
@@ -85,7 +85,7 @@ const Home: React.FC = () => {
       id: 5,
       src: "/images/publicidad/sakura4.jpg",
       alt: "Productos destacados",
-    },
+    },*/
   ];
   //Cargar datos protegidos
   useEffect(() => {
