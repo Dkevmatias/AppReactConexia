@@ -78,8 +78,7 @@ export default function Evento() {
         const mesesCompras = await getValidarClientesVentas(cardCodes);
         const vencido = false;
         setVentaTotal(puntosAcumulados.puntosDisponibles);
-        //setSaldoVencido(saldo?.vencido);
-        setSaldoVencido(vencido);
+        setSaldoVencido(saldo?.vencido);
         setMesesCompras(mesesCompras);
       } catch (error) {
         if (import.meta.env.DEV) {
