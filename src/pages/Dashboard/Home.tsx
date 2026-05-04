@@ -66,21 +66,22 @@ const Home: React.FC = () => {
       src: "/images/publicidad/portada.jpeg",
       alt: "Aniversario 50 años",
     },
-    /*{
+    {
       id: 2,
-      src: "/images/publicidad/sakura1.jpg",
+      src: "/images/publicidad/balwin.jpeg",
       alt: "Productos destacados",
     },
     {
       id: 3,
-      src: "/images/publicidad/sakura2.jpg",
+      src: "/images/publicidad/balwin2.jpeg",
       alt: "Productos destacados",
     },
     {
       id: 4,
-      src: "/images/publicidad/sakura3.jpg",
+      src: "/images/publicidad/balwin3.jpeg",
       alt: "Productos destacados",
     },
+    /*
     {
       id: 5,
       src: "/images/publicidad/sakura4.jpg",
