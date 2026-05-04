@@ -76,10 +76,10 @@ export default function Evento() {
         const puntosAcumulados = await getPuntosAcumulados(user.idPersona);
         const saldo = await getSaldoClientes(cardCodes);
         const mesesCompras = await getValidarClientesVentas(cardCodes);
-        console.log("Saldo API:", saldo);
+        const vencido = false;
         setVentaTotal(puntosAcumulados.puntosDisponibles);
-        setSaldoVencido(saldo?.vencido);
-        console.log("Saldo vencido:", saldo?.vencido);
+        //setSaldoVencido(saldo?.vencido);
+        setSaldoVencido(vencido);
         setMesesCompras(mesesCompras);
       } catch (error) {
         if (import.meta.env.DEV) {

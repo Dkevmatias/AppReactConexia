@@ -51,12 +51,19 @@ export default function PremiosCarousel({
   const [premios, setPremios] = useState<Premio[]>([]);
   const [historial, setHistorial] = useState<Record<number, number>>({});
   const [selected, setSelected] = useState<Record<number, number>>({});
+  const [canjeandoPremioId, setCanjeandoPremioId] = useState<number | null>(
+    null,
+  );
 
   const canjear = async (premio: Premio) => {
+    if (canjeandoPremioId !== null) return;
+
     const qty = selected[premio.idPremio] || 1;
     const puntosRequeridos = premio.puntos * qty;
 
     if (!qty) return;
+
+    setCanjeandoPremioId(premio.idPremio);
     try {
       const response: CanjeResponse = await canjearPremio(
         user!.cardCode,
@@ -97,6 +104,8 @@ export default function PremiosCarousel({
       console.error("Error al canjear", error);
       setMensajeModal("Error al procesar el canje.");
       setMostrarModal(true);
+    } finally {
+      setCanjeandoPremioId(null);
     }
   };
   // Consumir API
@@ -214,6 +223,9 @@ export default function PremiosCarousel({
           const qty = getQty(premio);
           const yaCanjeados = getCantidadHistorial(premio.idPremio);
           const puedeCanjear = puedeInteractuar(premio, qty);
+          const canjeBloqueado = canjeandoPremioId !== null;
+          const canjeActivoEnEstaTarjeta =
+            canjeandoPremioId === premio.idPremio;
           return (
             <PremioCard
               key={premio.idPremio}
@@ -223,6 +235,8 @@ export default function PremiosCarousel({
               yaCanjeados={yaCanjeados}
               bloqueoGlobal={bloqueoGlobal}
               puedeCanjear={puedeCanjear}
+              canjeBloqueado={canjeBloqueado}
+              canjeActivoEnEstaTarjeta={canjeActivoEnEstaTarjeta}
               onAdd={() => add(premio)}
               onRemove={() => remove(premio)}
               onCanjear={() => canjear(premio)}

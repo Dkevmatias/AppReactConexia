@@ -27,10 +27,16 @@ export function useCanjeControl({
   const puedeInteractuar = (premio: Premio, qty: number) => {
     if (bloqueoGlobal) return false;
     if (premio.existencia <= 0) return false;
-    if (premio.puntos > restante) return false;
 
     const yaCanjeados = historial[premio.idPremio] || 0;
-    if (yaCanjeados + qty >= premio.limite) return false;
+    if (yaCanjeados >= premio.limite) return false;
+    if (yaCanjeados + qty > premio.limite) return false;
+
+    if (qty > 0) {
+      if (restante < 0) return false;
+    } else if (premio.puntos > restante) {
+      return false;
+    }
 
     return true;
   };

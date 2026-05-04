@@ -19,6 +19,8 @@ type Props = {
   yaCanjeados: number;
   bloqueoGlobal: boolean;
   puedeCanjear: boolean;
+  canjeBloqueado?: boolean;
+  canjeActivoEnEstaTarjeta?: boolean;
   onAdd: () => void;
   onRemove: () => void;
   onCanjear: () => void;
@@ -31,6 +33,8 @@ export default function PremioCard({
   yaCanjeados,
   bloqueoGlobal,
   puedeCanjear,
+  canjeBloqueado = false,
+  canjeActivoEnEstaTarjeta = false,
   onAdd,
   onRemove,
   onCanjear,
@@ -38,6 +42,7 @@ export default function PremioCard({
 
   const sinStock = premio.existencia <= 0;
   const limiteAlcanzado = yaCanjeados >= premio.limite;
+  const noPuedeIncrementar = yaCanjeados + qty >= premio.limite;
 
   let estado: EstadoPremio;
 
@@ -143,10 +148,39 @@ export default function PremioCard({
       {/* Botón */}
       {puedeCanjearPremio && (
         <button
+          type="button"
           onClick={onCanjear}
-          className="mt-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+          disabled={canjeBloqueado}
+          className="mt-2 px-4 py-2 text-sm min-w-[10.5rem] inline-flex items-center justify-center gap-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-green-600"
         >
-          Canjear premio
+          {canjeActivoEnEstaTarjeta ? (
+            <>
+              <svg
+                className="h-4 w-4 shrink-0 animate-spin"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              <span>Canjeando…</span>
+            </>
+          ) : (
+            "Canjear premio"
+          )}
         </button>
       )}
       
@@ -155,8 +189,9 @@ export default function PremioCard({
       {premio.limite > 1 && (
         <div className="flex justify-center items-center gap-2 mt-2">
           <button
+            type="button"
             onClick={onRemove}
-            disabled={qty === 0}
+            disabled={qty === 0 || canjeBloqueado}
             className="w-7 h-7 rounded-full bg-gray-700 text-sm disabled:opacity-40"
           >
             –
@@ -167,8 +202,15 @@ export default function PremioCard({
           </span>
 
           <button
+            type="button"
             onClick={onAdd}
-            disabled={bloqueoGlobal || sinStock || limiteAlcanzado}
+            disabled={
+              bloqueoGlobal ||
+              sinStock ||
+              limiteAlcanzado ||
+              noPuedeIncrementar ||
+              canjeBloqueado
+            }
             className="w-7 h-7 rounded-full bg-blue-600 text-white text-sm disabled:opacity-40"
           >
             +
