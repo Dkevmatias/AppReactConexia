@@ -46,8 +46,9 @@ export default function PeriodoAlert({
   if (!mesescomprasanteriores) {
     return (
       <div className="text-center p-4 bg-blue-100 border border-blue-300 text-blue-700 rounded-xl">
-        Estimado cliente, debes contar con minimo 3 compras en los ultimos 3
-        meses para poder canjear premios.
+        Estimado cliente, debes contar con un minimo de 3 meses consecutivos de
+        compras para poder canjear premios. Puedes Contactar a tu asesor para
+        cualquier aclaración.
       </div>
     );
   }
