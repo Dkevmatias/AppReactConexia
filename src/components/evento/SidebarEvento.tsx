@@ -1,10 +1,52 @@
+import React, { useState, useEffect } from "react";
 import { Celular, Mail, Puntos } from "../../icons";
 
 type Props = {
   puntos: number;
 };
+//InterFacarrusel
+interface CarouselImage {
+  id: number;
+  src: string;
+  alt: string;
+}
 
 export default function SidebarEvento({ puntos }: Props) {
+  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+  // Datos tipados para el carrusel
+  const carouselImages: CarouselImage[] = [
+    {
+      id: 1,
+      src: "/images/publicidad/recompensas.jpeg",
+      alt: "Aniversario 50 años",
+    },
+    {
+      id: 2,
+      src: "/images/publicidad/recompensas2.jpeg",
+      alt: "Productos destacados",
+    },
+  ];
+  const nextImage = (): void => {
+    setCurrentImageIndex((prevIndex: number) =>
+      prevIndex === carouselImages.length - 1 ? 0 : prevIndex + 1,
+    );
+  };
+
+  const prevImage = (): void => {
+    setCurrentImageIndex((prevIndex: number) =>
+      prevIndex === 0 ? carouselImages.length - 1 : prevIndex - 1,
+    );
+  };
+
+  // Cambio automático de imagen
+  useEffect(() => {
+    const interval = setInterval(() => {
+      nextImage();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="col-span-12 lg:col-span-3 space-y-6 sticky top-6 h-fit">
       <div className="bg-black text-white rounded-2xl p-5 shadow-md w-full max-w-80 relative mx-auto">
@@ -26,11 +68,23 @@ export default function SidebarEvento({ puntos }: Props) {
         >
           Más recompensas
         </h3>
-        {/* Sección Derecha - Redes 
-        <img
-          src="/images/publicidad/recompensas.jpg"
-          className="w-full h-full object-cover"
-        />*/}
+        <div>
+          <img
+            src={carouselImages[currentImageIndex].src}
+            alt={carouselImages[currentImageIndex].alt}
+            className="w-full h-full object-cover"
+          />
+          <div className="carousel-indicators">
+            {carouselImages.map((_, index: number) => (
+              <button
+                key={index}
+                className={`indicator ${index === currentImageIndex ? "active" : ""}`}
+                onClick={() => setCurrentImageIndex(index)}
+                aria-label={`Ir a imagen ${index + 1}`}
+              />
+            ))}
+          </div>
+        </div>
       </div>
       {/* Sección Derecha - Redes */}
       <div className="right-bottom grid gap-6">
