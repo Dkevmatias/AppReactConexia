@@ -6,6 +6,7 @@ import "flatpickr/dist/flatpickr.css";
 import App from "./App.tsx";
 import { AppWrapper } from "./components/common/PageMeta.tsx";
 import { ThemeProvider } from "./context/ThemeContext.tsx";
+import { MuiThemeProviderBridge } from "./context/MuiThemeProviderBridge.tsx";
 import { AuthProvider } from "./context/AuthContext.tsx";
 import { VentaProvider } from "./context/VentaContext.tsx";
 import { SaldoProvider } from "./context/SaldoContext.tsx";
@@ -14,6 +15,8 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { ErrorBoundary } from "./components/common/ErrorBoundary.tsx";
 import { ComprasProvider } from "./context/ComprasContext.tsx";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -31,9 +34,13 @@ createRoot(document.getElementById("root")!).render(
             <SaldoProvider>
               <ComprasProvider>
                 <ThemeProvider>
-                  <AppWrapper>
-                    <App />
-                  </AppWrapper>
+                  <MuiThemeProviderBridge>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                      <AppWrapper>
+                        <App />
+                      </AppWrapper>
+                    </LocalizationProvider>
+                  </MuiThemeProviderBridge>
                 </ThemeProvider>
               </ComprasProvider>
             </SaldoProvider>

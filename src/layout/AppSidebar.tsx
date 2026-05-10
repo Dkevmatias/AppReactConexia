@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { VscCommentDiscussionSparkle } from "react-icons/vsc";
+import { MdOutlineCrisisAlert, MdViewList } from "react-icons/md";
+import { TbTruckDelivery } from "react-icons/tb";
 import AppLogo from "../components/logo/AppLogo";
 
 import {
@@ -12,7 +14,6 @@ import {
   HorizontaLDots,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
-//import SidebarWidget from "./SidebarWidget";
 import { useAuth } from "../context/useAuth";
 import { BoxIcon } from "lucide-react";
 
@@ -60,15 +61,20 @@ const navItems: NavItem[] = [
     name: "Terminos y Condiciones",
     path: "/dashboard/terminos",
   },
-  {
-    icon: <PromocionesIcon />,
-    name: "Promociones",
-    path: "/dashboard/promociones",
-  },
+  //{
+  //icon: <PromocionesIcon />,
+  //name: "Promociones",
+  //path: "/dashboard/promociones",
+  //},
   {
     icon: <PromocionesIcon />,
     name: "Reportes BI",
     path: "/dashboard/reportes",
+  },
+  {
+    icon: <TbTruckDelivery />,
+    name: "Entregas de premios",
+    path: "/configPage/entregasPremios",
   },
   {
     icon: <VscCommentDiscussionSparkle />,
@@ -78,9 +84,22 @@ const navItems: NavItem[] = [
   //Se comenta por lanzamiento a produccion
 
   {
-    icon: <BoxIcon />,
-    name: "Buscador de Existencias",
-    path: "/ventas/articulos",
+    name: "Ventas",
+    icon: <MdOutlineCrisisAlert />,
+    subItems: [
+      {
+        name: "Buscador de Existencias",
+        path: "/ventas/Articulos",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Lista de Precios",
+        path: "/ventas/ListaPrecios",
+        icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+    ],
   },
 
   /*
@@ -169,10 +188,82 @@ const AppSidebar: React.FC = () => {
     [location.pathname],
   );
 
+  // === FILTRO DE MENÚ SEGÚN ROL DESDE BACKEND ===
+  // Debe declararse antes de cualquier useEffect que lo use.
+  const filteredNavItems = useMemo((): NavItem[] => {
+    if (menuLoading || menu.length === 0) return [];
+
+    const permisoActivo = (
+      permisos: { clave: string; activo: boolean }[] | undefined,
+      clavePermiso: string,
+    ) =>
+      (permisos ?? []).some((p) => {
+        const c = (p.clave ?? "").trim().toLowerCase();
+        return p.activo && c === clavePermiso.trim().toLowerCase();
+      });
+
+    return navItems
+      .map((item) => {
+        if (item.name === "Ventas" && item.subItems) {
+          const moduloVentas = menu.find(
+            (m) => (m.clave ?? "").trim().toLowerCase() === "ventas",
+          );
+          if (!moduloVentas?.activo) return null;
+          const ventasSubs: {
+            clavePermiso: string;
+            entry: NonNullable<NavItem["subItems"]>[number];
+          }[] = [
+            {
+              clavePermiso: "Ventas.Articulos",
+              entry: item.subItems[0],
+            },
+            {
+              clavePermiso: "Ventas.Precios",
+              entry: item.subItems[1],
+            },
+          ];
+          const subItems = ventasSubs
+            .filter(({ clavePermiso }) =>
+              permisoActivo(moduloVentas.permisos, clavePermiso),
+            )
+            .map(({ entry }) => entry)
+            .filter(Boolean);
+          if (subItems.length === 0) return null;
+          return { ...item, subItems };
+        }
+
+        const menuClaveMap: Record<string, string> = {
+          Inicio: "Dashboard.Inicio",
+          Canjear: "Dashboard.Canjear",
+          "Terminos y Condiciones": "Dashboard.Terminos",
+          Promociones: "Dashboard.Promociones",
+          "Reportes BI": "Dashboard.Reportes",
+          "Respuesta Clientes": "Config.RespuestaClientes",
+          "Entregas de premios": "Entrega",
+        };
+
+        const clave = menuClaveMap[item.name];
+        if (!clave) return null;
+
+        const moduloEncontrado = menu.find((m) => m.clave === clave);
+        if (
+          !moduloEncontrado?.activo ||
+          !moduloEncontrado.permisos?.some((p) => p.activo)
+        ) {
+          return null;
+        }
+        return item;
+      })
+      .filter((item): item is NavItem => item != null);
+  }, [menu, menuLoading]);
+
+  const filteredOthersItems = othersItems;
+
   useEffect(() => {
     let submenuMatched = false;
     ["main", "others"].forEach((menuType) => {
-      const items = menuType === "main" ? navItems : othersItems;
+      const items =
+        menuType === "main" ? filteredNavItems : filteredOthersItems;
       items.forEach((nav, index) => {
         if (nav.subItems) {
           nav.subItems.forEach((subItem) => {
@@ -186,7 +277,7 @@ const AppSidebar: React.FC = () => {
     });
 
     if (!submenuMatched) setOpenSubmenu(null);
-  }, [location, isActive]);
+  }, [location, isActive, filteredNavItems, filteredOthersItems]);
 
   useEffect(() => {
     if (openSubmenu !== null) {
@@ -198,39 +289,7 @@ const AppSidebar: React.FC = () => {
         }));
       }
     }
-  }, [openSubmenu]);
-
-  // === FILTRO DE MENÚ SEGÚN ROL DESDE BACKEND ===
-  // Sin menú cargado: no mostrar ítems (evita flash de “todos” y luego filtrar)
-  let filteredNavItems: NavItem[] = [];
-
-  if (menuLoading) {
-    filteredNavItems = [];
-  } else if (menu.length > 0) {
-    filteredNavItems = navItems.filter((item) => {
-      const menuClaveMap: Record<string, string> = {
-        Inicio: "Dashboard.Inicio",
-        Canjear: "Dashboard.Canjear",
-        "Terminos y Condiciones": "Dashboard.Terminos",
-        Promociones: "Dashboard.Promociones",
-        "Reportes BI": "Dashboard.Reportes",
-        "Respuesta Clientes": "Config.RespuestaClientes",
-        "Buscador de Existencias": "Ventas.Articulos",
-      };
-
-      const clave = menuClaveMap[item.name];
-      if (!clave) return false;
-
-      const moduloEncontrado = menu.find((m) => m.clave === clave);
-      return (
-        moduloEncontrado?.activo &&
-        moduloEncontrado.permisos?.some((p) => p.activo)
-      );
-    });
-  }
-
-  // othersItems vacío - el menú se controla desde el backend
-  const filteredOthersItems: typeof navItems = [];
+  }, [openSubmenu, filteredNavItems]);
 
   const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
     setOpenSubmenu((prevOpenSubmenu) => {

@@ -23,7 +23,9 @@ import { resolvePostLoginPath } from "./config/postLoginRoutes";
 import Profile from "./pages/Clientes/Profile";
 import CambiarContrasena from "./pages/Clientes/CambiarContrasena";
 import RespuestaClientes from "./pages/ConfigPage/RespuestaClientes";
+import EntregasPremios from "./pages/ConfigPage/EntregasPremios";
 import Articulos from "./pages/Ventas/Articulos";
+import ListaPrecios from "./pages/Ventas/ListaPrecios";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -105,9 +107,14 @@ export default function App() {
             <Route path="/clientes/Acumulado" element={<Acumulado />} />
             <Route path="/clientes/Profile" element={<Profile />} />
             <Route path="/ventas/Articulos" element={<Articulos />} />
+            <Route path="/ventas/ListaPrecios" element={<ListaPrecios />} />
             <Route
               path="/configPage/Respuesta"
               element={<RespuestaClientes />}
+            />
+            <Route
+              path="/configPage/entregasPremios"
+              element={<EntregasPremios />}
             />
           </Route>
         </Routes>
