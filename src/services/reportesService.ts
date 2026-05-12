@@ -23,6 +23,14 @@ export interface VentaPorMarca {
   porcentaje: number;
 }
 
+export interface VentaPorVendedorMarca {
+  vendedor: string;
+  marca: string;
+  ulkp: number;
+  pesos: number;
+  porcentaje: number;
+}
+
 export interface VentaPorVendedor {
   SlpName: string;
   TotalVenta: number;
@@ -165,6 +173,22 @@ export const getReportesService = {
     if (firmCode != null) params.append("firmCode", String(firmCode));
     const response = await api.get<VentaPorMarca[]>(
       `/api/Reportes/VentasPorMarca?${params}`,
+    );
+    return response.data;
+  },
+
+  getVentasPorVendedorMarca: async (
+    fechaInicio?: string,
+    fechaFin?: string,
+    username?: string,
+    firmCode?: number | null,
+  ) => {
+    const params = new URLSearchParams();
+    appendFechas(params, fechaInicio, fechaFin);
+    if (username) params.append("username", username);
+    if (firmCode != null) params.append("firmCode", String(firmCode));
+    const response = await api.get<VentaPorVendedorMarca[]>(
+      `/api/Reportes/VentasPorVendedorMarca?${params}`,
     );
     return response.data;
   },

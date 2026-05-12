@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getReportesService,
-  VentaPorAlmacen,
-  TopCliente,
   VentaPorMarca,
+  VentaPorVendedorMarca,
+  TopCliente,
 } from "../../../services/reportesService";
-import ReactApexChart from "react-apexcharts";
 import { formatCurrency, formatNumber } from "../../../utils/format";
 
 interface ReportesVendedoresProps {
@@ -23,9 +22,42 @@ export default function ReportesVendedores({
   firmCode,
 }: ReportesVendedoresProps) {
   const [loading, setLoading] = useState(true);
-  const [ventasAlmacen, setVentasAlmacen] = useState<VentaPorAlmacen[]>([]);
+  // const [ventasAlmacen, setVentasAlmacen] = useState<VentaPorAlmacen[]>([]);
+  const [ventasMarcaDetalle, setVentasMarcaDetalle] = useState<
+    VentaPorVendedorMarca[]
+  >([]);
   const [ventasMarca, setVentasMarca] = useState<VentaPorMarca[]>([]);
   const [topClientes, setTopClientes] = useState<TopCliente[]>([]);
+
+  const totalesMarcaDetalle = useMemo(() => {
+    return ventasMarcaDetalle.reduce(
+      (acc, row) => ({
+        ulkp: acc.ulkp + (Number(row.ulkp) || 0),
+        pesos: acc.pesos + (Number(row.pesos) || 0),
+      }),
+      { ulkp: 0, pesos: 0 },
+    );
+  }, [ventasMarcaDetalle]);
+
+  const totalesMarca = useMemo(() => {
+    return ventasMarca.reduce(
+      (acc, row) => ({
+        ulkp: acc.ulkp + (Number(row.ulkp) || 0),
+        pesos: acc.pesos + (Number(row.pesos) || 0),
+      }),
+      { ulkp: 0, pesos: 0 },
+    );
+  }, [ventasMarca]);
+
+  const totalesTopClientes = useMemo(() => {
+    return topClientes.reduce(
+      (acc, row) => ({
+        documentos: acc.documentos + (Number(row.documentos) || 0),
+        ventas: acc.ventas + (Number(row.totalVenta) || 0),
+      }),
+      { documentos: 0, ventas: 0 },
+    );
+  }, [topClientes]);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +65,29 @@ export default function ReportesVendedores({
     const cargarDatos = async () => {
       setLoading(true);
       try {
+        const [marcaData, marcaDetalleData, clientesData] = await Promise.all([
+          getReportesService.getVentasPorMarca(
+            fechaInicio,
+            fechaFin,
+            username ?? undefined,
+            firmCode,
+          ),
+          getReportesService.getVentasPorVendedorMarca(
+            fechaInicio,
+            fechaFin,
+            username ?? undefined,
+            firmCode,
+          ),
+          getReportesService.getTopClientesVendedor(
+            10,
+            fechaInicio,
+            fechaFin,
+            username ?? undefined,
+          ),
+        ]);
+
+        /*
+        Ventas por Almacén (endpoint getVentasPorAlmacen) — oculto temporalmente:
         const [almacenData, marcaData, clientesData] = await Promise.all([
           getReportesService.getVentasPorAlmacen(fechaInicio, fechaFin),
           getReportesService.getVentasPorMarca(
@@ -48,11 +103,11 @@ export default function ReportesVendedores({
             username ?? undefined,
           ),
         ]);
-
-        console.log("Marca Data:", marcaData);
+        */
 
         if (!cancelled) {
-          setVentasAlmacen(almacenData ?? []);
+          // setVentasAlmacen(almacenData ?? []);
+          setVentasMarcaDetalle(marcaDetalleData ?? []);
           setVentasMarca(marcaData ?? []);
           setTopClientes(clientesData ?? []);
         }
@@ -104,6 +159,17 @@ export default function ReportesVendedores({
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700/80 font-semibold">
+                  <td className="px-3 py-2 text-left">Total</td>
+                  <td className="px-3 py-2 text-right">
+                    {formatNumber(totalesMarca.ulkp)}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {formatCurrency(totalesMarca.pesos)}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           ) : (
             <p className="text-center text-gray-500 py-10">
@@ -112,6 +178,58 @@ export default function ReportesVendedores({
           )}
         </div>
 
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-4">
+            Ventas por Marca Detallada
+          </h3>
+          {ventasMarcaDetalle.length > 0 ? (
+            <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Vendedor</th>
+                    <th className="px-3 py-2 text-right">ULKP</th>
+                    <th className="px-3 py-2 text-right">Pesos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ventasMarcaDetalle.map((row, idx) => (
+                    <tr
+                      key={`${row.vendedor}-${idx}`}
+                      className="border-t dark:border-gray-700"
+                    >
+                      <td className="px-3 py-2">{row.vendedor || "N/A"}</td>
+                      <td className="px-3 py-2 text-right">
+                        {formatNumber(row.ulkp)}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {formatCurrency(row.pesos)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700/80 font-semibold sticky bottom-0">
+                    <td className="px-3 py-2 text-left">Total</td>
+                    <td className="px-3 py-2 text-right">
+                      {formatNumber(totalesMarcaDetalle.ulkp)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {formatCurrency(totalesMarcaDetalle.pesos)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ) : (
+            <p className="text-center text-gray-500 py-10">
+              No hay datos del detalle por marca
+            </p>
+          )}
+        </div>
+
+        {/*
+        Ventas por Almacén — oculto temporalmente (donut + getVentasPorAlmacen):
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Ventas por Almacén</h3>
           {ventasAlmacen.length > 0 ? (
@@ -135,6 +253,7 @@ export default function ReportesVendedores({
             </p>
           )}
         </div>
+        */}
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
@@ -162,6 +281,19 @@ export default function ReportesVendedores({
               </tr>
             ))}
           </tbody>
+          {topClientes.length > 0 ? (
+            <tfoot>
+              <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700/80 font-semibold">
+                <td className="px-3 py-2 text-left">Total</td>
+                <td className="px-3 py-2 text-right">
+                  {formatNumber(totalesTopClientes.documentos)}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {formatCurrency(totalesTopClientes.ventas)}
+                </td>
+              </tr>
+            </tfoot>
+          ) : null}
         </table>
       </div>
     </div>
