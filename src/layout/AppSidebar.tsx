@@ -16,6 +16,7 @@ import {
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/useAuth";
 import { BoxIcon } from "lucide-react";
+import { permisoActivo } from "../utils/permisosModulo";
 
 type NavItem = {
   name: string;
@@ -192,15 +193,6 @@ const AppSidebar: React.FC = () => {
   // Debe declararse antes de cualquier useEffect que lo use.
   const filteredNavItems = useMemo((): NavItem[] => {
     if (menuLoading || menu.length === 0) return [];
-
-    const permisoActivo = (
-      permisos: { clave: string; activo: boolean }[] | undefined,
-      clavePermiso: string,
-    ) =>
-      (permisos ?? []).some((p) => {
-        const c = (p.clave ?? "").trim().toLowerCase();
-        return p.activo && c === clavePermiso.trim().toLowerCase();
-      });
 
     return navItems
       .map((item) => {

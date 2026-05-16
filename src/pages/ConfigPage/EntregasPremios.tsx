@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, Filter, Loader2 } from "lucide-react";
+import { Link } from "react-router";
+import { ChevronLeft, ChevronRight, Download, Filter, Loader2 } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import BasicDatePicker from "../../components/ui/datepicker/datepicker";
 import { useAuth } from "../../hooks/useAuth";
+import { useEntregaPremisos } from "../../hooks/useEntregaPremisos";
 
 import {
   cleanDisplayText,
@@ -56,6 +58,22 @@ const formatFecha = (iso?: string | null) => {
 type MergedRow = PremioCanjeadoApi & UiPatch;
 
 type FiltroEstatusExport = "todos" | "pendiente" | "validado" | "entregado";
+type PestañaEstatus = "pendiente" | "validado" | "entregado";
+
+const PAGE_SIZE = 25;
+const FILTRO_SUCURSAL_TODAS = "__todas__";
+
+const PESTAÑAS: { id: PestañaEstatus; label: string }[] = [
+  { id: "pendiente", label: "Pendientes" },
+  { id: "validado", label: "Validados" },
+  { id: "entregado", label: "Entregados" },
+];
+
+function estatusDeRow(row: MergedRow): PestañaEstatus {
+  if (row.entregado) return "entregado";
+  if (row.validado) return "validado";
+  return "pendiente";
+}
 
 function cumpleFiltroEstatus(
   row: MergedRow,
@@ -66,6 +84,26 @@ function cumpleFiltroEstatus(
   if (filtro === "validado") return row.validado && !row.entregado;
   if (filtro === "pendiente") return !row.validado;
   return true;
+}
+
+function cumpleFiltroSucursal(
+  r: PremioCanjeadoApi,
+  filtroSucursal: string,
+): boolean {
+  if (filtroSucursal === FILTRO_SUCURSAL_TODAS) return true;
+  return (r.sucursal?.trim() || "") === filtroSucursal;
+}
+
+function fechaCanjeMs(iso: string | null): number {
+  if (!iso) return Number.MAX_SAFE_INTEGER;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? Number.MAX_SAFE_INTEGER : t;
+}
+
+function stickyBg(entregado: boolean, validado: boolean): string {
+  if (entregado) return "bg-emerald-100 dark:bg-emerald-950/50";
+  if (validado) return "bg-blue-100 dark:bg-blue-950/45";
+  return "bg-white dark:bg-gray-900";
 }
 
 function estatusEtiqueta(row: MergedRow): string {
@@ -148,6 +186,13 @@ function descargarCsv(nombre: string, filas: string[][]) {
 
 export default function EntregasPremios() {
   const { user } = useAuth();
+  const {
+    menuLoading,
+    puedeAccederModulo,
+    puedeOperar,
+    puedeDescargar,
+    puedeRefrescarListado,
+  } = useEntregaPremisos();
   const [canjes, setCanjes] = useState<PremioCanjeadoApi[]>([]);
   const [uiMap, setUiMap] = useState<Record<string, UiPatch>>({});
   const [loading, setLoading] = useState(true);
@@ -158,6 +203,9 @@ export default function EntregasPremios() {
   );
   const [filtroEstatusExport, setFiltroEstatusExport] =
     useState<FiltroEstatusExport>("todos");
+  const [pestañaActiva, setPestañaActiva] = useState<PestañaEstatus>("pendiente");
+  const [filtroSucursal, setFiltroSucursal] = useState(FILTRO_SUCURSAL_TODAS);
+  const [page, setPage] = useState(1);
   const [menu, setMenu] = useState<{
     x: number;
     y: number;
@@ -166,6 +214,7 @@ export default function EntregasPremios() {
   } | null>(null);
 
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -187,8 +236,9 @@ export default function EntregasPremios() {
   }, []);
 
   useEffect(() => {
+    if (menuLoading || !puedeAccederModulo) return;
     void cargar();
-  }, [cargar]);
+  }, [cargar, menuLoading, puedeAccederModulo]);
 
   useEffect(() => {
     if (!menu) return;
@@ -206,6 +256,10 @@ export default function EntregasPremios() {
       document.removeEventListener("keydown", onKey);
     };
   }, [menu]);
+
+  useEffect(() => {
+    if (!puedeOperar) setMenu(null);
+  }, [puedeOperar]);
 
   const patchUi = useCallback(
     (rowId: string, partial: Partial<UiPatch>, base: PremioCanjeadoApi) => {
@@ -288,15 +342,12 @@ export default function EntregasPremios() {
 
   const tableData = useMemo(() => {
     const sorted = [...canjes].sort((a, b) => {
-      const rowA = mergeRow(a, idCanjeRow(a, 0), uiMap);
-      const rowB = mergeRow(b, idCanjeRow(b, 0), uiMap);
-      const prio = (m: MergedRow) => (m.entregado ? 1 : 0);
-      const pa = prio(rowA);
-      const pb = prio(rowB);
-      if (pa !== pb) return pa - pb;
-      const fa = fechaCanjeDe(a) || "";
-      const fb = fechaCanjeDe(b) || "";
-      return fb.localeCompare(fa);
+      const fa = fechaCanjeMs(fechaCanjeDe(a));
+      const fb = fechaCanjeMs(fechaCanjeDe(b));
+      if (fa !== fb) return fa - fb;
+      const ia = getIdCanjeNum(a) ?? 0;
+      const ib = getIdCanjeNum(b) ?? 0;
+      return ia - ib;
     });
     return sorted.map((r, i) => {
       const rowId = idCanjeRow(r, i);
@@ -304,12 +355,76 @@ export default function EntregasPremios() {
     });
   }, [canjes, uiMap]);
 
+  const sucursalesOpciones = useMemo(() => {
+    const set = new Set<string>();
+    for (const { r } of tableData) {
+      const s = r.sucursal?.trim();
+      if (s) set.add(s);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
+  }, [tableData]);
+
+  const conteosPorPestaña = useMemo(() => {
+    const counts: Record<PestañaEstatus, number> = {
+      pendiente: 0,
+      validado: 0,
+      entregado: 0,
+    };
+    for (const { row, r } of tableData) {
+      if (!cumpleFiltroSucursal(r, filtroSucursal)) continue;
+      counts[estatusDeRow(row)] += 1;
+    }
+    return counts;
+  }, [tableData, filtroSucursal]);
+
+  const filteredTableData = useMemo(
+    () =>
+      tableData.filter(
+        ({ row, r }) =>
+          estatusDeRow(row) === pestañaActiva &&
+          cumpleFiltroSucursal(r, filtroSucursal),
+      ),
+    [tableData, pestañaActiva, filtroSucursal],
+  );
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredTableData.length / PAGE_SIZE),
+  );
+  const pageSafe = Math.min(page, totalPages);
+
+  const paginatedTableData = useMemo(() => {
+    const start = (pageSafe - 1) * PAGE_SIZE;
+    return filteredTableData.slice(start, start + PAGE_SIZE);
+  }, [filteredTableData, pageSafe]);
+
+  const rangoMostrado = useMemo(() => {
+    if (filteredTableData.length === 0) return { desde: 0, hasta: 0 };
+    const desde = (pageSafe - 1) * PAGE_SIZE + 1;
+    const hasta = Math.min(pageSafe * PAGE_SIZE, filteredTableData.length);
+    return { desde, hasta };
+  }, [filteredTableData.length, pageSafe]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pestañaActiva, filtroSucursal]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  useEffect(() => {
+    tableScrollRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [pageSafe, pestañaActiva, filtroSucursal]);
+
   const datosExportacion = useMemo(
     () =>
-      tableData.filter(({ row }) =>
-        cumpleFiltroEstatus(row, filtroEstatusExport),
+      tableData.filter(
+        ({ row, r }) =>
+          cumpleFiltroEstatus(row, filtroEstatusExport) &&
+          cumpleFiltroSucursal(r, filtroSucursal),
       ),
-    [tableData, filtroEstatusExport],
+    [tableData, filtroEstatusExport, filtroSucursal],
   );
 
   const menuRow = useMemo(() => {
@@ -491,6 +606,7 @@ export default function EntregasPremios() {
   };
 
   const exportarExcel = () => {
+    if (!puedeDescargar) return;
     if (datosExportacion.length === 0) {
       alert("No hay registros con el estatus seleccionado para exportar.");
       return;
@@ -543,6 +659,39 @@ export default function EntregasPremios() {
     ]);
   };
 
+  if (menuLoading) {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 p-6 text-gray-500 dark:text-gray-400">
+        <Loader2 className="h-10 w-10 animate-spin" />
+        <p className="text-sm">Cargando permisos…</p>
+      </div>
+    );
+  }
+
+  if (!puedeAccederModulo) {
+    return (
+      <div className="space-y-4 p-6">
+        <PageMeta
+          title="Entregas de premios"
+          description="Seguimiento de premios canjeados y entregas."
+        />
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          <h1 className="text-lg font-semibold">Sin acceso</h1>
+          <p className="mt-2 text-sm">
+            No cuenta con permisos para ver este módulo. Si cree que es un
+            error, contacte al administrador.
+          </p>
+          <Link
+            to="/dashboard/Home"
+            className="mt-4 inline-block text-sm font-medium text-blue-600 underline hover:no-underline dark:text-blue-400"
+          >
+            Volver al inicio
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 p-6">
       <PageMeta
@@ -557,38 +706,44 @@ export default function EntregasPremios() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => void cargar()}
-            disabled={loading}
-            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
-          >
-            Actualizar listado
-          </button>
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <select
-              value={filtroEstatusExport}
-              onChange={(e) =>
-                setFiltroEstatusExport(e.target.value as FiltroEstatusExport)
-              }
-              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+          {puedeRefrescarListado && (
+            <button
+              type="button"
+              onClick={() => void cargar()}
+              disabled={loading}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
             >
-              <option value="todos">Todos</option>
-              <option value="pendiente">Pendiente</option>
-              <option value="validado">Validado</option>
-              <option value="entregado">Entregado</option>
-            </select>
-          </div>
-          <button
-            type="button"
-            onClick={exportarExcel}
-            disabled={loading || datosExportacion.length === 0}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            Descargar Excel
-          </button>
+              Actualizar listado
+            </button>
+          )}
+          {puedeDescargar && (
+            <>
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-gray-500" />
+                <select
+                  value={filtroEstatusExport}
+                  onChange={(e) =>
+                    setFiltroEstatusExport(e.target.value as FiltroEstatusExport)
+                  }
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="validado">Validado</option>
+                  <option value="entregado">Entregado</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={exportarExcel}
+                disabled={loading || datosExportacion.length === 0}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                <Download className="h-4 w-4" />
+                Descargar Excel
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -607,13 +762,67 @@ export default function EntregasPremios() {
         </span>
       </div>
 
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <nav
+          className="flex flex-wrap gap-1 border-b border-gray-200 dark:border-gray-700"
+          aria-label="Estatus de entregas"
+        >
+          {PESTAÑAS.map(({ id, label }) => {
+            const activa = pestañaActiva === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setPestañaActiva(id)}
+                className={`-mb-px px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  activa
+                    ? "border-brand-500 text-brand-600 dark:text-brand-400"
+                    : "border-transparent text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+                }`}
+              >
+                {label}
+                <span
+                  className={`ml-1.5 tabular-nums ${activa ? "" : "text-gray-400 dark:text-gray-500"}`}
+                >
+                  ({conteosPorPestaña[id]})
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <span className="whitespace-nowrap">Sucursal</span>
+            <select
+              value={filtroSucursal}
+              onChange={(e) => setFiltroSucursal(e.target.value)}
+              className="min-w-[160px] rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              <option value={FILTRO_SUCURSAL_TODAS}>Todas</option>
+              {sucursalesOpciones.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          {!loading && filteredTableData.length > 0 && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">
+              Mostrando {rangoMostrado.desde}–{rangoMostrado.hasta} de{" "}
+              {filteredTableData.length}
+            </p>
+          )}
+        </div>
+      </div>
+
       {error && (
         <div className="rounded-md bg-red-50 dark:bg-red-900/30 p-3 text-sm text-red-700 dark:text-red-200">
           {error}
         </div>
       )}
 
-      {menu && menuRow && (
+      {puedeOperar && menu && menuRow && (
         <div
           ref={menuRef}
           className="fixed z-[100] min-w-[220px] rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg py-1 text-sm"
@@ -663,7 +872,7 @@ export default function EntregasPremios() {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm flex flex-col">
         {loading ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-gray-500 dark:text-gray-400">
             <Loader2 className="w-8 h-8 animate-spin" />
@@ -673,9 +882,16 @@ export default function EntregasPremios() {
           <p className="p-8 text-center text-gray-500 dark:text-gray-400">
             No hay premios canjeados registrados.
           </p>
+        ) : filteredTableData.length === 0 ? (
+          <p className="p-8 text-center text-gray-500 dark:text-gray-400">
+            No hay registros en esta pestaña
+            {filtroSucursal !== FILTRO_SUCURSAL_TODAS ? " para la sucursal seleccionada" : ""}.
+          </p>
         ) : (
-          <table className="min-w-[1400px] w-full text-sm">
-            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+          <>
+          <div ref={tableScrollRef} className="max-h-[min(62vh,720px)] overflow-auto">
+          <table className="min-w-[1400px] w-full text-sm border-separate border-spacing-0">
+            <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-20">
               <tr>
                 <th className="px-2 py-2 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
                   Vendedor
@@ -711,28 +927,28 @@ export default function EntregasPremios() {
                 <th className="px-2 py-2 text-left font-medium text-gray-700 dark:text-gray-300 min-w-[140px]">
                   Observaciones
                 </th>
-                <th className="px-2 py-2 text-left font-medium text-gray-700 dark:text-gray-300 min-w-[120px]">
+                <th className="sticky right-[162px] z-20 min-w-[130px] bg-gray-50 px-2 py-2 text-left font-medium text-gray-700 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.12)] dark:bg-gray-800 dark:text-gray-300">
                   Persona Acreditada
                 </th>
-                <th className="px-2 py-2 text-left font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                <th className="sticky right-[52px] z-20 min-w-[110px] whitespace-nowrap bg-gray-50 px-2 py-2 text-left font-medium text-gray-700 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.12)] dark:bg-gray-800 dark:text-gray-300">
                   Fecha entrega
                 </th>
-                <th className="px-2 py-2 text-center font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                <th className="sticky right-0 z-20 min-w-[52px] whitespace-nowrap bg-gray-50 px-2 py-2 text-center font-medium text-gray-700 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.12)] dark:bg-gray-800 dark:text-gray-300">
                   Validar
                 </th>
               </tr>
             </thead>
             <tbody>
-              {tableData.map(({ r, rowId, row: m }) => {
+              {paginatedTableData.map(({ r, rowId, row: m }) => {
                 const saving = savingRows.has(rowId);
                 const recibeBloqueado =
                   m.validado && !editingRecibeRows.has(rowId);
                 return (
                   <tr
                     key={rowId}
-                    className={`border-t border-gray-100 dark:border-gray-800 cursor-context-menu ${rowClass(m.entregado, m.validado)}`}
+                    className={`border-t border-gray-100 dark:border-gray-800 ${puedeOperar ? "cursor-context-menu" : ""} ${rowClass(m.entregado, m.validado)}`}
                     onContextMenu={(e) => {
-                      if (m.entregado) return;
+                      if (!puedeOperar || m.entregado) return;
                       e.preventDefault();
                       setMenu({
                         x: e.clientX,
@@ -796,11 +1012,15 @@ export default function EntregasPremios() {
                         }
                         onKeyDown={onObservacionesKeyDown}
                         placeholder="Observaciones"
-                        disabled={saving || m.entregado}
+                        disabled={
+                          !puedeOperar || saving || m.entregado
+                        }
                         className="w-full min-w-[100px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1 text-xs disabled:opacity-60"
                       />
                     </td>
-                    <td className="px-2 py-2 align-top">
+                    <td
+                      className={`sticky right-[162px] z-[5] min-w-[130px] px-2 py-2 align-top shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)] ${stickyBg(m.entregado, m.validado)}`}
+                    >
                       <input
                         type="text"
                         value={m.recibe}
@@ -813,32 +1033,41 @@ export default function EntregasPremios() {
                             ? "Editar y Enter para guardar"
                             : "Quién recibe"
                         }
-                        disabled={saving || m.entregado || recibeBloqueado}
+                        disabled={
+                          !puedeOperar ||
+                          saving ||
+                          m.entregado ||
+                          recibeBloqueado
+                        }
                         className="w-full min-w-[100px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1 text-xs disabled:opacity-60"
                       />
                     </td>
                     <td
-                      className="px-2 py-2 align-top"
+                      className={`sticky right-[52px] z-[5] min-w-[110px] px-2 py-2 align-top shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)] ${stickyBg(m.entregado, m.validado)}`}
                       onMouseDown={(e) => e.stopPropagation()}
                     >
                       <BasicDatePicker
                         className="w-full min-w-[100px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1 text-xs disabled:opacity-60"
                         value={m.fechaEntrega}
-                        disabled={saving || m.entregado}
+                        disabled={!puedeOperar || saving || m.entregado}
                         onOpen={() => setMenu(null)}
                         onChange={(next) =>
                           patchUi(rowId, { fechaEntrega: next }, r)
                         }
                       />
                     </td>
-                    <td className="px-2 py-2 align-middle text-center">
+                    <td
+                      className={`sticky right-0 z-[5] min-w-[52px] px-2 py-2 align-middle text-center shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)] ${stickyBg(m.entregado, m.validado)}`}
+                    >
                       {saving ? (
                         <Loader2 className="mx-auto h-4 w-4 animate-spin text-gray-400" />
                       ) : (
                         <input
                           type="checkbox"
                           checked={m.validado}
-                          disabled={m.validado || m.entregado}
+                          disabled={
+                            !puedeOperar || m.validado || m.entregado
+                          }
                           onChange={(e) =>
                             void onValidadoChange(e.target.checked, r, rowId)
                           }
@@ -852,8 +1081,39 @@ export default function EntregasPremios() {
               })}
             </tbody>
           </table>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+            <p className="text-sm text-gray-500 dark:text-gray-400 tabular-nums">
+              Página {pageSafe} de {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={pageSafe <= 1}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                aria-label="Página anterior"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={pageSafe >= totalPages}
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800"
+                aria-label="Página siguiente"
+              >
+                Siguiente
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          </>
         )}
       </div>
     </div>
   );
 }
+
+
