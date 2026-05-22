@@ -10,12 +10,13 @@ interface ReportesFiltersProps {
   fechaFin: string;
   añoComparar: number;
   vendedorSeleccionado: number | null;
-  marcaSeleccionada: number | null;
+  /** firmName de la marca seleccionada (no idMarca) */
+  firmNameSeleccionado: string | null;
   onFechaInicioChange: (value: string) => void;
   onFechaFinChange: (value: string) => void;
   onAñoCompararChange: (value: number) => void;
   onVendedorChange: (value: number | null, nombre: string | null) => void;
-  onMarcaChange: (value: number | null, firmCode: number | null) => void;
+  onMarcaChange: (firmName: string | null) => void;
   onFilter: () => void;
 }
 
@@ -33,7 +34,7 @@ export default function ReportesFilters({
   fechaFin,
   añoComparar,
   vendedorSeleccionado,
-  marcaSeleccionada,
+  firmNameSeleccionado,
   onFechaInicioChange,
   onFechaFinChange,
   onAñoCompararChange,
@@ -47,7 +48,9 @@ export default function ReportesFilters({
   const [tempVendedor, setTempVendedor] = useState<number | null>(
     vendedorSeleccionado,
   );
-  const [tempMarca, setTempMarca] = useState<number | null>(marcaSeleccionada);
+  const [tempFirmName, setTempFirmName] = useState<string | null>(
+    firmNameSeleccionado,
+  );
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [loadingVendedores, setLoadingVendedores] = useState(true);
@@ -58,13 +61,13 @@ export default function ReportesFilters({
     setTempFechaFin(fechaFin);
     setTempAñoComparar(añoComparar);
     setTempVendedor(vendedorSeleccionado);
-    setTempMarca(marcaSeleccionada);
+    setTempFirmName(firmNameSeleccionado);
   }, [
     fechaInicio,
     fechaFin,
     añoComparar,
     vendedorSeleccionado,
-    marcaSeleccionada,
+    firmNameSeleccionado,
   ]);
 
   useEffect(() => {
@@ -87,16 +90,14 @@ export default function ReportesFilters({
 
   const handleFilter = () => {
     const vendedor = vendedores.find((v) => v.idUsuario === tempVendedor);
-    const nombreVendedor = vendedor ? vendedor.username : null;
-    const marca = marcas.find((m) => m.idMarca === tempMarca);
-    const nombreMarca = marca ? marca.firmCode : null;
-    console.log("Vendedor seleccionado:", tempVendedor, nombreVendedor);
-    console.log("Marca seleccionada:", tempMarca, nombreMarca);
+    const nombreVendedor = vendedor
+      ? (vendedor.slpName ?? vendedor.username)
+      : null;
     onFechaInicioChange(tempFechaInicio);
     onFechaFinChange(tempFechaFin);
     onAñoCompararChange(tempAñoComparar);
     onVendedorChange(tempVendedor, nombreVendedor);
-    onMarcaChange(tempMarca, nombreMarca);
+    onMarcaChange(tempFirmName);
     onFilter();
   };
 
@@ -166,15 +167,13 @@ export default function ReportesFilters({
             Marca
           </label>
           <select
-            value={tempMarca ?? ""}
-            onChange={(e) =>
-              setTempMarca(e.target.value ? Number(e.target.value) : null)
-            }
+            value={tempFirmName ?? ""}
+            onChange={(e) => setTempFirmName(e.target.value || null)}
             className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-w-[180px]"
           >
             <option value="">Todas las marcas</option>
             {marcas.map((m) => (
-              <option key={m.firmCode} value={m.firmCode}>
+              <option key={m.firmCode} value={m.firmName}>
                 {m.firmName}
               </option>
             ))}

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getReportesService,
-  VentaPorMarca,
   VentaPorVendedorMarca,
   TopCliente,
+  CumplimientoObjetivoFila,
+  TipoMetricaCumplimiento,
 } from "../../../services/reportesService";
 import { formatCurrency, formatNumber } from "../../../utils/format";
 
@@ -12,22 +13,56 @@ interface ReportesVendedoresProps {
   fechaFin: string;
   añoComparar: number;
   username: string | null;
-  firmCode: number | null;
+  firmName: string | null;
 }
+
+const formatMetrica = (value: number, tipoMetrica: TipoMetricaCumplimiento) =>
+  tipoMetrica === "pesos" ? formatCurrency(value) : formatNumber(value);
+
+const getColorCobertura = (cobertura: number) => {
+  if (cobertura >= 100) return "text-green-600";
+  if (cobertura >= 90) return "text-yellow-600";
+  return "text-red-600";
+};
 
 export default function ReportesVendedores({
   fechaInicio,
   fechaFin,
   username,
-  firmCode,
+  firmName,
 }: ReportesVendedoresProps) {
   const [loading, setLoading] = useState(true);
+  const [tipoMetrica, setTipoMetrica] =
+    useState<TipoMetricaCumplimiento>("ulkp");
+  const [cumplimientoMarca, setCumplimientoMarca] = useState<
+    CumplimientoObjetivoFila[]
+  >([]);
   // const [ventasAlmacen, setVentasAlmacen] = useState<VentaPorAlmacen[]>([]);
   const [ventasMarcaDetalle, setVentasMarcaDetalle] = useState<
     VentaPorVendedorMarca[]
   >([]);
-  const [ventasMarca, setVentasMarca] = useState<VentaPorMarca[]>([]);
+  // Reporte anterior — conservado para reutilizar en el futuro
+  // const [ventasMarca, setVentasMarca] = useState<VentaPorMarca[]>([]);
   const [topClientes, setTopClientes] = useState<TopCliente[]>([]);
+
+  const totalesCumplimientoMarca = useMemo(() => {
+    return cumplimientoMarca.reduce(
+      (acc, row) => ({
+        objetivo: acc.objetivo + (Number(row.objetivo) || 0),
+        ventaReal: acc.ventaReal + (Number(row.ventaReal) || 0),
+        diferencia: acc.diferencia + (Number(row.diferencia) || 0),
+      }),
+      { objetivo: 0, ventaReal: 0, diferencia: 0 },
+    );
+  }, [cumplimientoMarca]);
+
+  const coberturaTotal = useMemo(() => {
+    if (totalesCumplimientoMarca.objetivo <= 0) return 0;
+    return (
+      (totalesCumplimientoMarca.ventaReal / totalesCumplimientoMarca.objetivo) *
+      100
+    );
+  }, [totalesCumplimientoMarca]);
 
   const totalesMarcaDetalle = useMemo(() => {
     return ventasMarcaDetalle.reduce(
@@ -39,6 +74,7 @@ export default function ReportesVendedores({
     );
   }, [ventasMarcaDetalle]);
 
+  /*
   const totalesMarca = useMemo(() => {
     return ventasMarca.reduce(
       (acc, row) => ({
@@ -48,6 +84,7 @@ export default function ReportesVendedores({
       { ulkp: 0, pesos: 0 },
     );
   }, [ventasMarca]);
+  */
 
   const totalesTopClientes = useMemo(() => {
     return topClientes.reduce(
@@ -65,50 +102,50 @@ export default function ReportesVendedores({
     const cargarDatos = async () => {
       setLoading(true);
       try {
+        const [cumplimientoData, marcaDetalleData, clientesData] =
+          await Promise.all([
+            getReportesService.getCumplimientoObjetivosPorMarca(
+              fechaInicio,
+              fechaFin,
+              {
+                slpName: username ?? undefined,
+                firmName: firmName ?? undefined,
+                tipoMetrica,
+                agruparPorVendedor: false,
+              },
+            ),
+            getReportesService.getVentasPorVendedorMarca(
+              fechaInicio,
+              fechaFin,
+              username ?? undefined,
+              firmName ?? undefined,
+            ),
+            getReportesService.getTopClientesVendedor(
+              10,
+              fechaInicio,
+              fechaFin,
+              username ?? undefined,
+              firmName ?? undefined,
+            ),
+          ]);
+
+        /*
+        Reporte anterior Ventas por Marca (getVentasPorMarca):
         const [marcaData, marcaDetalleData, clientesData] = await Promise.all([
           getReportesService.getVentasPorMarca(
             fechaInicio,
             fechaFin,
             username ?? undefined,
-            firmCode,
+            firmName ?? undefined,
           ),
-          getReportesService.getVentasPorVendedorMarca(
-            fechaInicio,
-            fechaFin,
-            username ?? undefined,
-            firmCode,
-          ),
-          getReportesService.getTopClientesVendedor(
-            10,
-            fechaInicio,
-            fechaFin,
-            username ?? undefined,
-          ),
-        ]);
-
-        /*
-        Ventas por Almacén (endpoint getVentasPorAlmacen) — oculto temporalmente:
-        const [almacenData, marcaData, clientesData] = await Promise.all([
-          getReportesService.getVentasPorAlmacen(fechaInicio, fechaFin),
-          getReportesService.getVentasPorMarca(
-            fechaInicio,
-            fechaFin,
-            username ?? undefined,
-            firmCode,
-          ),
-          getReportesService.getTopClientesVendedor(
-            10,
-            fechaInicio,
-            fechaFin,
-            username ?? undefined,
-          ),
+          ...
         ]);
         */
 
         if (!cancelled) {
-          // setVentasAlmacen(almacenData ?? []);
+          setCumplimientoMarca(cumplimientoData?.filas ?? []);
           setVentasMarcaDetalle(marcaDetalleData ?? []);
-          setVentasMarca(marcaData ?? []);
+          // setVentasMarca(marcaData ?? []);
           setTopClientes(clientesData ?? []);
         }
       } catch (error) {
@@ -122,7 +159,7 @@ export default function ReportesVendedores({
     return () => {
       cancelled = true;
     };
-  }, [fechaInicio, fechaFin, username, firmCode]);
+  }, [fechaInicio, fechaFin, username, firmName, tipoMetrica]);
 
   if (loading) {
     return (
@@ -135,6 +172,114 @@ export default function ReportesVendedores({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h3 className="text-lg font-semibold">
+              Cumplimiento de objetivos por marca
+            </h3>
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="tipo-metrica-marca"
+                className="text-sm text-gray-500 dark:text-gray-400"
+              >
+                Métrica
+              </label>
+              <select
+                id="tipo-metrica-marca"
+                value={tipoMetrica}
+                onChange={(e) =>
+                  setTipoMetrica(e.target.value as TipoMetricaCumplimiento)
+                }
+                className="px-3 py-1.5 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+              >
+                <option value="ulkp">ULKP</option>
+                <option value="pesos">Pesos</option>
+              </select>
+            </div>
+          </div>
+          {cumplimientoMarca.length > 0 ? (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-3 py-2 text-left">Marca</th>
+                  <th className="px-3 py-2 text-right">Objetivo</th>
+                  <th className="px-3 py-2 text-right">Venta real</th>
+                  <th className="px-3 py-2 text-right">Diferencia</th>
+                  <th className="px-3 py-2 text-right">Cobertura</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cumplimientoMarca.map((row) => (
+                  <tr
+                    key={`${row.firmCode}-${row.marca}`}
+                    className="border-t dark:border-gray-700"
+                  >
+                    <td className="px-3 py-2">{row.marca || "N/A"}</td>
+                    <td className="px-3 py-2 text-right">
+                      {formatMetrica(row.objetivo, tipoMetrica)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {formatMetrica(row.ventaReal, tipoMetrica)}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-right ${
+                        row.diferencia >= 0 ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {formatMetrica(row.diferencia, tipoMetrica)}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-right font-medium ${getColorCobertura(row.cobertura)}`}
+                    >
+                      {row.cobertura.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700/80 font-semibold">
+                  <td className="px-3 py-2 text-left">Total</td>
+                  <td className="px-3 py-2 text-right">
+                    {formatMetrica(
+                      totalesCumplimientoMarca.objetivo,
+                      tipoMetrica,
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {formatMetrica(
+                      totalesCumplimientoMarca.ventaReal,
+                      tipoMetrica,
+                    )}
+                  </td>
+                  <td
+                    className={`px-3 py-2 text-right ${
+                      totalesCumplimientoMarca.diferencia >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatMetrica(
+                      totalesCumplimientoMarca.diferencia,
+                      tipoMetrica,
+                    )}
+                  </td>
+                  <td
+                    className={`px-3 py-2 text-right ${getColorCobertura(coberturaTotal)}`}
+                  >
+                    {coberturaTotal.toFixed(1)}%
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          ) : (
+            <p className="text-center text-gray-500 py-10">
+              No hay datos de cumplimiento por marca
+            </p>
+          )}
+        </div>
+
+        {/*
+        Reporte anterior — Ventas por Marca (getVentasPorMarca):
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Ventas por Marca</h3>
           {ventasMarca.length > 0 ? (
@@ -177,6 +322,7 @@ export default function ReportesVendedores({
             </p>
           )}
         </div>
+        */}
 
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">
@@ -231,27 +377,7 @@ export default function ReportesVendedores({
         {/*
         Ventas por Almacén — oculto temporalmente (donut + getVentasPorAlmacen):
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-4">Ventas por Almacén</h3>
-          {ventasAlmacen.length > 0 ? (
-            <ReactApexChart
-              options={{
-                chart: { type: "donut" },
-                colors: ["#8b5cf6", "#f59e0b", "#ef4444", "#10b981", "#3b82f6"],
-                labels: ventasAlmacen.map((a) => a.whsCode),
-                legend: { position: "bottom" },
-                dataLabels: { enabled: true },
-              }}
-              series={ventasAlmacen.map((a) =>
-                Number((a.totalVenta || 0).toFixed(2)),
-              )}
-              type="donut"
-              height={300}
-            />
-          ) : (
-            <p className="text-center text-gray-500 py-10">
-              No hay datos de almacenes
-            </p>
-          )}
+          ...
         </div>
         */}
       </div>

@@ -4,6 +4,10 @@ import { VscCommentDiscussionSparkle } from "react-icons/vsc";
 import { MdOutlineCrisisAlert, MdViewList } from "react-icons/md";
 import { TbTruckDelivery } from "react-icons/tb";
 import AppLogo from "../components/logo/AppLogo";
+import { SiCivicrm } from "react-icons/si";
+import { FcDataConfiguration } from "react-icons/fc";
+import { FaPersonWalkingArrowRight } from "react-icons/fa6";
+import { RxActivityLog } from "react-icons/rx";
 
 import {
   Inicio,
@@ -83,7 +87,6 @@ const navItems: NavItem[] = [
     path: "/configPage/Respuesta",
   },
   //Se comenta por lanzamiento a produccion
-
   {
     name: "Ventas",
     icon: <MdOutlineCrisisAlert />,
@@ -97,6 +100,54 @@ const navItems: NavItem[] = [
       {
         name: "Lista de Precios",
         path: "/ventas/ListaPrecios",
+        icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+    ],
+  },
+  {
+    name: "CRM",
+    icon: <SiCivicrm />,
+    subItems: [
+      {
+        name: "Configuración de CRM",
+        path: "/CRM/Configuración",
+        icon: <FcDataConfiguration className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Prospectos",
+        path: "/CRM/Prospectos",
+        icon: <FaPersonWalkingArrowRight className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Seguimintos de Prospectos",
+        path: "/CRM/Seguimientos",
+        icon: <RxActivityLog className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Clientes",
+        path: "/CRM/Clientes",
+        icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Catalogo de Etapas",
+        path: "/CRM/CatalogoEtapas",
+        icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Catalogo de Fuentes",
+        path: "/CRM/CatalogoFuentes",
+        icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Citas y Actividades",
+        path: "/CRM/CitasActividades",
         icon: <MdViewList className="w-4 h-4 shrink-0" />,
         pro: false,
       },

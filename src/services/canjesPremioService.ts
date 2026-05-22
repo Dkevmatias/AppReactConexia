@@ -121,6 +121,29 @@ export async function validarInfoCanje(
   }
 }
 
+export type EntregaObservacionesPayload = {
+  idCanje: number;
+  idUsuarioEdita: number;
+  observaciones: string;
+};
+
+export async function entregaObservaciones(
+  payload: EntregaObservacionesPayload,
+): Promise<void> {
+  const response = await api.post<unknown>(
+    "/api/CanjesPremio/EntregaObservaciones",
+    payload,
+  );
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(
+      errorDesdeRespuesta(
+        response.data,
+        "No se pudieron guardar las observaciones.",
+      ),
+    );
+  }
+}
+
 export type EntregaPremioPayload = {
   idCanje: number;
   idUsuarioEdita: number;

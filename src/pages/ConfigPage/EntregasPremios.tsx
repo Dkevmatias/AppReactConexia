@@ -8,6 +8,7 @@ import { useEntregaPremisos } from "../../hooks/useEntregaPremisos";
 
 import {
   cleanDisplayText,
+  entregaObservaciones,
   getIdCanjeNum,
   getPremiosCanjeados,
   idCanjeRow,
@@ -315,6 +316,8 @@ export default function EntregasPremios() {
                   estatusEntrega: "E",
                   entregado: true,
                   fechaEntrega,
+                  observaciones: merged.observaciones.trim(),
+                  recibe: merged.recibe.trim(),
                 }
               : c,
           ),
@@ -560,9 +563,67 @@ export default function EntregasPremios() {
     void actualizarRecibe(r, rowId);
   };
 
-  const onObservacionesKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const actualizarObservaciones = async (
+    r: PremioCanjeadoApi,
+    rowId: string,
+  ): Promise<boolean> => {
+    const merged = mergeRow(r, rowId, uiMap);
+
+    if (!user?.idPersona) {
+      alert("No se encontró el usuario en sesión.");
+      return false;
+    }
+
+    const idCanje = getIdCanjeNum(r);
+    if (idCanje == null) {
+      alert("No se encontró el identificador del canje.");
+      return false;
+    }
+
+    setSavingRows((prev) => new Set(prev).add(rowId));
+    try {
+      await entregaObservaciones({
+        idCanje,
+        idUsuarioEdita: user.idPersona,
+        observaciones: merged.observaciones.trim(),
+      });
+
+      const observaciones = merged.observaciones.trim();
+      setUiMap((prev) => ({
+        ...prev,
+        [rowId]: { ...merged, observaciones },
+      }));
+      setCanjes((prev) =>
+        prev.map((c) =>
+          getIdCanjeNum(c) === idCanje ? { ...c, observaciones } : c,
+        ),
+      );
+      return true;
+    } catch (e) {
+      console.error(e);
+      alert(
+        e instanceof Error
+          ? e.message
+          : "No se pudieron guardar las observaciones.",
+      );
+      return false;
+    } finally {
+      setSavingRows((prev) => {
+        const next = new Set(prev);
+        next.delete(rowId);
+        return next;
+      });
+    }
+  };
+
+  const onObservacionesKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    r: PremioCanjeadoApi,
+    rowId: string,
+  ) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
+    void actualizarObservaciones(r, rowId);
   };
 
   const toggleEntregado = async (
@@ -1010,11 +1071,11 @@ export default function EntregasPremios() {
                         onChange={(e) =>
                           patchUi(rowId, { observaciones: e.target.value }, r)
                         }
-                        onKeyDown={onObservacionesKeyDown}
-                        placeholder="Observaciones"
-                        disabled={
-                          !puedeOperar || saving || m.entregado
+                        onKeyDown={(e) =>
+                          onObservacionesKeyDown(e, r, rowId)
                         }
+                        placeholder="Observaciones (Enter para guardar)"
+                        disabled={!puedeOperar || saving}
                         className="w-full min-w-[100px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-2 py-1 text-xs disabled:opacity-60"
                       />
                     </td>

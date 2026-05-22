@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from "react";
 import {
   getReportesService,
   ResumenVentas,
@@ -6,9 +6,10 @@ import {
   VentaPorMarca,
   TopCliente,
   TopProducto,
-} from '../../../services/reportesService';
-import ReactApexChart from 'react-apexcharts';
-import { formatCurrency, formatNumber } from '../../../utils/format';
+  ResumenObjetivos,
+} from "../../../services/reportesService";
+import ReactApexChart from "react-apexcharts";
+import { formatCurrency, formatNumber } from "../../../utils/format";
 
 interface ReportesDashboardProps {
   fechaInicio: string;
@@ -23,7 +24,10 @@ export default function ReportesDashboard({
 }: ReportesDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [resumen, setResumen] = useState<ResumenVentas | null>(null);
-  const ventasAñoAnterior = 0;
+  const [resumenObjetivos, setResumenObjetivos] = useState<ResumenObjetivos[]>(
+    [],
+  );
+  const ventasAñoAnterior = resumen?.periodoAnterior?.ventasNetas ?? 0;
   const [ventasAlmacen, setVentasAlmacen] = useState<VentaPorAlmacen[]>([]);
   const [ventasMarca, setVentasMarca] = useState<VentaPorMarca[]>([]);
   const [topClientes, setTopClientes] = useState<TopCliente[]>([]);
@@ -34,12 +38,53 @@ export default function ReportesDashboard({
     ventasAñoAnterior > 0
       ? ((ventasActuales - ventasAñoAnterior) / ventasAñoAnterior) * 100
       : 0;
+  const porcentajeCoberturaObjetivos =
+    resumenObjetivos[0]?.objetivoPesos > 0
+      ? ((ventasActuales - resumenObjetivos[0]?.objetivoPesos) /
+          resumenObjetivos[0]?.objetivoPesos) *
+        100
+      : 0;
 
   const getColorCobertura = () => {
-    if (porcentajeCobertura >= 0) return 'text-green-600';
-    if (porcentajeCobertura >= -10) return 'text-yellow-600';
-    return 'text-red-600';
+    if (porcentajeCobertura >= 0) return "text-green-600";
+    if (porcentajeCobertura >= -10) return "text-yellow-600";
+    return "text-red-600";
   };
+  const getColorCoberturaObjetivos = () => {
+    if (porcentajeCoberturaObjetivos >= 0) return "text-green-600";
+    if (porcentajeCoberturaObjetivos >= -10) return "text-yellow-600";
+    return "text-red-600";
+  };
+
+  const totalesMarca = useMemo(
+    () =>
+      ventasMarca.reduce(
+        (acc, row) => ({
+          ulkp: acc.ulkp + (Number(row.ulkp) || 0),
+          pesos: acc.pesos + (Number(row.pesos) || 0),
+        }),
+        { ulkp: 0, pesos: 0 },
+      ),
+    [ventasMarca],
+  );
+
+  const totalesTopClientes = useMemo(
+    () =>
+      topClientes.reduce((acc, row) => acc + (Number(row.totalVenta) || 0), 0),
+    [topClientes],
+  );
+
+  const totalesTopProductos = useMemo(
+    () =>
+      topProductos.reduce(
+        (acc, row) => ({
+          cantidad: acc.cantidad + (Number(row.cantidad) || 0),
+          ventas: acc.ventas + (Number(row.totalVenta) || 0),
+        }),
+        { cantidad: 0, ventas: 0 },
+      ),
+    [topProductos],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -49,12 +94,14 @@ export default function ReportesDashboard({
       try {
         const [
           resumenData,
+          resumenObjetivosData,
           almacenData,
           marcaData,
           clientesData,
           productosData,
         ] = await Promise.all([
           getReportesService.getResumenVentas(fechaInicio, fechaFin),
+          getReportesService.getResumenObjetivos(fechaInicio, fechaFin),
           getReportesService.getVentasPorAlmacen(fechaInicio, fechaFin),
           getReportesService.getVentasPorMarca(fechaInicio, fechaFin),
           getReportesService.getTopClientes(10, fechaInicio, fechaFin),
@@ -63,13 +110,14 @@ export default function ReportesDashboard({
 
         if (!cancelled) {
           setResumen(resumenData);
+          setResumenObjetivos(resumenObjetivosData || []);
           setVentasAlmacen(almacenData || []);
           setVentasMarca(marcaData || []);
           setTopClientes(clientesData || []);
           setTopProductos(productosData || []);
         }
       } catch (error) {
-        console.error('Error cargando dashboard:', error);
+        console.error("Error cargando dashboard:", error);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -91,12 +139,24 @@ export default function ReportesDashboard({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <p className="text-sm text-gray-500">Ventas Año {añoComparar}</p>
-          <p className="text-2xl font-bold text-gray-600">
-            {formatCurrency(ventasAñoAnterior)}
-          </p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+        <div className="flex flex-col gap-4">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-500">Ventas Año {añoComparar}</p>
+            <p className="text-2xl font-bold text-gray-600">
+              {formatCurrency(ventasAñoAnterior)}
+            </p>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-500">
+              % Cobertura vs {añoComparar}
+            </p>
+            <p className={`text-2xl font-bold ${getColorCobertura()}`}>
+              {porcentajeCobertura >= 0 ? "+" : ""}
+              {porcentajeCobertura.toFixed(1)}%
+            </p>
+          </div>
         </div>
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <p className="text-sm text-gray-500">
@@ -106,12 +166,24 @@ export default function ReportesDashboard({
             {formatCurrency(ventasActuales)}
           </p>
         </div>
-        <div className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow`}>
-          <p className="text-sm text-gray-500">% Cobertura vs {añoComparar}</p>
-          <p className={`text-2xl font-bold ${getColorCobertura()}`}>
-            {porcentajeCobertura >= 0 ? '+' : ''}
-            {porcentajeCobertura.toFixed(1)}%
-          </p>
+        <div className="flex flex-col gap-4">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-500">
+              Objetivo Anual {añoComparar}
+            </p>
+            <p className="text-2xl font-bold text-indigo-600">
+              {resumenObjetivos !== null
+                ? formatNumber(resumenObjetivos[0]?.objetivoPesos)
+                : "—"}
+            </p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <p className="text-sm text-gray-500"> % Cobertura 2026</p>
+            <p className={`text-2xl font-bold ${getColorCoberturaObjetivos()}`}>
+              {porcentajeCoberturaObjetivos >= 0 ? "+" : ""}
+              {porcentajeCoberturaObjetivos.toFixed(1)}%
+            </p>
+          </div>
         </div>
       </div>
 
@@ -151,7 +223,7 @@ export default function ReportesDashboard({
               <tbody>
                 {ventasMarca.map((m) => (
                   <tr key={m.marca} className="border-t dark:border-gray-700">
-                    <td className="px-3 py-2">{m.marca || 'N/A'}</td>
+                    <td className="px-3 py-2">{m.marca || "N/A"}</td>
                     <td className="px-3 py-2 text-right">
                       {formatNumber(m.ulkp)}
                     </td>
@@ -161,6 +233,17 @@ export default function ReportesDashboard({
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700/80 font-semibold">
+                  <td className="px-3 py-2 text-left">Total</td>
+                  <td className="px-3 py-2 text-right">
+                    {formatNumber(totalesMarca.ulkp)}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {formatCurrency(totalesMarca.pesos)}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           ) : (
             <p className="text-center text-gray-500 py-10">
@@ -174,16 +257,16 @@ export default function ReportesDashboard({
           {ventasAlmacen.length > 0 ? (
             <ReactApexChart
               options={{
-                chart: { type: 'bar', height: 350 },
+                chart: { type: "bar", height: 350 },
                 plotOptions: { bar: { borderRadius: 4 } },
-                colors: ['#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#3b82f6'],
+                colors: ["#8b5cf6", "#f59e0b", "#ef4444", "#10b981", "#3b82f6"],
                 dataLabels: { enabled: false },
                 xaxis: { categories: ventasAlmacen.map((a) => a.whsCode) },
-                legend: { position: 'bottom' },
+                legend: { position: "bottom" },
               }}
               series={[
                 {
-                  name: 'Ventas',
+                  name: "Ventas",
                   data: ventasAlmacen.map((a) =>
                     Number((a.totalVenta || 0).toFixed(2)),
                   ),
@@ -213,13 +296,23 @@ export default function ReportesDashboard({
             <tbody>
               {topClientes.map((c) => (
                 <tr key={c.cardCode} className="border-t dark:border-gray-700">
-                  <td className="px-3 py-2">{c.cardName || 'N/A'}</td>
+                  <td className="px-3 py-2">{c.cardName || "N/A"}</td>
                   <td className="px-3 py-2 text-right">
                     {formatCurrency(c.totalVenta)}
                   </td>
                 </tr>
               ))}
             </tbody>
+            {topClientes.length > 0 ? (
+              <tfoot>
+                <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700/80 font-semibold">
+                  <td className="px-3 py-2 text-left">Total</td>
+                  <td className="px-3 py-2 text-right">
+                    {formatCurrency(totalesTopClientes)}
+                  </td>
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
         </div>
 
@@ -237,7 +330,7 @@ export default function ReportesDashboard({
               {topProductos.map((p) => (
                 <tr key={p.itemCode} className="border-t dark:border-gray-700">
                   <td className="px-3 py-2 truncate max-w-xs">
-                    {p.dscription || 'N/A'}
+                    {p.dscription || "N/A"}
                   </td>
                   <td className="px-3 py-2 text-right">
                     {formatNumber(p.cantidad)}
@@ -248,6 +341,19 @@ export default function ReportesDashboard({
                 </tr>
               ))}
             </tbody>
+            {topProductos.length > 0 ? (
+              <tfoot>
+                <tr className="border-t-2 border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700/80 font-semibold">
+                  <td className="px-3 py-2 text-left">Total</td>
+                  <td className="px-3 py-2 text-right">
+                    {formatNumber(totalesTopProductos.cantidad)}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {formatCurrency(totalesTopProductos.ventas)}
+                  </td>
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
         </div>
       </div>

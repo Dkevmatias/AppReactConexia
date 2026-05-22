@@ -9,18 +9,43 @@ export interface DashboardData {
   VentasDiarias: VentaDiaria[];
 }
 
-export interface ResumenVentas {
+export interface ResumenVentasKpis {
+  ventasNetas: number;
+  ventasBrutas: number;
   totalDocumentos: number;
   clientesUnicos: number;
-  ventasNetas: number;
-  VentasBrutas: number;
   ticketPromedio: number;
+}
+
+export interface ResumenVentas extends ResumenVentasKpis {
+  periodoAnterior?: ResumenVentasKpis;
 }
 export interface VentaPorMarca {
   marca: string;
   ulkp: number;
   pesos: number;
   porcentaje: number;
+}
+
+export type TipoMetricaCumplimiento = "ulkp" | "pesos";
+
+export interface CumplimientoObjetivoFila {
+  firmCode: number;
+  marca: string;
+  slpName: string | null;
+  nombreVendedor: string | null;
+  objetivo: number;
+  ventaReal: number;
+  diferencia: number;
+  cobertura: number;
+}
+
+export interface CumplimientoObjetivosPorMarcaResponse {
+  fechaInicio: string;
+  fechaFin: string;
+  tipoMetrica: TipoMetricaCumplimiento;
+  agruparPorVendedor: boolean;
+  filas: CumplimientoObjetivoFila[];
 }
 
 export interface VentaPorVendedorMarca {
@@ -44,6 +69,13 @@ export interface VentaPorAlmacen {
   totalVenta: number;
   documentos: number;
   porcentaje: number;
+}
+
+export interface ResumenObjetivos {
+  firmName: string;
+  slpName: string;
+  objetivoPesos: number;
+  objetivoUlkp: number;
 }
 
 export interface TopCliente {
@@ -101,6 +133,8 @@ export interface Vendedor {
   idUsuario: number;
   nombre: string;
   username: string;
+  /** Código SAP del vendedor (ej. VTX01); usar para reportes y objetivos */
+  slpName?: string;
   email: string;
   idRol: number;
   idPersona: number;
@@ -142,6 +176,28 @@ export const getReportesService = {
     );
     return response.data;
   },
+  getResumenObjetivos: async (
+    fechaInicio?: string,
+    fechaFin?: string,
+    año?: number,
+    mes?: number,
+    slpName?: string,
+    agruparPorVendedor?: boolean,
+  ) => {
+    const params = new URLSearchParams();
+    appendFechas(params, fechaInicio, fechaFin);
+    if (año) params.append("año", String(año));
+    if (mes) params.append("mes", String(mes));
+    if (slpName) params.append("slpName", slpName);
+    if (agruparPorVendedor !== undefined) {
+      params.append("agruparPorVendedor", String(agruparPorVendedor));
+    }
+    const response = await api.get<ResumenObjetivos[]>(
+      `/api/ObjetivoVendedor/GetObjetivosporPeriodo?${params}`,
+    );
+    console.log("ResumenObjetivosData:", response.data);
+    return response.data;
+  },
 
   getVentasPorVendedor: async (fechaInicio?: string, fechaFin?: string) => {
     const params = new URLSearchParams();
@@ -165,14 +221,42 @@ export const getReportesService = {
     fechaInicio?: string,
     fechaFin?: string,
     username?: string,
-    firmCode?: number | null,
+    firmName?: string | null,
   ) => {
     const params = new URLSearchParams();
     appendFechas(params, fechaInicio, fechaFin);
     if (username) params.append("username", username);
-    if (firmCode != null) params.append("firmCode", String(firmCode));
+    if (firmName != null) params.append("firmName", firmName);
     const response = await api.get<VentaPorMarca[]>(
       `/api/Reportes/VentasPorMarca?${params}`,
+    );
+    return response.data;
+  },
+
+  getCumplimientoObjetivosPorMarca: async (
+    fechaInicio?: string,
+    fechaFin?: string,
+    options?: {
+      slpName?: string;
+      /** Alias de slpName (valor del filtro de vendedor) */
+      username?: string;
+      firmName?: string;
+      tipoMetrica?: TipoMetricaCumplimiento;
+      agruparPorVendedor?: boolean;
+    },
+  ) => {
+    const params = new URLSearchParams();
+    appendFechas(params, fechaInicio, fechaFin);
+    const slpName = options?.slpName ?? options?.username;
+    if (slpName) params.append("slpName", slpName);
+    if (options?.firmName) params.append("firmName", options.firmName);
+    params.append("tipoMetrica", options?.tipoMetrica ?? "ulkp");
+    params.append(
+      "agruparPorVendedor",
+      String(options?.agruparPorVendedor ?? false),
+    );
+    const response = await api.get<CumplimientoObjetivosPorMarcaResponse>(
+      `/api/Reportes/CumplimientoObjetivosPorMarca?${params}`,
     );
     return response.data;
   },
@@ -181,12 +265,12 @@ export const getReportesService = {
     fechaInicio?: string,
     fechaFin?: string,
     username?: string,
-    firmCode?: number | null,
+    firmName?: string | null,
   ) => {
     const params = new URLSearchParams();
     appendFechas(params, fechaInicio, fechaFin);
     if (username) params.append("username", username);
-    if (firmCode != null) params.append("firmCode", String(firmCode));
+    if (firmName != null) params.append("firmName", firmName);
     const response = await api.get<VentaPorVendedorMarca[]>(
       `/api/Reportes/VentasPorVendedorMarca?${params}`,
     );
@@ -208,11 +292,13 @@ export const getReportesService = {
     fechaInicio?: string,
     fechaFin?: string,
     username?: string,
+    firmName?: string | null,
   ) => {
     const params = new URLSearchParams();
     params.append("top", String(top));
     appendFechas(params, fechaInicio, fechaFin);
     if (username) params.append("username", username);
+    if (firmName != null) params.append("firmName", firmName);
     const response = await api.get<TopCliente[]>(
       `/api/Reportes/TopClientesVendedor?${params}`,
     );

@@ -30,9 +30,9 @@ export default function Reportes() {
     number | null
   >(null);
   const [username, setNombreVendedor] = useState<string | null>(null);
-  const [marcaSeleccionada, setMarcaSeleccionada] = useState<number | null>(
-    null,
-  );
+  const [firmNameSeleccionado, setFirmNameSeleccionado] = useState<
+    string | null
+  >(null);
   const [filterKey, setFilterKey] = useState(0);
 
   const handleVendedorChange = (id: number | null, nombre: string | null) => {
@@ -40,8 +40,8 @@ export default function Reportes() {
     setNombreVendedor(nombre);
   };
 
-  const handleMarcaChange = (id: number | null) => {
-    setMarcaSeleccionada(id);
+  const handleMarcaChange = (firmName: string | null) => {
+    setFirmNameSeleccionado(firmName);
   };
 
   const handleFilter = () => {
@@ -68,7 +68,7 @@ export default function Reportes() {
             fechaInicio={fechaInicio}
             fechaFin={fechaFin}
             username={username}
-            firmCode={marcaSeleccionada}
+            firmName={firmNameSeleccionado}
             añoComparar={0}
           />
         );
@@ -111,7 +111,7 @@ export default function Reportes() {
         fechaFin={fechaFin}
         añoComparar={añoComparar}
         vendedorSeleccionado={vendedorSeleccionado}
-        marcaSeleccionada={marcaSeleccionada}
+        firmNameSeleccionado={firmNameSeleccionado}
         onFechaInicioChange={setFechaInicio}
         onFechaFinChange={setFechaFin}
         onAñoCompararChange={setAñoComparar}
