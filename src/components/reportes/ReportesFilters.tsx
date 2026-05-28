@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   getReportesService,
   Marca,
+  TipoMetricaCumplimiento,
   Vendedor,
 } from "../../services/reportesService";
 
@@ -12,6 +13,8 @@ interface ReportesFiltersProps {
   vendedorSeleccionado: number | null;
   /** firmName de la marca seleccionada (no idMarca) */
   firmNameSeleccionado: string | null;
+  tipoMetrica: TipoMetricaCumplimiento;
+  onTipoMetricaChange: (value: TipoMetricaCumplimiento) => void;
   onFechaInicioChange: (value: string) => void;
   onFechaFinChange: (value: string) => void;
   onAñoCompararChange: (value: number) => void;
@@ -35,6 +38,8 @@ export default function ReportesFilters({
   añoComparar,
   vendedorSeleccionado,
   firmNameSeleccionado,
+  tipoMetrica,
+  onTipoMetricaChange,
   onFechaInicioChange,
   onFechaFinChange,
   onAñoCompararChange,
@@ -177,6 +182,21 @@ export default function ReportesFilters({
                 {m.firmName}
               </option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Métrica
+          </label>
+          <select
+            value={tipoMetrica}
+            onChange={(e) =>
+              onTipoMetricaChange(e.target.value as TipoMetricaCumplimiento)
+            }
+            className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-w-[120px]"
+          >
+            <option value="pesos">Pesos</option>
+            <option value="ulkp">ULKP</option>
           </select>
         </div>
         <button

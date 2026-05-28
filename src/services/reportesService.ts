@@ -14,6 +14,7 @@ export interface ResumenVentasKpis {
   ventasBrutas: number;
   totalDocumentos: number;
   clientesUnicos: number;
+  ulkp: number;
   ticketPromedio: number;
 }
 
@@ -29,21 +30,32 @@ export interface VentaPorMarca {
 
 export type TipoMetricaCumplimiento = "ulkp" | "pesos";
 
-export interface CumplimientoObjetivoFila {
-  firmCode: number;
-  marca: string;
-  slpName: string | null;
-  nombreVendedor: string | null;
+export interface CumplimientoMetricaValores {
   objetivo: number;
   ventaReal: number;
   diferencia: number;
   cobertura: number;
 }
 
+export interface CumplimientoObjetivoFila {
+  firmName: string;
+  marca: string;
+  slpName: string | null;
+  nombreVendedor: string | null;
+  ulkp: CumplimientoMetricaValores;
+  pesos: CumplimientoMetricaValores;
+}
+
+/** Fila aplanada según la métrica activa (solo presentación). */
+export type CumplimientoObjetivoFilaVista = Pick<
+  CumplimientoObjetivoFila,
+  "firmName" | "marca" | "slpName" | "nombreVendedor"
+> &
+  CumplimientoMetricaValores;
+
 export interface CumplimientoObjetivosPorMarcaResponse {
   fechaInicio: string;
   fechaFin: string;
-  tipoMetrica: TipoMetricaCumplimiento;
   agruparPorVendedor: boolean;
   filas: CumplimientoObjetivoFila[];
 }
@@ -149,6 +161,59 @@ export interface Marca {
 
 const formatDate = (date: Date) => date.toISOString().split("T")[0];
 
+function pickNumber(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): number | undefined {
+  for (const key of keys) {
+    const v = o[key];
+    if (typeof v === "number" && !Number.isNaN(v)) return v;
+    if (typeof v === "string" && v.trim()) {
+      const parsed = Number(v);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  }
+  return undefined;
+}
+
+function pickString(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    const v = o[key];
+    if (typeof v === "string" && v.trim()) return v;
+  }
+  return undefined;
+}
+
+function normalizeVendedor(raw: unknown): Vendedor {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const username = pickString(o, "username", "Username", "userName") ?? "";
+  const slpName =
+    pickString(o, "slpName", "SlpName", "slpCode", "SlpCode") ?? username;
+
+  return {
+    idUsuario: pickNumber(o, "idUsuario", "IdUsuario") ?? 0,
+    nombre: pickString(o, "nombre", "Nombre") ?? "",
+    username,
+    slpName: slpName || undefined,
+    email: pickString(o, "email", "Email") ?? "",
+    idRol: pickNumber(o, "idRol", "IdRol") ?? 0,
+    idPersona: pickNumber(o, "idPersona", "IdPersona") ?? 0,
+    cardCode: pickString(o, "cardCode", "CardCode") ?? "",
+  };
+}
+
+function normalizeVendedoresArray(raw: unknown): Vendedor[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
+      ? (raw as { data: unknown[] }).data
+      : [];
+  return list.map(normalizeVendedor).filter((v) => v.idUsuario > 0);
+}
+
 const appendFechas = (
   params: URLSearchParams,
   fechaInicio?: string,
@@ -241,7 +306,6 @@ export const getReportesService = {
       /** Alias de slpName (valor del filtro de vendedor) */
       username?: string;
       firmName?: string;
-      tipoMetrica?: TipoMetricaCumplimiento;
       agruparPorVendedor?: boolean;
     },
   ) => {
@@ -250,7 +314,6 @@ export const getReportesService = {
     const slpName = options?.slpName ?? options?.username;
     if (slpName) params.append("slpName", slpName);
     if (options?.firmName) params.append("firmName", options.firmName);
-    params.append("tipoMetrica", options?.tipoMetrica ?? "ulkp");
     params.append(
       "agruparPorVendedor",
       String(options?.agruparPorVendedor ?? false),
@@ -364,9 +427,9 @@ export const getReportesService = {
     };
   },
 
-  getVendedores: async () => {
-    const response = await api.get<Vendedor[]>(`/api/Usuarios/GetVendedores`);
-    return response.data;
+  getVendedores: async (): Promise<Vendedor[]> => {
+    const response = await api.get<unknown>(`/api/Usuarios/GetVendedores`);
+    return normalizeVendedoresArray(response.data);
   },
 
   getMarcas: async () => {

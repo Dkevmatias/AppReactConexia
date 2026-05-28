@@ -24,8 +24,17 @@ import Profile from "./pages/Clientes/Profile";
 import CambiarContrasena from "./pages/Clientes/CambiarContrasena";
 import RespuestaClientes from "./pages/ConfigPage/RespuestaClientes";
 import EntregasPremios from "./pages/ConfigPage/EntregasPremios";
+import CrmConfiguracion from "./pages/CRM/CrmConfiguracion";
+import CatalogoEtapas from "./pages/CRM/CatalogoEtapas";
+import CatalogoFuentes from "./pages/CRM/CatalogoFuentes";
+import CatalogoSeguimientos from "./pages/CRM/CatalogoSeguimientos";
+import CatalogoEstatus from "./pages/CRM/CatalogoEstatus";
+import CatalogoTipoEstatus from "./pages/CRM/CatalogoTipoEstatus";
+import Prospectos from "./pages/CRM/Prospectos";
 import Articulos from "./pages/Ventas/Articulos";
 import ListaPrecios from "./pages/Ventas/ListaPrecios";
+import BitacoraCobranza from "./pages/Operaciones/BitacoraCobranza";
+import ListaBitacorasCobranza from "./pages/Operaciones/ListaBitacorasCobranza";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -115,6 +124,39 @@ export default function App() {
             <Route
               path="/configPage/entregasPremios"
               element={<EntregasPremios />}
+            />
+            <Route path="/CRM/Prospectos" element={<Prospectos />} />
+            <Route
+              path="/CRM/Configuración"
+              element={<CrmConfiguracion />}
+            />
+            <Route
+              path="/CRM/CatalogoEtapas"
+              element={<CatalogoEtapas />}
+            />
+            <Route
+              path="/CRM/CatalogoFuentes"
+              element={<CatalogoFuentes />}
+            />
+            <Route
+              path="/CRM/CatalogoSeguimientos"
+              element={<CatalogoSeguimientos />}
+            />
+            <Route
+              path="/CRM/CatalogoEstatus"
+              element={<CatalogoEstatus />}
+            />
+            <Route
+              path="/CRM/CatalogoTipoEstatus"
+              element={<CatalogoTipoEstatus />}
+            />
+            <Route
+              path="/operaciones/BitacoraCobranza"
+              element={<BitacoraCobranza />}
+            />
+            <Route
+              path="/operaciones/ListaBitacorasCobranza"
+              element={<ListaBitacorasCobranza />}
             />
           </Route>
         </Routes>

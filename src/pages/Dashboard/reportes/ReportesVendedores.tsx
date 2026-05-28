@@ -4,6 +4,7 @@ import {
   VentaPorVendedorMarca,
   TopCliente,
   CumplimientoObjetivoFila,
+  CumplimientoObjetivoFilaVista,
   TipoMetricaCumplimiento,
 } from "../../../services/reportesService";
 import { formatCurrency, formatNumber } from "../../../utils/format";
@@ -14,6 +15,7 @@ interface ReportesVendedoresProps {
   añoComparar: number;
   username: string | null;
   firmName: string | null;
+  tipoMetrica: TipoMetricaCumplimiento;
 }
 
 const formatMetrica = (value: number, tipoMetrica: TipoMetricaCumplimiento) =>
@@ -30,13 +32,22 @@ export default function ReportesVendedores({
   fechaFin,
   username,
   firmName,
+  tipoMetrica,
 }: ReportesVendedoresProps) {
   const [loading, setLoading] = useState(true);
-  const [tipoMetrica, setTipoMetrica] =
-    useState<TipoMetricaCumplimiento>("ulkp");
-  const [cumplimientoMarca, setCumplimientoMarca] = useState<
+  const [cumplimientoFilas, setCumplimientoFilas] = useState<
     CumplimientoObjetivoFila[]
   >([]);
+
+  const cumplimientoMarca = useMemo((): CumplimientoObjetivoFilaVista[] => {
+    return cumplimientoFilas.map((fila) => ({
+      firmName: fila.firmName,
+      marca: fila.marca,
+      slpName: fila.slpName,
+      nombreVendedor: fila.nombreVendedor,
+      ...fila[tipoMetrica],
+    }));
+  }, [cumplimientoFilas, tipoMetrica]);
   // const [ventasAlmacen, setVentasAlmacen] = useState<VentaPorAlmacen[]>([]);
   const [ventasMarcaDetalle, setVentasMarcaDetalle] = useState<
     VentaPorVendedorMarca[]
@@ -110,7 +121,6 @@ export default function ReportesVendedores({
               {
                 slpName: username ?? undefined,
                 firmName: firmName ?? undefined,
-                tipoMetrica,
                 agruparPorVendedor: false,
               },
             ),
@@ -143,7 +153,7 @@ export default function ReportesVendedores({
         */
 
         if (!cancelled) {
-          setCumplimientoMarca(cumplimientoData?.filas ?? []);
+          setCumplimientoFilas(cumplimientoData?.filas ?? []);
           setVentasMarcaDetalle(marcaDetalleData ?? []);
           // setVentasMarca(marcaData ?? []);
           setTopClientes(clientesData ?? []);
@@ -159,7 +169,7 @@ export default function ReportesVendedores({
     return () => {
       cancelled = true;
     };
-  }, [fechaInicio, fechaFin, username, firmName, tipoMetrica]);
+  }, [fechaInicio, fechaFin, username, firmName]);
 
   if (loading) {
     return (
@@ -173,30 +183,9 @@ export default function ReportesVendedores({
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <h3 className="text-lg font-semibold">
-              Cumplimiento de objetivos por marca
-            </h3>
-            <div className="flex items-center gap-2">
-              <label
-                htmlFor="tipo-metrica-marca"
-                className="text-sm text-gray-500 dark:text-gray-400"
-              >
-                Métrica
-              </label>
-              <select
-                id="tipo-metrica-marca"
-                value={tipoMetrica}
-                onChange={(e) =>
-                  setTipoMetrica(e.target.value as TipoMetricaCumplimiento)
-                }
-                className="px-3 py-1.5 text-sm border rounded-lg dark:bg-gray-700 dark:border-gray-600"
-              >
-                <option value="ulkp">ULKP</option>
-                <option value="pesos">Pesos</option>
-              </select>
-            </div>
-          </div>
+          <h3 className="text-lg font-semibold mb-4">
+            Cumplimiento de objetivos por marca
+          </h3>
           {cumplimientoMarca.length > 0 ? (
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700">
@@ -211,7 +200,7 @@ export default function ReportesVendedores({
               <tbody>
                 {cumplimientoMarca.map((row) => (
                   <tr
-                    key={`${row.firmCode}-${row.marca}`}
+                    key={`${row.firmName}-${row.marca}-${row.slpName ?? ""}`}
                     className="border-t dark:border-gray-700"
                   >
                     <td className="px-3 py-2">{row.marca || "N/A"}</td>

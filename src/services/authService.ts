@@ -64,6 +64,74 @@ export const getPersonasTelefono = async () => {
   return response.data;
 };
 
+export interface ContextoOperativoPersona {
+  idPersona: number;
+  idEmpresa: number;
+  idSucursal: number;
+  empresa?: string | null;
+  sucursal?: string | null;
+}
+
+function pickNumber(o: Record<string, unknown>, ...keys: string[]): number {
+  for (const key of keys) {
+    const value = o[key];
+    if (typeof value === "number" && !Number.isNaN(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+  }
+  return 0;
+}
+
+function pickString(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): string | null {
+  for (const key of keys) {
+    const value = o[key];
+    if (typeof value === "string") return value;
+  }
+  return null;
+}
+
+function normalizeContextoOperativo(raw: unknown): ContextoOperativoPersona {
+  const data =
+    raw && typeof raw === "object" && "data" in raw
+      ? (raw as Record<string, unknown>).data
+      : raw;
+  const o = (data && typeof data === "object" ? data : {}) as Record<
+    string,
+    unknown
+  >;
+
+  return {
+    idPersona: pickNumber(o, "idPersona", "IdPersona"),
+    idEmpresa: pickNumber(o, "idEmpresa", "IdEmpresa"),
+    idSucursal: pickNumber(o, "idSucursal", "IdSucursal"),
+    empresa: pickString(o, "empresa", "Empresa", "nombreEmpresa", "NombreEmpresa"),
+    sucursal: pickString(
+      o,
+      "sucursal",
+      "Sucursal",
+      "nombreSucursal",
+      "NombreSucursal",
+    ),
+  };
+}
+
+export const getContextoOperativoPersona = async (
+  idPersona: number,
+): Promise<ContextoOperativoPersona> => {
+  const response = await api.get<unknown>(
+    `/api/Personas/contexto-operativo/${idPersona}`,
+  );
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error("No se pudo cargar el contexto operativo del usuario.");
+  }
+  return normalizeContextoOperativo(response.data);
+};
+
 export const getUsuario = async () => {
   const response = await api.get(`api/Usuarios/GetUsuarios`, {
     withCredentials: true,

@@ -8,6 +8,7 @@ import { SiCivicrm } from "react-icons/si";
 import { FcDataConfiguration } from "react-icons/fc";
 import { FaPersonWalkingArrowRight } from "react-icons/fa6";
 import { RxActivityLog } from "react-icons/rx";
+import { GiProcessor } from "react-icons/gi";
 
 import {
   Inicio,
@@ -106,6 +107,24 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    name: "Operaciones",
+    icon: <GiProcessor />,
+    subItems: [
+      {
+        name: "Generador de Bitacoras de Cobranza",
+        path: "/operaciones/BitacoraCobranza",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Lista de Bitacoras de Cobranza",
+        path: "/operaciones/ListaBitacorasCobranza",
+        icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+    ],
+  },
+  {
     name: "CRM",
     icon: <SiCivicrm />,
     subItems: [
@@ -142,6 +161,25 @@ const navItems: NavItem[] = [
       {
         name: "Catalogo de Fuentes",
         path: "/CRM/CatalogoFuentes",
+        icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+
+      {
+        name: "Catalogo de Seguimientos",
+        path: "/CRM/CatalogoSeguimientos",
+        icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Catalogo de Estatus",
+        path: "/CRM/CatalogoEstatus",
+        icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Catalogo de Tipo Estatus",
+        path: "/CRM/CatalogoTipoEstatus",
         icon: <MdViewList className="w-4 h-4 shrink-0" />,
         pro: false,
       },
@@ -273,6 +311,31 @@ const AppSidebar: React.FC = () => {
             .filter(Boolean);
           if (subItems.length === 0) return null;
           return { ...item, subItems };
+        }
+
+        if (item.name === "CRM" && item.subItems) {
+          const moduloCrm = menu.find(
+            (m) => (m.clave ?? "").trim().toLowerCase() === "crm",
+          );
+          if (!moduloCrm?.activo) return null;
+          if (!moduloCrm.permisos?.some((p) => p.activo)) return null;
+          return item;
+        }
+
+        if (item.name === "Operaciones" && item.subItems) {
+          const moduloBitacora = menu.find((m) => {
+            const clave = (m.clave ?? "").trim().toLowerCase();
+            return (
+              clave === "bitacora" ||
+              clave === "bitacora.cobranza" ||
+              clave === "operaciones"
+            );
+          });
+          if (!moduloBitacora?.activo) return null;
+          if (!permisoActivo(moduloBitacora.permisos, "bitacora.ver")) {
+            return null;
+          }
+          return item;
         }
 
         const menuClaveMap: Record<string, string> = {

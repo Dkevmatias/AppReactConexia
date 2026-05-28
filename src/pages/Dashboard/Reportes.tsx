@@ -2,7 +2,10 @@ import { useMemo, useState } from "react";
 import PageMeta from "../../components/common/PageMeta";
 import ReportesFilters from "../../components/reportes/ReportesFilters";
 import ReportesTabs from "../../components/reportes/ReportesTabs";
-import { getReportesService } from "../../services/reportesService";
+import {
+  getReportesService,
+  TipoMetricaCumplimiento,
+} from "../../services/reportesService";
 import ReportesDashboard from "./reportes/ReportesDashboard";
 import ReportesVendedores from "./reportes/ReportesVendedores";
 import ReportesClientes from "./reportes/ReportesClientes";
@@ -34,6 +37,8 @@ export default function Reportes() {
     string | null
   >(null);
   const [filterKey, setFilterKey] = useState(0);
+  const [tipoMetrica, setTipoMetrica] =
+    useState<TipoMetricaCumplimiento>("pesos");
 
   const handleVendedorChange = (id: number | null, nombre: string | null) => {
     setVendedorSeleccionado(id);
@@ -59,7 +64,11 @@ export default function Reportes() {
     switch (activeTab) {
       case "dashboard":
         return (
-          <ReportesDashboard key={`dashboard-${filterKey}`} {...tabProps} />
+          <ReportesDashboard
+            key={`dashboard-${filterKey}`}
+            {...tabProps}
+            tipoMetrica={tipoMetrica}
+          />
         );
       case "vendedores":
         return (
@@ -70,6 +79,7 @@ export default function Reportes() {
             username={username}
             firmName={firmNameSeleccionado}
             añoComparar={0}
+            tipoMetrica={tipoMetrica}
           />
         );
       case "clientes":
@@ -88,7 +98,11 @@ export default function Reportes() {
         );
       default:
         return (
-          <ReportesDashboard key={`dashboard-${filterKey}`} {...tabProps} />
+          <ReportesDashboard
+            key={`dashboard-${filterKey}`}
+            {...tabProps}
+            tipoMetrica={tipoMetrica}
+          />
         );
     }
   };
@@ -117,6 +131,8 @@ export default function Reportes() {
         onAñoCompararChange={setAñoComparar}
         onVendedorChange={handleVendedorChange}
         onMarcaChange={handleMarcaChange}
+        tipoMetrica={tipoMetrica}
+        onTipoMetricaChange={setTipoMetrica}
         onFilter={handleFilter}
       />
 

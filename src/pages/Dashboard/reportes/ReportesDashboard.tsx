@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getReportesService,
   ResumenVentas,
+  TipoMetricaCumplimiento,
   VentaPorAlmacen,
   VentaPorMarca,
   TopCliente,
@@ -15,35 +16,79 @@ interface ReportesDashboardProps {
   fechaInicio: string;
   fechaFin: string;
   añoComparar: number;
+  tipoMetrica: TipoMetricaCumplimiento;
 }
+
+const formatMetrica = (value: number, tipoMetrica: TipoMetricaCumplimiento) =>
+  tipoMetrica === "pesos" ? formatCurrency(value) : formatNumber(value);
+
+const etiquetaMetrica = (tipoMetrica: TipoMetricaCumplimiento) =>
+  tipoMetrica === "pesos" ? "Pesos" : "ULKP";
 
 export default function ReportesDashboard({
   fechaInicio,
   fechaFin,
   añoComparar,
+  tipoMetrica,
 }: ReportesDashboardProps) {
   const [loading, setLoading] = useState(true);
   const [resumen, setResumen] = useState<ResumenVentas | null>(null);
   const [resumenObjetivos, setResumenObjetivos] = useState<ResumenObjetivos[]>(
     [],
   );
-  const ventasAñoAnterior = resumen?.periodoAnterior?.ventasNetas ?? 0;
   const [ventasAlmacen, setVentasAlmacen] = useState<VentaPorAlmacen[]>([]);
   const [ventasMarca, setVentasMarca] = useState<VentaPorMarca[]>([]);
   const [topClientes, setTopClientes] = useState<TopCliente[]>([]);
   const [topProductos, setTopProductos] = useState<TopProducto[]>([]);
 
-  const ventasActuales = resumen?.ventasNetas || 0;
-  const porcentajeCobertura =
-    ventasAñoAnterior > 0
-      ? ((ventasActuales - ventasAñoAnterior) / ventasAñoAnterior) * 100
-      : 0;
-  const porcentajeCoberturaObjetivos =
-    resumenObjetivos[0]?.objetivoPesos > 0
-      ? ((ventasActuales - resumenObjetivos[0]?.objetivoPesos) /
-          resumenObjetivos[0]?.objetivoPesos) *
-        100
-      : 0;
+  const ventasActuales = useMemo(() => {
+    if (!resumen) return 0;
+    return tipoMetrica === "pesos"
+      ? resumen.ventasNetas ?? 0
+      : resumen.ulkp ?? 0;
+  }, [resumen, tipoMetrica]);
+
+  const ventasAñoAnterior = useMemo(() => {
+    if (!resumen?.periodoAnterior) return 0;
+    return tipoMetrica === "pesos"
+      ? resumen.periodoAnterior.ventasNetas ?? 0
+      : resumen.periodoAnterior.ulkp ?? 0;
+  }, [resumen, tipoMetrica]);
+
+  const objetivoAnual = useMemo(
+    () =>
+      resumenObjetivos.reduce(
+        (acc, row) => ({
+          pesos: acc.pesos + (Number(row.objetivoPesos) || 0),
+          ulkp: acc.ulkp + (Number(row.objetivoUlkp) || 0),
+        }),
+        { pesos: 0, ulkp: 0 },
+      ),
+    [resumenObjetivos],
+  );
+
+  const objetivoActual = useMemo(
+    () => (tipoMetrica === "pesos" ? objetivoAnual.pesos : objetivoAnual.ulkp),
+    [tipoMetrica, objetivoAnual],
+  );
+
+  const porcentajeCobertura = useMemo(
+    () =>
+      ventasAñoAnterior > 0
+        ? ((ventasActuales - ventasAñoAnterior) / ventasAñoAnterior) * 100
+        : 0,
+    [ventasActuales, ventasAñoAnterior],
+  );
+
+  const porcentajeCoberturaObjetivos = useMemo(
+    () =>
+      objetivoActual > 0
+        ? ((ventasActuales - objetivoActual) / objetivoActual) * 100
+        : 0,
+    [ventasActuales, objetivoActual],
+  );
+
+  const metricaLabel = etiquetaMetrica(tipoMetrica);
 
   const getColorCobertura = () => {
     if (porcentajeCobertura >= 0) return "text-green-600";
@@ -142,9 +187,11 @@ export default function ReportesDashboard({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
         <div className="flex flex-col gap-4">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-            <p className="text-sm text-gray-500">Ventas Año {añoComparar}</p>
+            <p className="text-sm text-gray-500">
+              Ventas Año {añoComparar} ({metricaLabel})
+            </p>
             <p className="text-2xl font-bold text-gray-600">
-              {formatCurrency(ventasAñoAnterior)}
+              {formatMetrica(ventasAñoAnterior, tipoMetrica)}
             </p>
           </div>
 
@@ -160,20 +207,21 @@ export default function ReportesDashboard({
         </div>
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <p className="text-sm text-gray-500">
-            Ventas Netas ({new Date().getFullYear()})
+            {tipoMetrica === "pesos" ? "Ventas Netas" : "Ventas ULKP"} (
+            {new Date().getFullYear()})
           </p>
           <p className="text-2xl font-bold text-green-600">
-            {formatCurrency(ventasActuales)}
+            {formatMetrica(ventasActuales, tipoMetrica)}
           </p>
         </div>
         <div className="flex flex-col gap-4">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
             <p className="text-sm text-gray-500">
-              Objetivo Anual {añoComparar}
+              Objetivo Anual 2026 ({metricaLabel})
             </p>
             <p className="text-2xl font-bold text-indigo-600">
-              {resumenObjetivos !== null
-                ? formatNumber(resumenObjetivos[0]?.objetivoPesos)
+              {resumenObjetivos.length > 0
+                ? formatMetrica(objetivoActual, tipoMetrica)
                 : "—"}
             </p>
           </div>
