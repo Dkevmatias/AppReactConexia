@@ -6,6 +6,8 @@ import { useAuth } from "../../hooks/useAuth";
 import {
   bitacoraCobranzaService,
   BitacoraCobranza,
+  claseBadgeEstatusBitacora,
+  etiquetaEstatusBitacora,
 } from "../../services/bitacoraCobranzaService";
 import { rutasService, Ruta } from "../../services/rutasService";
 import { getReportesService, Vendedor } from "../../services/reportesService";
@@ -236,13 +238,9 @@ export default function ListaBitacorasCobranza() {
                     </td>
                     <td className="px-4 py-2">
                       <span
-                        className={
-                          b.activo
-                            ? "rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
-                            : "rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                        }
+                        className={`${claseBadgeEstatusBitacora(b.estatus)} px-2 py-0.5 text-xs`}
                       >
-                        {b.activo ? "Activa" : "Inactiva"}
+                        {etiquetaEstatusBitacora(b.estatus)}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-right whitespace-nowrap">

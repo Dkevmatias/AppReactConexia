@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FileText, Loader2, Plus, Save } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ChevronRight,
+  FileText,
+  Loader2,
+  Plus,
+  Save,
+  Search,
+  UserPlus,
+  X,
+} from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import PageMeta from "../../components/common/PageMeta";
 import { useAuth } from "../../hooks/useAuth";
@@ -10,11 +21,23 @@ import {
 import {
   bitacoraCobranzaService,
   BitacoraCobranza as BitacoraCobranzaModel,
+  buildBitacoraUpdatePayload,
   calcularVencidas,
+  claseBadgeEstatusBitacora,
+  claseFilaEstatusCobro,
+  ClienteBitacoraBusqueda,
+  clienteBitacoraBusquedaKey,
+  documentoCobranzaUnicoKey,
   detalleToDocumentoGenerar,
   DIAS_VISITA,
   DocumentoCobranzaGenerar,
+  etiquetaEstatusBitacora,
+  etiquetaEstatusCobro,
+  mergeEstatusCobroEnDocumentos,
   ModoPeriodoBitacora,
+  normalizarEstatusBitacora,
+  prioridadOrdenEstatusCobro,
+  ValidarCobroBitacoraResponse,
 } from "../../services/bitacoraCobranzaService";
 import {
   filtrarRutasPorVendedor,
@@ -35,6 +58,28 @@ function formatearFecha(valor: string | null | undefined): string {
   if (!valor) return "—";
   const d = new Date(valor);
   return Number.isNaN(d.getTime()) ? valor : d.toLocaleDateString("es-MX");
+}
+
+function formatearFechaCreacion(
+  valor: string | number | null | undefined,
+): string {
+  if (valor == null || valor === "") return "—";
+  if (typeof valor === "number") {
+    if (valor <= 0) return "—";
+    const d = new Date(valor);
+    return Number.isNaN(d.getTime()) ? String(valor) : d.toLocaleString("es-MX");
+  }
+  const d = new Date(valor);
+  return Number.isNaN(d.getTime()) ? valor : d.toLocaleString("es-MX");
+}
+
+type EtapaModalAgregarCliente = 1 | 2;
+
+function etiquetaReferenciaDocumento(
+  doc: DocumentoCobranzaGenerar,
+): string {
+  const referencia = (doc.numAtCard ?? "").trim();
+  return referencia || "—";
 }
 
 function documentoKey(doc: DocumentoCobranzaGenerar, index: number): string {
@@ -114,7 +159,9 @@ export default function BitacoraCobranza() {
   const [loadingCatalogos, setLoadingCatalogos] = useState(true);
 
   const [idVendedor, setIdVendedor] = useState<number | "">("");
-  const [idRuta, setIdRuta] = useState<number | "">("");
+  const [rutasSeleccionadas, setRutasSeleccionadas] = useState<Set<number>>(
+    new Set(),
+  );
   const [modoPeriodo, setModoPeriodo] =
     useState<ModoPeriodoBitacora>("semanal");
   const [diaVisita, setDiaVisita] = useState<string>(DIAS_VISITA[0].value);
@@ -129,35 +176,108 @@ export default function BitacoraCobranza() {
 
   const [idBitacora, setIdBitacora] = useState<number | null>(null);
   const [folioBitacora, setFolioBitacora] = useState<number | null>(null);
+  const [estatusBitacora, setEstatusBitacora] = useState<string>("B");
+  const [fechaCreacionBitacora, setFechaCreacionBitacora] = useState<
+    string | number | null
+  >(null);
   const [documentos, setDocumentos] = useState<DocumentoCobranzaGenerar[]>([]);
   const [documentosSeleccionados, setDocumentosSeleccionados] = useState<
     Set<string>
   >(new Set());
   const [totalRegistros, setTotalRegistros] = useState(0);
   const [detalleGuardado, setDetalleGuardado] = useState(false);
+  const [cobroValidado, setCobroValidado] = useState(false);
+  const [validandoCobro, setValidandoCobro] = useState(false);
+  const [resumenValidacionCobro, setResumenValidacionCobro] =
+    useState<ValidarCobroBitacoraResponse | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [terminando, setTerminando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
+
+  const [modalAgregarClienteAbierto, setModalAgregarClienteAbierto] =
+    useState(false);
+  const [busquedaCliente, setBusquedaCliente] = useState("");
+  const [resultadosClientes, setResultadosClientes] = useState<
+    ClienteBitacoraBusqueda[]
+  >([]);
+  const [clienteActivo, setClienteActivo] =
+    useState<ClienteBitacoraBusqueda | null>(null);
+  const [clienteSeleccionadoBusqueda, setClienteSeleccionadoBusqueda] =
+    useState<ClienteBitacoraBusqueda | null>(null);
+  const [etapaModalAgregar, setEtapaModalAgregar] =
+    useState<EtapaModalAgregarCliente>(1);
+  const [documentosCliente, setDocumentosCliente] = useState<
+    DocumentoCobranzaGenerar[]
+  >([]);
+  const [documentosClienteSeleccionados, setDocumentosClienteSeleccionados] =
+    useState<Set<string>>(new Set());
+  const [buscandoClientes, setBuscandoClientes] = useState(false);
+  const [cargandoDocumentosCliente, setCargandoDocumentosCliente] =
+    useState(false);
+  const [totalClientesBusqueda, setTotalClientesBusqueda] = useState(0);
+  const [errorBusquedaClientes, setErrorBusquedaClientes] = useState<
+    string | null
+  >(null);
 
   const vendedorSeleccionado = useMemo(
     () => vendedores.find((v) => v.idUsuario === idVendedor) ?? null,
     [vendedores, idVendedor],
   );
 
-  const rutaSeleccionada = useMemo(
-    () => rutas.find((r) => r.idRuta === idRuta) ?? null,
-    [rutas, idRuta],
-  );
-
   const slpName =
     vendedorSeleccionado?.slpName ?? vendedorSeleccionado?.username ?? "";
+
   const rutasFiltradas = useMemo(
     () => filtrarRutasPorVendedor(rutas, vendedorSeleccionado),
     [rutas, vendedorSeleccionado],
   );
-  const codigoRuta = rutaSeleccionada?.codigo ?? "";
+  const rutasSeleccionadasList = useMemo(
+    () => rutasFiltradas.filter((r) => rutasSeleccionadas.has(r.idRuta)),
+    [rutasFiltradas, rutasSeleccionadas],
+  );
+  const codigosRutaSeleccionados = useMemo(
+    () => rutasSeleccionadasList.map((r) => r.codigo).filter(Boolean),
+    [rutasSeleccionadasList],
+  );
+  const idsRutasSeleccionadas = useMemo(
+    () => rutasSeleccionadasList.map((r) => r.idRuta),
+    [rutasSeleccionadasList],
+  );
+  const idRutaEncabezado = idsRutasSeleccionadas[0] ?? 0;
+  const etiquetaRutas =
+    codigosRutaSeleccionados.length > 0
+      ? codigosRutaSeleccionados.join(", ")
+      : "Todas las rutas";
+  const todasRutasSeleccionadas =
+    rutasFiltradas.length > 0 &&
+    rutasFiltradas.every((r) => rutasSeleccionadas.has(r.idRuta));
+  const bitacoraTerminada =
+    normalizarEstatusBitacora(estatusBitacora) === "T";
+  const puedeTerminar =
+    detalleGuardado && !!idBitacora && !bitacoraTerminada && !terminando;
+  const puedeGenerarPdf =
+    bitacoraTerminada && !!idBitacora && documentos.length > 0;
+  const puedeAgregarCliente =
+    !bitacoraTerminada &&
+    normalizarEstatusBitacora(estatusBitacora) === "B" &&
+    !!idBitacora;
+  const pasoDocumentosCliente = etapaModalAgregar === 2;
+  const documentosYaEnBitacora = useMemo(
+    () => new Set(documentos.map(documentoCobranzaUnicoKey)),
+    [documentos],
+  );
+  const todosDocumentosClienteSeleccionados =
+    documentosCliente.length > 0 &&
+    documentosCliente
+      .filter(
+        (doc) => !documentosYaEnBitacora.has(documentoCobranzaUnicoKey(doc)),
+      )
+      .every((doc) =>
+        documentosClienteSeleccionados.has(documentoCobranzaUnicoKey(doc)),
+      );
   const documentosParaGuardar = useMemo(
     () =>
       documentos.filter((doc, idx) =>
@@ -185,13 +305,19 @@ export default function BitacoraCobranza() {
         return true;
       })
       .sort((a, b) => {
+        if (cobroValidado) {
+          const ordenCobro =
+            prioridadOrdenEstatusCobro(a.doc.estatusCobro) -
+            prioridadOrdenEstatusCobro(b.doc.estatusCobro);
+          if (ordenCobro !== 0) return ordenCobro;
+        }
         const cliente = a.doc.cardName.localeCompare(b.doc.cardName, "es", {
           sensitivity: "base",
         });
         if (cliente !== 0) return cliente;
         return a.doc.docNum - b.doc.docNum;
       });
-  }, [documentos, filtroEstatus, filtroEstatusEntrega]);
+  }, [documentos, filtroEstatus, filtroEstatusEntrega, cobroValidado]);
   const todosSeleccionados =
     documentosFiltradosOrdenados.length > 0 &&
     documentosFiltradosOrdenados.every(({ doc, originalIndex }) =>
@@ -229,15 +355,62 @@ export default function BitacoraCobranza() {
       setIdBitacora(bitacora.idBitacora);
       setFolioBitacora(bitacora.folio);
       setIdVendedor(bitacora.idVendedor);
-      setIdRuta(bitacora.idRuta);
+      setRutasSeleccionadas(
+        new Set(
+          bitacora.idRutas.length > 0
+            ? bitacora.idRutas
+            : bitacora.idRuta > 0
+              ? [bitacora.idRuta]
+              : [],
+        ),
+      );
+      setEstatusBitacora(bitacora.estatus ?? "B");
+      setFechaCreacionBitacora(bitacora.fechaCreacion);
       setObservaciones(bitacora.observaciones ?? "");
       const detalle = await bitacoraCobranzaService.getDetallePorBitacora(id);
-      const documentosDetalle = detalle.map(detalleToDocumentoGenerar);
-      const primeraSociedad = documentosDetalle.find((d) => d.sociedad?.trim())
-        ?.sociedad;
+      let documentosDetalle = detalle.map((item) =>
+        detalleToDocumentoGenerar(item),
+      );
+      const primeraSociedad = documentosDetalle.find((d) =>
+        d.sociedad?.trim(),
+      )?.sociedad;
       if (primeraSociedad) {
         setSociedad(primeraSociedad);
       }
+
+      setCobroValidado(false);
+      setResumenValidacionCobro(null);
+      let cobroValidadoOk = false;
+      if (detalle.length > 0) {
+        setValidandoCobro(true);
+        try {
+          const validacion =
+            await bitacoraCobranzaService.validarCobroBitacora(id);
+          setResumenValidacionCobro(validacion);
+          if (validacion.detalles.length > 0) {
+            documentosDetalle = validacion.detalles.map((item) =>
+              detalleToDocumentoGenerar(item),
+            );
+          } else {
+            documentosDetalle = mergeEstatusCobroEnDocumentos(
+              documentosDetalle,
+              validacion.items,
+            );
+          }
+          cobroValidadoOk = true;
+          setCobroValidado(true);
+        } catch (validacionErr) {
+          console.error(validacionErr);
+          setError(
+            validacionErr instanceof Error
+              ? validacionErr.message
+              : "No se pudo validar el cobro de la bitácora.",
+          );
+        } finally {
+          setValidandoCobro(false);
+        }
+      }
+
       setTotalRegistros(detalle.length);
       setDocumentos(documentosDetalle);
       setDocumentosSeleccionados(
@@ -248,7 +421,9 @@ export default function BitacoraCobranza() {
         bitacora.folio != null && bitacora.folio > 0
           ? `folio ${bitacora.folio}`
           : `#${id}`;
-      setMensaje(`Bitácora ${folioLabel} cargada (${detalle.length} registros).`);
+      setMensaje(
+        `Bitácora ${folioLabel} cargada (${detalle.length} registros${cobroValidadoOk ? ", cobro validado" : ""}).`,
+      );
     } catch (err) {
       console.error(err);
       setError(
@@ -284,9 +459,7 @@ export default function BitacoraCobranza() {
 
     const cargarContextoOperativo = async () => {
       try {
-        setContextoOperativo(
-          await getContextoOperativoPersona(user.idPersona),
-        );
+        setContextoOperativo(await getContextoOperativoPersona(user.idPersona));
       } catch (err) {
         console.error(err);
         setContextoOperativo(null);
@@ -307,11 +480,55 @@ export default function BitacoraCobranza() {
     if (!Number.isNaN(id) && id > 0) void cargarBitacoraExistente(id);
   }, [idDesdeUrl, cargarBitacoraExistente]);
 
+  useEffect(() => {
+    if (!modalAgregarClienteAbierto || pasoDocumentosCliente) return;
+
+    const termino = busquedaCliente.trim();
+    if (termino.length < 2) {
+      setResultadosClientes([]);
+      setTotalClientesBusqueda(0);
+      setErrorBusquedaClientes(null);
+      setBuscandoClientes(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setBuscandoClientes(true);
+        setErrorBusquedaClientes(null);
+        try {
+          const resultado = await bitacoraCobranzaService.buscarClientes({
+            texto: termino,
+            slpName: slpName || undefined,
+          });
+          setResultadosClientes(resultado.clientes);
+          setTotalClientesBusqueda(resultado.total);
+        } catch (err) {
+          console.error(err);
+          setResultadosClientes([]);
+          setTotalClientesBusqueda(0);
+          setErrorBusquedaClientes(
+            err instanceof Error
+              ? err.message
+              : "No se pudo buscar clientes.",
+          );
+        } finally {
+          setBuscandoClientes(false);
+        }
+      })();
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    modalAgregarClienteAbierto,
+    pasoDocumentosCliente,
+    busquedaCliente,
+    slpName,
+  ]);
+
   const validarFiltros = (): string | null => {
     if (!idVendedor) return "Seleccione un vendedor.";
-    if (!idRuta) return "Seleccione una ruta.";
     if (!slpName) return "El vendedor no tiene código SAP (slpName).";
-    if (!codigoRuta) return "La ruta no tiene código.";
     if (modoPeriodo === "dia" && !diaVisita)
       return "Seleccione el día de visita.";
     return null;
@@ -320,9 +537,10 @@ export default function BitacoraCobranza() {
   const crearEncabezado = async (): Promise<BitacoraCobranzaModel> => {
     const validacion = validarFiltros();
     if (validacion) throw new Error(validacion);
-    if (!rutaSeleccionada) throw new Error("Ruta no válida.");
     if (!user?.idPersona) {
-      throw new Error("No hay sesión de usuario para obtener empresa y sucursal.");
+      throw new Error(
+        "No hay sesión de usuario para obtener empresa y sucursal.",
+      );
     }
     if (!contextoOperativo?.idEmpresa || !contextoOperativo?.idSucursal) {
       throw new Error(
@@ -335,7 +553,7 @@ export default function BitacoraCobranza() {
       idSucursal: contextoOperativo.idSucursal,
       idEmpresa: contextoOperativo.idEmpresa,
       idVendedor: idVendedor as number,
-      idRuta: idRuta as number,
+      idRutas: idsRutasSeleccionadas,
       idUsuarioCreacion: idUsuario,
       observaciones: observaciones.trim() || null,
       activo: true,
@@ -344,6 +562,11 @@ export default function BitacoraCobranza() {
     const creada = await bitacoraCobranzaService.crearBitacora(payload);
     setIdBitacora(creada.idBitacora);
     setFolioBitacora(creada.folio);
+    setEstatusBitacora(creada.estatus ?? "B");
+    setFechaCreacionBitacora(creada.fechaCreacion);
+    if (creada.idRutas.length > 0) {
+      setRutasSeleccionadas(new Set(creada.idRutas));
+    }
     return creada;
   };
 
@@ -367,7 +590,10 @@ export default function BitacoraCobranza() {
 
       const params = {
         slpName,
-        uBxpRuta: codigoRuta,
+        uBxpRutas:
+          codigosRutaSeleccionados.length > 0
+            ? codigosRutaSeleccionados
+            : undefined,
         sociedad: sociedad.trim() || undefined,
       };
 
@@ -389,6 +615,8 @@ export default function BitacoraCobranza() {
       );
       setTotalRegistros(resultado.totalRegistros);
       setDetalleGuardado(false);
+      setCobroValidado(false);
+      setResumenValidacionCobro(null);
       const refFolio = bitacoraRef?.folio ?? folioBitacora;
       setMensaje(
         `Se generaron ${resultado.documentos.length} documento(s) para la bitácora ${etiquetaFolioBitacora(refFolio, bitacoraId)}. Revise el listado y guarde el detalle.`,
@@ -436,6 +664,11 @@ export default function BitacoraCobranza() {
         `Se guardaron ${documentosParaGuardar.length} registro(s) en la bitácora ${etiquetaFolioBitacora(refFolio, bitacoraId)}.`,
       );
       setDetalleGuardado(true);
+
+      const actualizada =
+        await bitacoraCobranzaService.getBitacoraPorId(bitacoraId);
+      setEstatusBitacora(actualizada.estatus ?? "B");
+      setFechaCreacionBitacora(actualizada.fechaCreacion);
     } catch (err) {
       console.error(err);
       setError(
@@ -444,6 +677,88 @@ export default function BitacoraCobranza() {
     } finally {
       setGuardando(false);
     }
+  };
+
+  const handleTerminarBitacora = async () => {
+    if (!idBitacora) {
+      setError("No hay bitácora activa para terminar.");
+      return;
+    }
+    if (!detalleGuardado) {
+      setError("Guarde el detalle antes de terminar la bitácora.");
+      return;
+    }
+    if (bitacoraTerminada) return;
+
+    const idUsuario =
+      user?.idPersona ?? (typeof idVendedor === "number" ? idVendedor : 0);
+    if (!idUsuario) {
+      setError("No hay sesión de usuario para terminar la bitácora.");
+      return;
+    }
+
+    setTerminando(true);
+    setError(null);
+    setMensaje(null);
+    try {
+      const encabezado =
+        await bitacoraCobranzaService.getBitacoraPorId(idBitacora);
+      const payload = buildBitacoraUpdatePayload(encabezado, {
+        idUsuarioEdita: idUsuario,
+        idVendedor:
+          typeof idVendedor === "number" ? idVendedor : encabezado.idVendedor,
+        idRuta:
+          idRutaEncabezado > 0
+            ? idRutaEncabezado
+            : encabezado.idRutas[0] ?? encabezado.idRuta,
+        observaciones: observaciones.trim() || null,
+        estatus: "T",
+      });
+      const actualizada = await bitacoraCobranzaService.actualizarBitacora(
+        idBitacora,
+        payload,
+      );
+      setEstatusBitacora(actualizada.estatus ?? "T");
+      setFechaCreacionBitacora(actualizada.fechaCreacion);
+      setMensaje(
+        `Bitácora ${etiquetaFolioBitacora(actualizada.folio, idBitacora)} terminada. Ya puede generar el PDF.`,
+      );
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error ? err.message : "No se pudo terminar la bitácora.",
+      );
+    } finally {
+      setTerminando(false);
+    }
+  };
+
+  const toggleRutaSeleccionada = (idRuta: number) => {
+    setRutasSeleccionadas((prev) => {
+      const next = new Set(prev);
+      if (next.has(idRuta)) {
+        next.delete(idRuta);
+      } else {
+        next.add(idRuta);
+      }
+      return next;
+    });
+    setIdBitacora(null);
+    setDocumentos([]);
+    setDocumentosSeleccionados(new Set());
+    setDetalleGuardado(false);
+  };
+
+  const toggleTodasRutas = () => {
+    if (todasRutasSeleccionadas) {
+      setRutasSeleccionadas(new Set());
+    } else {
+      setRutasSeleccionadas(new Set(rutasFiltradas.map((r) => r.idRuta)));
+    }
+    setIdBitacora(null);
+    setDocumentos([]);
+    setDocumentosSeleccionados(new Set());
+    setDetalleGuardado(false);
   };
 
   const toggleSeleccionTodos = () => {
@@ -480,8 +795,10 @@ export default function BitacoraCobranza() {
   const handleNuevaBitacora = () => {
     setIdBitacora(null);
     setFolioBitacora(null);
+    setEstatusBitacora("B");
+    setFechaCreacionBitacora(null);
     setIdVendedor("");
-    setIdRuta("");
+    setRutasSeleccionadas(new Set());
     setModoPeriodo("semanal");
     setDiaVisita(DIAS_VISITA[0].value);
     setSociedad("");
@@ -492,6 +809,9 @@ export default function BitacoraCobranza() {
     setDocumentosSeleccionados(new Set());
     setTotalRegistros(0);
     setDetalleGuardado(false);
+    setCobroValidado(false);
+    setValidandoCobro(false);
+    setResumenValidacionCobro(null);
     setError(null);
     setMensaje(null);
     navigate("/operaciones/BitacoraCobranza", { replace: true });
@@ -509,12 +829,183 @@ export default function BitacoraCobranza() {
     });
   };
 
+  const abrirModalAgregarCliente = () => {
+    setBusquedaCliente("");
+    setResultadosClientes([]);
+    setTotalClientesBusqueda(0);
+    setClienteActivo(null);
+    setClienteSeleccionadoBusqueda(null);
+    setEtapaModalAgregar(1);
+    setDocumentosCliente([]);
+    setDocumentosClienteSeleccionados(new Set());
+    setErrorBusquedaClientes(null);
+    setModalAgregarClienteAbierto(true);
+  };
+
+  const cerrarModalAgregarCliente = () => {
+    setModalAgregarClienteAbierto(false);
+    setBusquedaCliente("");
+    setResultadosClientes([]);
+    setTotalClientesBusqueda(0);
+    setClienteActivo(null);
+    setClienteSeleccionadoBusqueda(null);
+    setEtapaModalAgregar(1);
+    setDocumentosCliente([]);
+    setDocumentosClienteSeleccionados(new Set());
+    setErrorBusquedaClientes(null);
+  };
+
+  const volverABusquedaClientes = () => {
+    setClienteActivo(null);
+    setEtapaModalAgregar(1);
+    setDocumentosCliente([]);
+    setDocumentosClienteSeleccionados(new Set());
+    setErrorBusquedaClientes(null);
+  };
+
+  const preseleccionarClienteBusqueda = (cliente: ClienteBitacoraBusqueda) => {
+    setClienteSeleccionadoBusqueda(cliente);
+    setErrorBusquedaClientes(null);
+  };
+
+  const continuarConClienteSeleccionado = () => {
+    if (!clienteSeleccionadoBusqueda) {
+      setErrorBusquedaClientes("Seleccione un cliente de la lista.");
+      return;
+    }
+    void seleccionarClienteParaDocumentos(clienteSeleccionadoBusqueda);
+  };
+
+  const seleccionarClienteParaDocumentos = async (
+    cliente: ClienteBitacoraBusqueda,
+  ) => {
+    if (!cliente.cardCode.trim()) {
+      setErrorBusquedaClientes("El cliente no tiene código válido.");
+      return;
+    }
+
+    setCargandoDocumentosCliente(true);
+    setErrorBusquedaClientes(null);
+    setClienteActivo(cliente);
+    setClienteSeleccionadoBusqueda(cliente);
+    setEtapaModalAgregar(2);
+    setDocumentosCliente([]);
+    setDocumentosClienteSeleccionados(new Set());
+
+    try {
+      const resultado = await bitacoraCobranzaService.buscarClientes({
+        texto: busquedaCliente.trim() || cliente.cardCode,
+        cardCode: cliente.cardCode,
+        sociedad: cliente.sociedad ?? undefined,
+        slpName: slpName || undefined,
+        incluirDocumentos: true,
+      });
+
+      const clienteConDocs =
+        resultado.clientes.find(
+          (item) =>
+            item.cardCode === cliente.cardCode &&
+            (item.sociedad ?? "") === (cliente.sociedad ?? ""),
+        ) ?? resultado.clientes[0];
+
+      const docs = clienteConDocs?.detalleDocumentos ?? [];
+      setClienteActivo(clienteConDocs ?? cliente);
+      setDocumentosCliente(docs);
+
+      if (!docs.length) {
+        setErrorBusquedaClientes(
+          "El cliente no tiene documentos de cartera para agregar.",
+        );
+      }
+    } catch (err) {
+      console.error(err);
+      setClienteActivo(null);
+      setEtapaModalAgregar(1);
+      setErrorBusquedaClientes(
+        err instanceof Error
+          ? err.message
+          : "No se pudieron cargar los documentos del cliente.",
+      );
+    } finally {
+      setCargandoDocumentosCliente(false);
+    }
+  };
+
+  const toggleDocumentoCliente = (doc: DocumentoCobranzaGenerar) => {
+    const key = documentoCobranzaUnicoKey(doc);
+    if (documentosYaEnBitacora.has(key)) return;
+    setDocumentosClienteSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const toggleSeleccionTodosDocumentosCliente = () => {
+    const agregables = documentosCliente.filter(
+      (doc) => !documentosYaEnBitacora.has(documentoCobranzaUnicoKey(doc)),
+    );
+    if (!agregables.length) return;
+
+    const todosAgregablesSeleccionados = agregables.every((doc) =>
+      documentosClienteSeleccionados.has(documentoCobranzaUnicoKey(doc)),
+    );
+
+    if (todosAgregablesSeleccionados) {
+      setDocumentosClienteSeleccionados(new Set());
+      return;
+    }
+    setDocumentosClienteSeleccionados(
+      new Set(agregables.map((doc) => documentoCobranzaUnicoKey(doc))),
+    );
+  };
+
+  const handleConfirmarAgregarDocumentos = () => {
+    const seleccionados = documentosCliente.filter((doc) =>
+      documentosClienteSeleccionados.has(documentoCobranzaUnicoKey(doc)),
+    );
+    if (!seleccionados.length) {
+      setErrorBusquedaClientes("Seleccione al menos un documento.");
+      return;
+    }
+
+    const existentes = new Set(documentos.map(documentoCobranzaUnicoKey));
+    const nuevos = seleccionados.filter(
+      (doc) => !existentes.has(documentoCobranzaUnicoKey(doc)),
+    );
+    const duplicados = seleccionados.length - nuevos.length;
+
+    if (!nuevos.length) {
+      setErrorBusquedaClientes(
+        "Los documentos seleccionados ya están en la bitácora.",
+      );
+      return;
+    }
+
+    setDocumentos((prev) => [...prev, ...nuevos]);
+    setDetalleGuardado(false);
+    setMensaje(
+      `Se agregaron ${nuevos.length} documento(s) de ${clienteActivo?.cardName ?? "el cliente"}.${duplicados > 0 ? ` ${duplicados} ya existían y se omitieron.` : ""} Guarde el detalle para persistir.`,
+    );
+    cerrarModalAgregarCliente();
+  };
+
   const handleGenerarPdf = () => {
     const docsPdf = documentosParaGuardar.length
       ? documentosParaGuardar
       : documentos;
     if (!idBitacora || !docsPdf.length) {
-      setError("No hay detalle guardado para generar el PDF.");
+      setError("No hay detalle para generar el PDF.");
+      return;
+    }
+    if (!bitacoraTerminada) {
+      setError(
+        "La bitácora debe estar terminada para generar el PDF. Use el botón Terminar.",
+      );
       return;
     }
 
@@ -527,7 +1018,10 @@ export default function BitacoraCobranza() {
     }
 
     const total = docsPdf.reduce((sum, doc) => sum + doc.saldoDocumento, 0);
-    const totalCobrado = docsPdf.reduce((sum, doc) => sum + montoCobrado(doc), 0);
+    const totalCobrado = docsPdf.reduce(
+      (sum, doc) => sum + montoCobrado(doc),
+      0,
+    );
     const fecha = new Date().toLocaleDateString("es-MX");
     const hora = new Date().toLocaleTimeString("es-MX", {
       hour: "2-digit",
@@ -746,7 +1240,7 @@ export default function BitacoraCobranza() {
           <div class="summary">
             <div class="box"><span class="label">Vendedor</span>${escapeHtml(vendedorSeleccionado?.nombre ?? "")}</div>
             <div class="box"><span class="label">Código SAP</span>${escapeHtml(slpName)}</div>
-            <div class="box"><span class="label">Ruta</span>${escapeHtml(codigoRuta)}</div>
+            <div class="box"><span class="label">Ruta(s)</span>${escapeHtml(etiquetaRutas)}</div>
             <div class="box"><span class="label">Periodo</span>${escapeHtml(modoPeriodo === "semanal" ? "Semanal" : `Día ${diaVisita}`)}</div>
           </div>
 
@@ -853,6 +1347,20 @@ export default function BitacoraCobranza() {
       )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-4 border-b border-gray-200 pb-4 dark:border-gray-700">
+          <label className={labelClass}>Estatus Bitacora</label>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className={claseBadgeEstatusBitacora(estatusBitacora)}>
+              {etiquetaEstatusBitacora(estatusBitacora)}
+            </span>
+            {/* Se comenta creo no es necesario poner la Letra del estatus ya que el badge ya lo indica y se busca no saturar la interfaz
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              ({normalizarEstatusBitacora(estatusBitacora) ?? "B"})
+            </span>
+             */}
+          </div>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={labelClass}>Vendedor</label>
@@ -861,9 +1369,11 @@ export default function BitacoraCobranza() {
               value={idVendedor}
               onChange={(e) => {
                 setIdVendedor(e.target.value ? Number(e.target.value) : "");
-                setIdRuta("");
+                setRutasSeleccionadas(new Set());
                 setIdBitacora(null);
                 setFolioBitacora(null);
+                setEstatusBitacora("B");
+                setFechaCreacionBitacora(null);
                 setDocumentos([]);
                 setDocumentosSeleccionados(new Set());
                 setDetalleGuardado(false);
@@ -878,39 +1388,75 @@ export default function BitacoraCobranza() {
                 </option>
               ))}
             </select>
+            <label className={`${labelClass} mt-3`}>Fecha</label>
+            <div
+              className={`${inputClass} bg-gray-50 text-gray-700 dark:bg-gray-900/40 dark:text-gray-200`}
+            >
+              {formatearFechaCreacion(fechaCreacionBitacora)}
+            </div>
           </div>
 
           <div>
-            <label className={labelClass}>Ruta</label>
-            <select
-              className={inputClass}
-              value={idRuta}
-              onChange={(e) => {
-                setIdRuta(e.target.value ? Number(e.target.value) : "");
-                setIdBitacora(null);
-                setDocumentos([]);
-                setDocumentosSeleccionados(new Set());
-                setDetalleGuardado(false);
-              }}
-              disabled={loadingCatalogos || detalleGuardado || !idVendedor}
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <label className={labelClass}>Rutas (opcional)</label>
+              {idVendedor && rutasFiltradas.length > 0 && (
+                <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={todasRutasSeleccionadas}
+                    onChange={toggleTodasRutas}
+                    disabled={loadingCatalogos || detalleGuardado}
+                    className="h-3.5 w-3.5 rounded border-gray-300"
+                  />
+                  Todas
+                </label>
+              )}
+            </div>
+            <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+              Sin selección = toda la cartera del vendedor.
+            </p>
+            <div
+              className={`${inputClass} max-h-44 space-y-2 overflow-y-auto bg-white p-2 dark:bg-gray-700`}
             >
-              <option value="">Seleccione ruta</option>
               {!idVendedor && (
-                <option value="" disabled>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
                   Seleccione vendedor primero
-                </option>
+                </p>
               )}
               {idVendedor && rutasFiltradas.length === 0 && (
-                <option value="" disabled>
-                  Sin rutas para este vendedor
-                </option>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Sin rutas registradas; se usará toda la cartera.
+                </p>
               )}
               {rutasFiltradas.map((r) => (
-                <option key={r.idRuta} value={r.idRuta}>
-                  {r.codigo}
-                </option>
+                <label
+                  key={r.idRuta}
+                  className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-0.5 hover:bg-gray-50 dark:hover:bg-gray-600/40"
+                >
+                  <input
+                    type="checkbox"
+                    checked={rutasSeleccionadas.has(r.idRuta)}
+                    onChange={() => toggleRutaSeleccionada(r.idRuta)}
+                    disabled={loadingCatalogos || detalleGuardado}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300"
+                  />
+                  <span className="text-sm leading-snug">
+                    <span className="font-medium">{r.codigo}</span>
+                    {r.nombre ? (
+                      <span className="text-gray-500 dark:text-gray-300">
+                        {" "}
+                        — {r.nombre}
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
               ))}
-            </select>
+            </div>
+            {codigosRutaSeleccionados.length > 0 && (
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Seleccionadas: {etiquetaRutas}
+              </p>
+            )}
           </div>
           {/* Se Comenta Sociedad ya que la vista considera ambas sociedades y no es necesario filtrar
 
@@ -997,13 +1543,48 @@ export default function BitacoraCobranza() {
           </button>
           <button
             type="button"
+            onClick={() => void handleTerminarBitacora()}
+            disabled={!puedeTerminar}
+            title={
+              !detalleGuardado
+                ? "Guarde el detalle primero"
+                : bitacoraTerminada
+                  ? "La bitácora ya está terminada"
+                  : "Finalizar bitácora y cambiar estatus a Terminado"
+            }
+            className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+          >
+            {terminando ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            Terminar
+          </button>
+          <button
+            type="button"
             onClick={handleGenerarPdf}
-            disabled={!detalleGuardado || !idBitacora}
+            disabled={!puedeGenerarPdf}
+            title={
+              !bitacoraTerminada
+                ? "Termine la bitácora para habilitar el PDF"
+                : "Generar PDF"
+            }
             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
           >
             <FileText className="h-4 w-4" />
             Generar PDF
           </button>
+          {puedeAgregarCliente && (
+            <button
+              type="button"
+              onClick={abrirModalAgregarCliente}
+              className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+            >
+              <UserPlus className="h-4 w-4" />
+              Agregar Cliente
+            </button>
+          )}
           {idBitacora && (
             <button
               type="button"
@@ -1106,6 +1687,65 @@ export default function BitacoraCobranza() {
           </p>
         ) : (
           <div className="overflow-x-auto">
+            {(validandoCobro || cobroValidado) && (
+              <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+                {validandoCobro ? (
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Validando cobro contra Prizma / vista global...
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 dark:text-gray-300">
+                      <span className="font-medium text-gray-700 dark:text-gray-200">
+                        Estatus de cobro:
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-3 w-6 rounded border border-blue-200 bg-blue-100 dark:border-blue-800 dark:bg-blue-900/35" />
+                        Pago Prizma
+                        {resumenValidacionCobro
+                          ? ` (${resumenValidacionCobro.pagoPrizma})`
+                          : ""}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-3 w-6 rounded border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800" />
+                        Sin pago
+                        {resumenValidacionCobro
+                          ? ` (${resumenValidacionCobro.sinPago})`
+                          : ""}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-3 w-6 rounded border border-amber-200 bg-amber-100 dark:border-amber-800 dark:bg-amber-900/35" />
+                        Pago parcial
+                        {resumenValidacionCobro
+                          ? ` (${resumenValidacionCobro.pagoParcial})`
+                          : ""}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-3 w-6 rounded border border-emerald-200 bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/35" />
+                        Pagado
+                        {resumenValidacionCobro
+                          ? ` (${resumenValidacionCobro.pagados})`
+                          : ""}
+                      </span>
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Orden: azul → blanco → amarillo → verde
+                      </span>
+                    </div>
+                    {resumenValidacionCobro && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Sincronizados {resumenValidacionCobro.actualizados} de{" "}
+                        {resumenValidacionCobro.totalDetalles} · Pendientes{" "}
+                        {resumenValidacionCobro.pendientes}
+                        {resumenValidacionCobro.fechaSincronizacion
+                          ? ` · ${formatearFechaCreacion(resumenValidacionCobro.fechaSincronizacion)}`
+                          : ""}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <table className="min-w-full table-auto divide-y divide-gray-200 text-xs dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900/50">
                 <tr>
@@ -1141,6 +1781,11 @@ export default function BitacoraCobranza() {
                   <th className="w-32 px-2 py-2 text-left font-medium text-gray-600 dark:text-gray-300">
                     Estatus de Entrega
                   </th>
+                  {cobroValidado && (
+                    <th className="w-28 px-2 py-2 text-left font-medium text-gray-600 dark:text-gray-300">
+                      Cobro
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -1148,12 +1793,16 @@ export default function BitacoraCobranza() {
                   const key = documentoKey(doc, originalIndex);
                   const seleccionado = documentosSeleccionados.has(key);
                   const estatus = estatusCartera(doc);
+                  const filaCobro =
+                    cobroValidado && seleccionado
+                      ? claseFilaEstatusCobro(doc.estatusCobro)
+                      : "";
                   return (
                     <tr
                       key={key}
                       className={
                         seleccionado
-                          ? ""
+                          ? filaCobro
                           : "bg-gray-50 text-gray-400 dark:bg-gray-900/30"
                       }
                     >
@@ -1215,6 +1864,13 @@ export default function BitacoraCobranza() {
                           {estatusLabel(doc.estatus)}
                         </span>
                       </td>
+                      {cobroValidado && (
+                        <td className="whitespace-nowrap px-2 py-2">
+                          <span className="text-[11px] font-medium text-gray-800 dark:text-gray-100">
+                            {etiquetaEstatusCobro(doc.estatusCobro)}
+                          </span>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -1223,6 +1879,457 @@ export default function BitacoraCobranza() {
           </div>
         )}
       </div>
+
+      {modalAgregarClienteAbierto && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-agregar-cliente-titulo"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) cerrarModalAgregarCliente();
+          }}
+        >
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-lg border border-gray-200 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800">
+            <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3
+                    id="modal-agregar-cliente-titulo"
+                    className="text-lg font-semibold text-gray-900 dark:text-white"
+                  >
+                    Agregar cliente a la bitácora
+                  </h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Seleccione el cliente y valide el folio/documento antes de
+                    agregarlo al detalle.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={cerrarModalAgregarCliente}
+                  className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-center gap-2 text-sm">
+                <div
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-medium ${
+                    etapaModalAgregar === 1
+                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                      : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                  }`}
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-xs font-bold dark:bg-gray-900/50">
+                    1
+                  </span>
+                  Buscar y seleccionar cliente
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-400" />
+                <div
+                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-medium ${
+                    etapaModalAgregar === 2
+                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                      : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                  }`}
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-xs font-bold dark:bg-gray-900/50">
+                    2
+                  </span>
+                  Elegir documentos / folios
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto px-5 py-4">
+              {etapaModalAgregar === 1 ? (
+                <>
+                  <div>
+                    <label className={labelClass}>Paso 1 · Buscar cliente</label>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="search"
+                        autoFocus
+                        value={busquedaCliente}
+                        onChange={(e) => {
+                          setBusquedaCliente(e.target.value);
+                          setClienteSeleccionadoBusqueda(null);
+                        }}
+                        placeholder="Código, nombre o RFC (mín. 2 caracteres)"
+                        className={`${inputClass} pl-9`}
+                      />
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Seleccione un cliente y pulse &quot;Ver documentos&quot;
+                      para continuar al paso 2.
+                    </p>
+                  </div>
+
+                  <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900/40">
+                      <span className="font-medium text-gray-700 dark:text-gray-200">
+                        Clientes encontrados
+                        {totalClientesBusqueda > 0
+                          ? ` (${totalClientesBusqueda})`
+                          : resultadosClientes.length > 0
+                            ? ` (${resultadosClientes.length})`
+                            : ""}
+                      </span>
+                    </div>
+
+                    <div className="max-h-72 overflow-y-auto">
+                      {buscandoClientes ? (
+                        <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-500">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Buscando...
+                        </div>
+                      ) : busquedaCliente.trim().length < 2 ? (
+                        <p className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                          Escriba al menos 2 caracteres para buscar.
+                        </p>
+                      ) : resultadosClientes.length === 0 ? (
+                        <p className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                          No se encontraron clientes.
+                        </p>
+                      ) : (
+                        <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+                          {resultadosClientes.map((cliente) => {
+                            const key = clienteBitacoraBusquedaKey(cliente);
+                            const seleccionado =
+                              clienteSeleccionadoBusqueda != null &&
+                              clienteBitacoraBusquedaKey(
+                                clienteSeleccionadoBusqueda,
+                              ) === key;
+                            return (
+                              <li key={key}>
+                                <div
+                                  className={`flex items-start gap-3 px-4 py-3 ${
+                                    seleccionado
+                                      ? "bg-amber-50 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:ring-amber-800"
+                                      : "hover:bg-gray-50 dark:hover:bg-gray-700/40"
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="cliente-busqueda"
+                                    checked={seleccionado}
+                                    onChange={() =>
+                                      preseleccionarClienteBusqueda(cliente)
+                                    }
+                                    className="mt-1 h-4 w-4 border-gray-300 text-amber-600"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      preseleccionarClienteBusqueda(cliente)
+                                    }
+                                    className="min-w-0 flex-1 text-left"
+                                  >
+                                    <span className="block font-medium text-gray-900 dark:text-white">
+                                      {cliente.cardName || "—"}
+                                    </span>
+                                    <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                                      Código: {cliente.cardCode}
+                                      {cliente.sociedad
+                                        ? ` · ${cliente.sociedad}`
+                                        : ""}
+                                      {cliente.documentos > 0
+                                        ? ` · ${cliente.documentos} doc(s)`
+                                        : ""}
+                                    </span>
+                                    <span className="mt-1 block text-xs text-gray-600 dark:text-gray-300">
+                                      Saldo:{" "}
+                                      {formatCurrency(cliente.saldoTotal)}
+                                      {cliente.carteraVencida > 0
+                                        ? ` · Vencida: ${formatCurrency(cliente.carteraVencida)}`
+                                        : ""}
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void seleccionarClienteParaDocumentos(
+                                        cliente,
+                                      )
+                                    }
+                                    disabled={cargandoDocumentosCliente}
+                                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                                  >
+                                    Ver docs
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+
+                  {clienteSeleccionadoBusqueda && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-100">
+                      Cliente seleccionado:{" "}
+                      <strong>{clienteSeleccionadoBusqueda.cardName}</strong> (
+                      {clienteSeleccionadoBusqueda.cardCode})
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/20">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                      Paso 2 · Cliente seleccionado
+                    </div>
+                    <div className="mt-1 font-medium text-gray-900 dark:text-white">
+                      {clienteActivo?.cardName || "—"}
+                    </div>
+                    <div className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                      {clienteActivo?.cardCode}
+                      {clienteActivo?.sociedad
+                        ? ` · ${clienteActivo.sociedad}`
+                        : ""}
+                      {clienteActivo
+                        ? ` · Saldo ${formatCurrency(clienteActivo.saldoTotal)}`
+                        : ""}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <label className={labelClass}>
+                        Documentos del cliente — valide folio SAP y referencia
+                      </label>
+                      {documentosCliente.length > 0 && (
+                        <label className="inline-flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                          <input
+                            type="checkbox"
+                            checked={todosDocumentosClienteSeleccionados}
+                            onChange={toggleSeleccionTodosDocumentosCliente}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          Seleccionar todos disponibles
+                        </label>
+                      )}
+                    </div>
+
+                    <div className="max-h-[26rem] space-y-3 overflow-y-auto pr-1">
+                      {cargandoDocumentosCliente ? (
+                        <div className="flex items-center justify-center gap-2 py-12 text-sm text-gray-500">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Cargando documentos del cliente...
+                        </div>
+                      ) : documentosCliente.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
+                          No hay documentos disponibles para este cliente.
+                        </p>
+                      ) : (
+                        documentosCliente.map((doc) => {
+                          const key = documentoCobranzaUnicoKey(doc);
+                          const yaEnBitacora = documentosYaEnBitacora.has(key);
+                          const seleccionado =
+                            documentosClienteSeleccionados.has(key);
+                          const estatus = estatusCartera(doc);
+
+                          return (
+                            <label
+                              key={key}
+                              className={`block cursor-pointer rounded-xl border p-4 transition-colors ${
+                                yaEnBitacora
+                                  ? "cursor-not-allowed border-gray-200 bg-gray-50 opacity-70 dark:border-gray-700 dark:bg-gray-900/30"
+                                  : seleccionado
+                                    ? "border-amber-400 bg-amber-50 ring-1 ring-amber-300 dark:border-amber-600 dark:bg-amber-900/20 dark:ring-amber-700"
+                                    : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-600"
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={seleccionado}
+                                  disabled={yaEnBitacora}
+                                  onChange={() => toggleDocumentoCliente(doc)}
+                                  className="mt-1 h-4 w-4 rounded border-gray-300"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div>
+                                      <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                        Folio SAP (DocNum)
+                                      </div>
+                                      <div className="text-xl font-bold text-gray-900 dark:text-white">
+                                        {doc.docNum}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                                        Saldo documento
+                                      </div>
+                                      <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                                        {formatCurrency(doc.saldoDocumento)}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/40">
+                                      <div className="text-[10px] font-semibold uppercase text-gray-500">
+                                        Referencia / Folio cliente
+                                      </div>
+                                      <div className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white">
+                                        {etiquetaReferenciaDocumento(doc)}
+                                      </div>
+                                    </div>
+                                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/40">
+                                      <div className="text-[10px] font-semibold uppercase text-gray-500">
+                                        Sociedad
+                                      </div>
+                                      <div className="mt-0.5 text-sm font-medium text-gray-900 dark:text-white">
+                                        {etiquetaSociedad(doc.sociedad)}
+                                      </div>
+                                    </div>
+                                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/40">
+                                      <div className="text-[10px] font-semibold uppercase text-gray-500">
+                                        Cliente
+                                      </div>
+                                      <div className="mt-0.5 truncate text-sm font-medium text-gray-900 dark:text-white">
+                                        {doc.cardCode}
+                                      </div>
+                                    </div>
+                                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/40">
+                                      <div className="text-[10px] font-semibold uppercase text-gray-500">
+                                        Emisión
+                                      </div>
+                                      <div className="mt-0.5 text-sm text-gray-900 dark:text-white">
+                                        {formatearFecha(doc.docDate)}
+                                      </div>
+                                    </div>
+                                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/40">
+                                      <div className="text-[10px] font-semibold uppercase text-gray-500">
+                                        Vencimiento
+                                      </div>
+                                      <div className="mt-0.5 text-sm text-gray-900 dark:text-white">
+                                        {formatearFecha(doc.docDueDate)}
+                                      </div>
+                                    </div>
+                                    <div className="rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900/40">
+                                      <div className="text-[10px] font-semibold uppercase text-gray-500">
+                                        Días vencido
+                                      </div>
+                                      <div className="mt-0.5 text-sm text-gray-900 dark:text-white">
+                                        {doc.diasVencido}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${estatusCarteraClass(estatus)}`}
+                                    >
+                                      Cartera: {estatus}
+                                    </span>
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${estatusClass(doc.estatus)}`}
+                                    >
+                                      Entrega: {estatusLabel(doc.estatus)}
+                                    </span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      Total: {formatCurrency(doc.docTotal)} ·
+                                      Cobrado: {formatCurrency(montoCobrado(doc))}
+                                    </span>
+                                    {doc.u_BXP_RUTA ? (
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        Ruta: {doc.u_BXP_RUTA}
+                                      </span>
+                                    ) : null}
+                                    {yaEnBitacora ? (
+                                      <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                                        Ya en la bitácora
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {errorBusquedaClientes && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
+                  {errorBusquedaClientes}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 px-5 py-4 dark:border-gray-700">
+              {etapaModalAgregar === 2 ? (
+                <button
+                  type="button"
+                  onClick={volverABusquedaClientes}
+                  disabled={cargandoDocumentosCliente}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Volver al paso 1
+                </button>
+              ) : (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {clienteSeleccionadoBusqueda
+                    ? "Puede continuar para ver los documentos del cliente."
+                    : "Seleccione un cliente de la lista."}
+                </span>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={cerrarModalAgregarCliente}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  Cancelar
+                </button>
+                {etapaModalAgregar === 1 ? (
+                  <button
+                    type="button"
+                    onClick={continuarConClienteSeleccionado}
+                    disabled={
+                      !clienteSeleccionadoBusqueda || cargandoDocumentosCliente
+                    }
+                    className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    {cargandoDocumentosCliente ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    Ver documentos
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleConfirmarAgregarDocumentos}
+                    disabled={
+                      cargandoDocumentosCliente ||
+                      documentosClienteSeleccionados.size === 0
+                    }
+                    className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Agregar al detalle ({documentosClienteSeleccionados.size})
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
