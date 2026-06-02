@@ -1,10 +1,12 @@
 import { createContext, useEffect, useState } from "react";
 import {
   checkAuthService,
+  isSessionAuthenticated,
   logout as logoutService,
   getMenuByRol,
   Modulo,
 } from "../services/authService";
+import { clearTokenFallback } from "../utils/tokenFallback";
 
 interface User {
   role: number;
@@ -43,10 +45,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const checkAuth = async () => {
     try {
       const res = await checkAuthService();
-      if (res?.isAuthenticated) {
-        setUser(res.user);
+      if (isSessionAuthenticated(res)) {
+        setUser(res.user!);
         setMenuLoading(true);
-        const menuData = await getMenuByRol(res.user.role);
+        const menuData = await getMenuByRol(res.user!.role);
         if (menuData && menuData.modulos) {
           setMenu(menuData.modulos);
         } else {
@@ -83,10 +85,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const logout = async () => {
-    await logoutService();
-    setUser(null);
-    setMenu([]);
-    setMenuLoading(false);
+    try {
+      await logoutService();
+    } finally {
+      clearTokenFallback();
+      setUser(null);
+      setMenu([]);
+      setMenuLoading(false);
+    }
   };
 
   return (

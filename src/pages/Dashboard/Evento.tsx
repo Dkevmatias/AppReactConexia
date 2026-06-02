@@ -57,8 +57,6 @@ export default function Evento() {
           .filter(Boolean) // limpia null/undefined
           .join(",");
 
-        console.log("CardCodes para API:", cardCodes);
-
         const periodo = await getPeriodoEvaluar();
 
         const inicio = new Date(periodo.fechaInicio);

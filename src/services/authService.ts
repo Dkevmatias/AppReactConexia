@@ -1,5 +1,9 @@
 import { api } from "./apiServices";
-import { saveTokenFallback } from "../utils/tokenFallback";
+import {
+  applyMobileAuthHeaders,
+  persistTokensFromAuthResponse,
+} from "../utils/tokenFallback";
+
 export interface User {
   idPersona: number;
   role: number;
@@ -14,7 +18,21 @@ export interface LoginResponse {
   user: User;
   requireCaptcha?: boolean;
   accessToken?: string;
+  refreshToken?: string;
 }
+
+export interface CheckAuthResponse {
+  authenticated?: boolean;
+  isAuthenticated?: boolean;
+  user?: User;
+}
+
+export const isSessionAuthenticated = (
+  res: CheckAuthResponse | null | undefined,
+): boolean => {
+  if (!res?.user) return false;
+  return res.authenticated === true || res.isAuthenticated === true;
+};
 
 // LOGIN
 export const loginService = async (
@@ -22,31 +40,46 @@ export const loginService = async (
   password: string,
   recaptchaToken?: string | null,
 ): Promise<LoginResponse> => {
+  const headers: Record<string, string> = {};
+  applyMobileAuthHeaders({ headers });
+
   const res = await api.post<LoginResponse>(
     "/api/Acceso/Login",
     { email, password, recaptchaToken },
-    { withCredentials: true, validateStatus: (status) => status < 500 },
+    {
+      withCredentials: true,
+      headers,
+      validateStatus: (status) => status < 500,
+    },
   );
 
-  if (res.data.isSuccess && res.data.accessToken) {
-    saveTokenFallback(res.data.accessToken);
+  if (res.status >= 200 && res.status < 300 && res.data.isSuccess) {
+    persistTokensFromAuthResponse(res.data);
   }
 
   return res.data;
 };
 
-// CHECK AUTH (lee cookie HttpOnly)
-export const checkAuthService = async () => {
-  const res = await api.get("/api/Acceso/CheckAuth", {
+// CHECK AUTH (lee cookie HttpOnly o Bearer en móvil)
+export const checkAuthService = async (): Promise<CheckAuthResponse> => {
+  const res = await api.get<CheckAuthResponse>("/api/Acceso/checkauth", {
     validateStatus: (status) => status === 200 || status === 401,
   });
-  return res.data;
+  return res.data ?? {};
 };
 
 // LOGOUT
 export const logout = async () => {
-  await api.post("/api/Acceso/Logout", {}, { withCredentials: true });
+  await api.post(
+    "/api/Acceso/logout",
+    {},
+    {
+      withCredentials: true,
+      validateStatus: (status) => status < 500,
+    },
+  );
 };
+
 export const getPeriodoEvaluar = async () => {
   const response = await api.get(`/api/PeriodoBoletos/GetPeriodoEvaluar`);
   return response.data;
@@ -190,14 +223,11 @@ export const getCarteraCliente = async (cardCodes: string[]) => {
   return response.data;
 };
 
-//Acumulado de Ventas por mes
 export const getPeriodosActivos = async () => {
   const response = await api.get(`/api/PeriodoBoletos/GetPeriodosActivos`);
-  //console.log("datos",response.data)
   return response.data;
 };
 
-//Validamos si el cliente tiene deudas
 export const getSaldoClientes = async (clientes: string) => {
   const response = await api.get(`/api/Personas/GetSaldosClientes`, {
     params: {
@@ -224,7 +254,6 @@ export const getVentasCLientes = async (
   fechaFin: string,
   clientes: string,
 ) => {
-  // Llamada a la API para obtener ventas de clientes
   const response = await api.get(`/api/Clientes/GetVentasClientesNetas`, {
     params: {
       fechaInicio,
@@ -313,6 +342,7 @@ export const getMenuByRol = async (
         withCredentials: true,
       },
     );
+    if (response.status < 200 || response.status >= 300) return null;
     return response.data;
   } catch (error) {
     console.error("Error fetching menu:", error);
