@@ -1,39 +1,27 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../services/apiServices";
-import { useAuth } from "../context/useAuth";
+import { estaEnRangoCanje } from "../utils/date";
 
-const MES_REDENSION = 5; // Mayo
+export type PeriodoBoletosActivo = {
+  idPeriodo: number;
+  fechaInicio: string;
+  fechaFin: string;
+  activo: boolean;
+};
 
 export function usePeriodoActivo() {
-  const [periodo, setPeriodo] = useState<{
-    idPeriodo: number;
-    fechaInicio: string;
-    fechaFin: string;
-    activo: boolean;
-  } | null>(null);
-
+  const [periodo, setPeriodo] = useState<PeriodoBoletosActivo | null>(null);
   const [periodoActivo, setPeriodoActivo] = useState(false);
   const [tieneBoletos, setTieneBoletos] = useState(false);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
-
-  const esMesRedencion = useMemo(() => {
-    if (!periodo?.fechaInicio) return false;
-    const mes = new Date(periodo.fechaInicio).getMonth() + 1;
-    return mes === MES_REDENSION;
-  }, [periodo?.fechaInicio]);
 
   useEffect(() => {
-    if (!user?.cardCode) {
-      setLoading(false);
-      return;
-    }
     const fetchPeriodo = async () => {
       try {
         const response = await api.get("/api/PeriodoBoletos/GetPeriodoActivo");
-        const periodoData = response.data ?? null;
+        const periodoData = (response.data ?? null) as PeriodoBoletosActivo | null;
 
-        if (!periodoData) {
+        if (!periodoData?.fechaInicio || !periodoData?.fechaFin) {
           setPeriodo(null);
           setPeriodoActivo(false);
           setTieneBoletos(false);
@@ -41,9 +29,11 @@ export function usePeriodoActivo() {
         }
 
         setPeriodo(periodoData);
-        const mesPeriodo = new Date(periodoData.fechaInicio).getMonth() + 1;
-        setPeriodoActivo(periodoData.activo === true && mesPeriodo === MES_REDENSION);
-
+        const enRango = estaEnRangoCanje(
+          periodoData.fechaInicio,
+          periodoData.fechaFin,
+        );
+        setPeriodoActivo(periodoData.activo === true && enRango);
       } catch (error) {
         console.error("Error verificando periodo activo:", error);
         setPeriodo(null);
@@ -54,8 +44,8 @@ export function usePeriodoActivo() {
       }
     };
 
-    fetchPeriodo();
+    void fetchPeriodo();
   }, []);
 
-  return { periodoActivo, periodo, tieneBoletos, loading, esMesRedencion };
+  return { periodoActivo, periodo, tieneBoletos, loading };
 }

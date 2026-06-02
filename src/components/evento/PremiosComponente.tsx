@@ -198,12 +198,14 @@ export default function PremiosCarousel({
         />
       )}
 
-      <PeriodoCountdown />
+      <PeriodoCountdown fechaInicio={periodo?.fechaInicio} />
 
       <PeriodoAlert
         periodoActivo={periodoActivo}
         saldoVencido={vencido}
         mesescomprasanteriores={mesescomprasanteriores}
+        fechaInicioCanje={periodo?.fechaInicio}
+        fechaFinCanje={periodo?.fechaFin}
       />
       {/* Header */}
       <div className="mb-6 text-center">

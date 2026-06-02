@@ -75,9 +75,9 @@ export default function PeriodoCount({ fechaInicio }: { fechaInicio?: string }) 
   );
 
   const esFechaFija = !fechaInicio;
-  const mensajeFecha = esFechaFija 
+  const mensajeFecha = esFechaFija
     ? `El canje de premios estará disponible a partir de Mayo ${AÑO_REDENSION}`
-    : `El canje de premios estará disponible a partir del ${new Date(fechaInicio).toLocaleDateString('es-MX', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+    : `El canje de premios estará disponible a partir del ${new Date(fechaInicio).toLocaleDateString("es-MX", { month: "long", day: "numeric", year: "numeric" })}`;
 
   return (
     <div className="bg-gradient-to-r from-blue-500 to-blue-700 text-white p-6 rounded-2xl mb-6 shadow-lg">
