@@ -31,6 +31,7 @@ import {
   detalleToDocumentoGenerar,
   DIAS_VISITA,
   DocumentoCobranzaGenerar,
+  etiquetaDiasVisita,
   etiquetaEstatusBitacora,
   etiquetaEstatusCobro,
   mergeEstatusCobroEnDocumentos,
@@ -164,7 +165,9 @@ export default function BitacoraCobranza() {
   );
   const [modoPeriodo, setModoPeriodo] =
     useState<ModoPeriodoBitacora>("semanal");
-  const [diaVisita, setDiaVisita] = useState<string>(DIAS_VISITA[0].value);
+  const [diasVisitaSeleccionados, setDiasVisitaSeleccionados] = useState<
+    Set<string>
+  >(new Set());
   const [sociedad, setSociedad] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [filtroEstatus, setFiltroEstatus] = useState<"todos" | "OK" | "V">(
@@ -254,6 +257,20 @@ export default function BitacoraCobranza() {
   const todasRutasSeleccionadas =
     rutasFiltradas.length > 0 &&
     rutasFiltradas.every((r) => rutasSeleccionadas.has(r.idRuta));
+  const codigosDiasVisitaSeleccionados = useMemo(
+    () =>
+      [...diasVisitaSeleccionados]
+        .map((d) => d.trim())
+        .filter(Boolean)
+        .sort((a, b) => Number(a) - Number(b)),
+    [diasVisitaSeleccionados],
+  );
+  const etiquetaPeriodoDia = useMemo(
+    () => etiquetaDiasVisita(codigosDiasVisitaSeleccionados),
+    [codigosDiasVisitaSeleccionados],
+  );
+  const todosDiasSeleccionados =
+    diasVisitaSeleccionados.size === DIAS_VISITA.length;
   const bitacoraTerminada =
     normalizarEstatusBitacora(estatusBitacora) === "T";
   const puedeTerminar =
@@ -529,8 +546,8 @@ export default function BitacoraCobranza() {
   const validarFiltros = (): string | null => {
     if (!idVendedor) return "Seleccione un vendedor.";
     if (!slpName) return "El vendedor no tiene código SAP (slpName).";
-    if (modoPeriodo === "dia" && !diaVisita)
-      return "Seleccione el día de visita.";
+    if (modoPeriodo === "dia" && diasVisitaSeleccionados.size === 0)
+      return "Seleccione al menos un día de visita.";
     return null;
   };
 
@@ -594,16 +611,17 @@ export default function BitacoraCobranza() {
           codigosRutaSeleccionados.length > 0
             ? codigosRutaSeleccionados
             : undefined,
+        uDiaVisitas:
+          modoPeriodo === "dia" && codigosDiasVisitaSeleccionados.length > 0
+            ? codigosDiasVisitaSeleccionados
+            : undefined,
         sociedad: sociedad.trim() || undefined,
       };
 
       const resultado =
         modoPeriodo === "semanal"
           ? await bitacoraCobranzaService.generarDocumentosSemanal(params)
-          : await bitacoraCobranzaService.generarDocumentos({
-              ...params,
-              uDiaVisita: diaVisita,
-            });
+          : await bitacoraCobranzaService.generarDocumentos(params);
 
       if (resultado.sociedad && !sociedad.trim()) {
         setSociedad(resultado.sociedad);
@@ -733,6 +751,36 @@ export default function BitacoraCobranza() {
     }
   };
 
+  const toggleDiaVisitaSeleccionado = (valor: string) => {
+    setDiasVisitaSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(valor)) {
+        next.delete(valor);
+      } else {
+        next.add(valor);
+      }
+      return next;
+    });
+    setIdBitacora(null);
+    setDocumentos([]);
+    setDocumentosSeleccionados(new Set());
+    setDetalleGuardado(false);
+  };
+
+  const toggleTodosDiasVisita = () => {
+    if (todosDiasSeleccionados) {
+      setDiasVisitaSeleccionados(new Set());
+    } else {
+      setDiasVisitaSeleccionados(
+        new Set(DIAS_VISITA.map((d) => d.value)),
+      );
+    }
+    setIdBitacora(null);
+    setDocumentos([]);
+    setDocumentosSeleccionados(new Set());
+    setDetalleGuardado(false);
+  };
+
   const toggleRutaSeleccionada = (idRuta: number) => {
     setRutasSeleccionadas((prev) => {
       const next = new Set(prev);
@@ -800,7 +848,7 @@ export default function BitacoraCobranza() {
     setIdVendedor("");
     setRutasSeleccionadas(new Set());
     setModoPeriodo("semanal");
-    setDiaVisita(DIAS_VISITA[0].value);
+    setDiasVisitaSeleccionados(new Set());
     setSociedad("");
     setObservaciones("");
     setFiltroEstatus("todos");
@@ -1017,7 +1065,7 @@ export default function BitacoraCobranza() {
       return;
     }
 
-    const total = docsPdf.reduce((sum, doc) => sum + doc.saldoDocumento, 0);
+    const total = docsPdf.reduce((sum, doc) => sum + doc.docTotal, 0);
     const totalCobrado = docsPdf.reduce(
       (sum, doc) => sum + montoCobrado(doc),
       0,
@@ -1037,13 +1085,14 @@ export default function BitacoraCobranza() {
               <strong>${escapeHtml(doc.cardCode)}</strong>
               ${escapeHtml(doc.cardName)}
             </td>
+            <td class="center col-referencia">${escapeHtml(etiquetaReferenciaDocumento(doc))}</td>
             <td class="col-doc">
               <strong>${escapeHtml(doc.docNum)}</strong>
               ${escapeHtml(etiquetaSociedad(doc.sociedad))}
             </td>
             <td class="center col-compact">${escapeHtml(formatearFecha(doc.docDate))}</td>
             <td class="center col-compact">${escapeHtml(formatearFecha(doc.docDueDate))}</td>
-            <td class="center col-money">${escapeHtml(formatCurrency(doc.saldoDocumento))}</td>
+            <td class="center col-money">${escapeHtml(formatCurrency(doc.docTotal))}</td>
             <td class="center col-money">${escapeHtml(formatCurrency(montoCobrado(doc)))}</td>
             <td class="center col-status">${escapeHtml(estatusCartera(doc))}</td>
             <td class="center col-status">${escapeHtml(estatusLabel(doc.estatus))}</td>
@@ -1145,6 +1194,15 @@ export default function BitacoraCobranza() {
               font-size: 7px;
               margin-bottom: 1px;
             }
+            .col-referencia {
+              width: 52px;
+              max-width: 52px;
+              font-size: 7px;
+              line-height: 1.2;
+              padding: 2px 2px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
             .col-doc {
               width: 54px;
               max-width: 54px;
@@ -1241,7 +1299,7 @@ export default function BitacoraCobranza() {
             <div class="box"><span class="label">Vendedor</span>${escapeHtml(vendedorSeleccionado?.nombre ?? "")}</div>
             <div class="box"><span class="label">Código SAP</span>${escapeHtml(slpName)}</div>
             <div class="box"><span class="label">Ruta(s)</span>${escapeHtml(etiquetaRutas)}</div>
-            <div class="box"><span class="label">Periodo</span>${escapeHtml(modoPeriodo === "semanal" ? "Semanal" : `Día ${diaVisita}`)}</div>
+            <div class="box"><span class="label">Periodo</span>${escapeHtml(modoPeriodo === "semanal" ? "Semanal" : etiquetaPeriodoDia || "—")}</div>
           </div>
 
           <div class="legend">
@@ -1254,6 +1312,7 @@ export default function BitacoraCobranza() {
               <tr>
                 <th class="col-num">#</th>
                 <th class="col-cliente">Cliente</th>
+                <th class="col-referencia">Referencias</th>
                 <th class="col-doc">Doc</th>
                 <th class="col-compact">Fecha</th>
                 <th class="col-compact">Vence</th>
@@ -1267,7 +1326,7 @@ export default function BitacoraCobranza() {
             <tbody>
               ${rows}
               <tr class="totals">
-                <td colspan="5" class="right">Totales</td>
+                <td colspan="6" class="right">Totales</td>
                 <td class="center col-money">${escapeHtml(formatCurrency(total))}</td>
                 <td class="center col-money">${escapeHtml(formatCurrency(totalCobrado))}</td>
                 <td colspan="3"></td>
@@ -1477,9 +1536,17 @@ export default function BitacoraCobranza() {
             <select
               className={inputClass}
               value={modoPeriodo}
-              onChange={(e) =>
-                setModoPeriodo(e.target.value as ModoPeriodoBitacora)
-              }
+              onChange={(e) => {
+                const modo = e.target.value as ModoPeriodoBitacora;
+                setModoPeriodo(modo);
+                if (modo === "semanal") {
+                  setDiasVisitaSeleccionados(new Set());
+                }
+                setIdBitacora(null);
+                setDocumentos([]);
+                setDocumentosSeleccionados(new Set());
+                setDetalleGuardado(false);
+              }}
               disabled={detalleGuardado}
             >
               <option value="semanal">Semanal (según ruta)</option>
@@ -1489,19 +1556,46 @@ export default function BitacoraCobranza() {
 
           {modoPeriodo === "dia" && (
             <div>
-              <label className={labelClass}>Día de visita SAP</label>
-              <select
-                className={inputClass}
-                value={diaVisita}
-                onChange={(e) => setDiaVisita(e.target.value)}
-                disabled={detalleGuardado}
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <label className={labelClass}>Días de visita SAP</label>
+                <label className="inline-flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={todosDiasSeleccionados}
+                    onChange={toggleTodosDiasVisita}
+                    disabled={loadingCatalogos || detalleGuardado}
+                    className="h-3.5 w-3.5 rounded border-gray-300"
+                  />
+                  Todos
+                </label>
+              </div>
+              <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                Seleccione uno o más días.
+              </p>
+              <div
+                className={`${inputClass} max-h-44 space-y-2 overflow-y-auto bg-white p-2 dark:bg-gray-700`}
               >
                 {DIAS_VISITA.map((d) => (
-                  <option key={d.value} value={d.value}>
-                    {d.label}
-                  </option>
+                  <label
+                    key={d.value}
+                    className="flex cursor-pointer items-start gap-2 rounded-md px-1 py-0.5 hover:bg-gray-50 dark:hover:bg-gray-600/40"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={diasVisitaSeleccionados.has(d.value)}
+                      onChange={() => toggleDiaVisitaSeleccionado(d.value)}
+                      disabled={loadingCatalogos || detalleGuardado}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300"
+                    />
+                    <span className="text-sm leading-snug">{d.label}</span>
+                  </label>
                 ))}
-              </select>
+              </div>
+              {diasVisitaSeleccionados.size > 0 && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Seleccionados: {etiquetaPeriodoDia}
+                </p>
+              )}
             </div>
           )}
 
@@ -1845,7 +1939,7 @@ export default function BitacoraCobranza() {
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 text-right">
-                        {formatCurrency(doc.saldoDocumento)}
+                        {formatCurrency(doc.docTotal)}
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 text-right">
                         {formatCurrency(montoCobrado(doc))}

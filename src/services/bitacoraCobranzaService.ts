@@ -310,6 +310,7 @@ export interface GenerarBitacoraResponse {
   uBxpRutas: string[];
   uBxpRuta: string | null;
   uDiaVisita: string | null;
+  uDiaVisitas: string[];
   sociedad: string | null;
   totalRegistros: number;
   documentos: DocumentoCobranzaGenerar[];
@@ -319,7 +320,8 @@ export interface GenerarBitacoraParams {
   slpName: string;
   /** Códigos de ruta; omitir o vacío = toda la cartera del vendedor */
   uBxpRutas?: string[];
-  uDiaVisita?: string;
+  /** Días SAP 1-7 (modo día específico); query: uDiaVisita=1&uDiaVisita=3 */
+  uDiaVisitas?: string[];
   sociedad?: string;
 }
 
@@ -332,6 +334,15 @@ export const DIAS_VISITA = [
   { value: "6", label: "6 - Sábado" },
   { value: "7", label: "7 - Domingo" },
 ] as const;
+
+export function etiquetaDiasVisita(values: Iterable<string>): string {
+  const labels = [...values]
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .sort((a, b) => Number(a) - Number(b))
+    .map((v) => DIAS_VISITA.find((d) => d.value === v)?.label ?? v);
+  return labels.join(", ");
+}
 
 export type ModoPeriodoBitacora = "dia" | "semanal";
 
@@ -645,6 +656,18 @@ function pickStringArray(
   return [];
 }
 
+/** Repite el parámetro en query (ej. uBxpRuta=A&uBxpRuta=B, uDiaVisita=1&uDiaVisita=3). */
+function appendQueryList(
+  qs: URLSearchParams,
+  paramName: string,
+  values?: string[],
+): void {
+  (values ?? []).forEach((raw) => {
+    const value = raw.trim();
+    if (value) qs.append(paramName, value);
+  });
+}
+
 function normalizeGenerarResponse(raw: unknown): GenerarBitacoraResponse {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<
     string,
@@ -662,11 +685,30 @@ function normalizeGenerarResponse(raw: unknown): GenerarBitacoraResponse {
             .filter((item) => item.length > 0)
         : [];
 
+  const uDiaVisitas = pickStringArray(
+    o,
+    "uDiaVisitas",
+    "UDiaVisitas",
+    "uDiaVisita",
+    "UDiaVisita",
+  );
+  const uDiaVisitaLegacy = pickString(o, "uDiaVisita", "UDiaVisita");
+  const diasVisita =
+    uDiaVisitas.length > 0
+      ? uDiaVisitas
+      : uDiaVisitaLegacy
+        ? uDiaVisitaLegacy
+            .split(",")
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0)
+        : [];
+
   return {
     slpName: pickString(o, "slpName", "SlpName"),
     uBxpRutas: rutas,
     uBxpRuta: uBxpRutaLegacy ?? (rutas.length ? rutas.join(",") : null),
-    uDiaVisita: pickString(o, "uDiaVisita", "UDiaVisita"),
+    uDiaVisita: diasVisita[0] ?? uDiaVisitaLegacy,
+    uDiaVisitas: diasVisita,
     sociedad: pickString(o, "sociedad", "Sociedad"),
     totalRegistros: pickNumber(o, "totalRegistros", "TotalRegistros") ?? 0,
     documentos: normalizeArray(
@@ -738,7 +780,7 @@ export function detalleToDocumentoGenerar(
     docDate: d.docDate ?? "",
     docDueDate: d.docDueDate ?? "",
     diasVencido: d.diasVencidos,
-    totalDeuda: d.total,
+    totalDeuda: d.alCorriente + d.vencidas + d.porCobrar,
     porVencer: d.alCorriente,
     rango0_30: 0,
     rango31_60: 0,
@@ -964,11 +1006,8 @@ export const bitacoraCobranzaService = {
   ): Promise<GenerarBitacoraResponse> => {
     const qs = new URLSearchParams();
     qs.append("slpName", params.slpName);
-    (params.uBxpRutas ?? []).forEach((ruta) => {
-      const codigo = ruta.trim();
-      if (codigo) qs.append("uBxpRuta", codigo);
-    });
-    if (params.uDiaVisita) qs.append("uDiaVisita", params.uDiaVisita);
+    appendQueryList(qs, "uBxpRuta", params.uBxpRutas);
+    appendQueryList(qs, "uDiaVisita", params.uDiaVisitas);
     if (params.sociedad) qs.append("sociedad", params.sociedad);
     const response = await api.get<unknown>(
       `/api/BitacoraCobranzaDetalle/generar?${qs.toString()}`,
@@ -979,7 +1018,7 @@ export const bitacoraCobranzaService = {
   },
 
   generarDocumentosSemanal: async (
-    params: Omit<GenerarBitacoraParams, "uDiaVisita">,
+    params: Omit<GenerarBitacoraParams, "uDiaVisitas">,
   ): Promise<GenerarBitacoraResponse> => {
     return bitacoraCobranzaService.generarDocumentos(params);
   },
@@ -1039,10 +1078,7 @@ export const bitacoraCobranzaService = {
       if (params.slpName?.trim()) {
         qs.append("slpName", params.slpName.trim());
       }
-      (params.uBxpRutas ?? []).forEach((ruta) => {
-        const codigo = ruta.trim();
-        if (codigo) qs.append("uBxpRuta", codigo);
-      });
+      appendQueryList(qs, "uBxpRuta", params.uBxpRutas);
       if (params.sociedad?.trim()) {
         qs.append("sociedad", params.sociedad.trim());
       }
