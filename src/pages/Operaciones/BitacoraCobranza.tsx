@@ -5,6 +5,7 @@ import {
   ChevronRight,
   FileText,
   Loader2,
+  Lock,
   Plus,
   Save,
   Search,
@@ -68,7 +69,9 @@ function formatearFechaCreacion(
   if (typeof valor === "number") {
     if (valor <= 0) return "—";
     const d = new Date(valor);
-    return Number.isNaN(d.getTime()) ? String(valor) : d.toLocaleString("es-MX");
+    return Number.isNaN(d.getTime())
+      ? String(valor)
+      : d.toLocaleString("es-MX");
   }
   const d = new Date(valor);
   return Number.isNaN(d.getTime()) ? valor : d.toLocaleString("es-MX");
@@ -76,15 +79,44 @@ function formatearFechaCreacion(
 
 type EtapaModalAgregarCliente = 1 | 2;
 
-function etiquetaReferenciaDocumento(
-  doc: DocumentoCobranzaGenerar,
-): string {
+function etiquetaReferenciaDocumento(doc: DocumentoCobranzaGenerar): string {
   const referencia = (doc.numAtCard ?? "").trim();
   return referencia || "—";
 }
 
 function documentoKey(doc: DocumentoCobranzaGenerar, index: number): string {
   return `${doc.sociedad ?? ""}|${doc.cardCode}|${doc.docNum}|${doc.docDate}|${index}`;
+}
+
+function documentoEstaPersistido(
+  doc: DocumentoCobranzaGenerar,
+  clavesPersistidos: Set<string>,
+): boolean {
+  return (
+    (doc.idBitacoraDetalle != null && doc.idBitacoraDetalle > 0) ||
+    clavesPersistidos.has(documentoCobranzaUnicoKey(doc))
+  );
+}
+
+function combinarDocumentosGenerados(
+  documentosActuales: DocumentoCobranzaGenerar[],
+  generados: DocumentoCobranzaGenerar[],
+  clavesPersistidos: Set<string>,
+): {
+  merged: DocumentoCobranzaGenerar[];
+  nuevos: DocumentoCobranzaGenerar[];
+} {
+  const persistidosEnLista = documentosActuales.filter((d) =>
+    documentoEstaPersistido(d, clavesPersistidos),
+  );
+  const clavesConocidas = new Set(clavesPersistidos);
+  persistidosEnLista.forEach((d) =>
+    clavesConocidas.add(documentoCobranzaUnicoKey(d)),
+  );
+  const nuevos = generados.filter(
+    (d) => !clavesConocidas.has(documentoCobranzaUnicoKey(d)),
+  );
+  return { merged: [...persistidosEnLista, ...nuevos], nuevos };
 }
 
 function estatusLabel(estatus: string | null | undefined): string {
@@ -95,6 +127,24 @@ function estatusLabel(estatus: string | null | undefined): string {
 
 function estatusCartera(doc: DocumentoCobranzaGenerar): "OK" | "V" {
   return doc.porVencer > 0 || calcularVencidas(doc) > 0 ? "V" : "OK";
+}
+
+function documentoPasaFiltrosTabla(
+  doc: DocumentoCobranzaGenerar,
+  filtroEstatus: "todos" | "OK" | "V",
+  filtroEstatusEntrega: Set<EstatusEntregaFiltro>,
+): boolean {
+  if (filtroEstatus !== "todos" && estatusCartera(doc) !== filtroEstatus) {
+    return false;
+  }
+  const entrega = (doc.estatus ?? "").trim().toUpperCase();
+  if (
+    filtroEstatusEntrega.size > 0 &&
+    !filtroEstatusEntrega.has(entrega as EstatusEntregaFiltro)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 /** Monto ya cobrado / pagado del documento. */
@@ -125,11 +175,29 @@ function estatusClass(estatus: string | null | undefined): string {
   return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200";
 }
 
+function folioBitacoraValido(folio: number | null | undefined): boolean {
+  return folio != null && folio > 0;
+}
+
+/** Conserva el folio visible si el PUT/GET no lo trae en la respuesta. */
+function resolverFolioVisual(
+  respuesta: { folio: number | null },
+  referencia: { folio: number | null } | null,
+  previo: number | null,
+): number | null {
+  if (folioBitacoraValido(respuesta.folio)) return respuesta.folio;
+  if (referencia && folioBitacoraValido(referencia.folio)) {
+    return referencia.folio;
+  }
+  if (folioBitacoraValido(previo)) return previo;
+  return null;
+}
+
 function etiquetaFolioBitacora(
   folio: number | null | undefined,
   idBitacora: number,
 ): string {
-  if (folio != null && folio > 0) return `folio ${folio}`;
+  if (folioBitacoraValido(folio)) return `folio ${folio}`;
   return `#${idBitacora}`;
 }
 
@@ -140,6 +208,11 @@ function escapeHtml(value: string | number | null | undefined): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+/** Espacios de relleno al final/inicio (campos char fijos en BD). */
+function trimCampoBd(value: string | null | undefined): string {
+  return (value ?? "").trim();
 }
 
 type DocumentoConIndice = {
@@ -188,6 +261,9 @@ export default function BitacoraCobranza() {
     Set<string>
   >(new Set());
   const [totalRegistros, setTotalRegistros] = useState(0);
+  const [clavesDocumentosPersistidos, setClavesDocumentosPersistidos] = useState<
+    Set<string>
+  >(new Set());
   const [detalleGuardado, setDetalleGuardado] = useState(false);
   const [cobroValidado, setCobroValidado] = useState(false);
   const [validandoCobro, setValidandoCobro] = useState(false);
@@ -197,6 +273,7 @@ export default function BitacoraCobranza() {
   const [loading, setLoading] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [terminando, setTerminando] = useState(false);
+  const [cerrando, setCerrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<string | null>(null);
 
@@ -271,12 +348,21 @@ export default function BitacoraCobranza() {
   );
   const todosDiasSeleccionados =
     diasVisitaSeleccionados.size === DIAS_VISITA.length;
+  const estatusEncabezado = normalizarEstatusBitacora(estatusBitacora);
   const bitacoraTerminada =
-    normalizarEstatusBitacora(estatusBitacora) === "T";
+    estatusEncabezado === "T" || estatusEncabezado === "C";
+  const bitacoraPuedeCerrar =
+    estatusEncabezado === "T" && !!idBitacora && !cerrando;
+  const tieneDetallePersistido = clavesDocumentosPersistidos.size > 0;
   const puedeTerminar =
-    detalleGuardado && !!idBitacora && !bitacoraTerminada && !terminando;
+    tieneDetallePersistido &&
+    !!idBitacora &&
+    estatusEncabezado === "B" &&
+    !terminando;
   const puedeGenerarPdf =
-    bitacoraTerminada && !!idBitacora && documentos.length > 0;
+    (estatusEncabezado === "T" || estatusEncabezado === "C") &&
+    !!idBitacora &&
+    documentos.length > 0;
   const puedeAgregarCliente =
     !bitacoraTerminada &&
     normalizarEstatusBitacora(estatusBitacora) === "B" &&
@@ -297,30 +383,26 @@ export default function BitacoraCobranza() {
       );
   const documentosParaGuardar = useMemo(
     () =>
-      documentos.filter((doc, idx) =>
-        documentosSeleccionados.has(documentoKey(doc, idx)),
+      documentos.filter(
+        (doc) =>
+          documentosSeleccionados.has(documentoCobranzaUnicoKey(doc)) &&
+          !documentoEstaPersistido(doc, clavesDocumentosPersistidos),
       ),
-    [documentos, documentosSeleccionados],
+    [documentos, documentosSeleccionados, clavesDocumentosPersistidos],
+  );
+  const totalDocumentosPersistidos = useMemo(
+    () =>
+      documentos.filter((doc) =>
+        documentoEstaPersistido(doc, clavesDocumentosPersistidos),
+      ).length,
+    [documentos, clavesDocumentosPersistidos],
   );
   const documentosFiltradosOrdenados = useMemo<DocumentoConIndice[]>(() => {
     return documentos
       .map((doc, originalIndex) => ({ doc, originalIndex }))
-      .filter(({ doc }) => {
-        if (
-          filtroEstatus !== "todos" &&
-          estatusCartera(doc) !== filtroEstatus
-        ) {
-          return false;
-        }
-        const entrega = (doc.estatus ?? "").trim().toUpperCase();
-        if (
-          filtroEstatusEntrega.size > 0 &&
-          !filtroEstatusEntrega.has(entrega as EstatusEntregaFiltro)
-        ) {
-          return false;
-        }
-        return true;
-      })
+      .filter(({ doc }) =>
+        documentoPasaFiltrosTabla(doc, filtroEstatus, filtroEstatusEntrega),
+      )
       .sort((a, b) => {
         if (cobroValidado) {
           const ordenCobro =
@@ -335,34 +417,72 @@ export default function BitacoraCobranza() {
         return a.doc.docNum - b.doc.docNum;
       });
   }, [documentos, filtroEstatus, filtroEstatusEntrega, cobroValidado]);
+  const documentosSeleccionablesFiltrados = useMemo(
+    () =>
+      documentosFiltradosOrdenados.filter(
+        ({ doc }) => !documentoEstaPersistido(doc, clavesDocumentosPersistidos),
+      ),
+    [documentosFiltradosOrdenados, clavesDocumentosPersistidos],
+  );
   const todosSeleccionados =
-    documentosFiltradosOrdenados.length > 0 &&
-    documentosFiltradosOrdenados.every(({ doc, originalIndex }) =>
-      documentosSeleccionados.has(documentoKey(doc, originalIndex)),
+    documentosSeleccionablesFiltrados.length > 0 &&
+    documentosSeleccionablesFiltrados.every(({ doc }) =>
+      documentosSeleccionados.has(documentoCobranzaUnicoKey(doc)),
     );
 
+  const idBitacoraDesdeUrl = useMemo(() => {
+    if (!idDesdeUrl) return null;
+    const id = Number(idDesdeUrl);
+    return !Number.isNaN(id) && id > 0 ? id : null;
+  }, [idDesdeUrl]);
+
+  const resolverIdBitacoraActivo = useCallback((): number | null => {
+    if (idBitacora != null && idBitacora > 0) return idBitacora;
+    return idBitacoraDesdeUrl;
+  }, [idBitacora, idBitacoraDesdeUrl]);
+
   const etiquetaBitacora = useMemo(() => {
-    if (folioBitacora != null && folioBitacora > 0) {
+    if (folioBitacoraValido(folioBitacora)) {
       return String(folioBitacora);
     }
-    if (idBitacora) return `#${idBitacora}`;
+    const idActivo = resolverIdBitacoraActivo();
+    if (idActivo) return `#${idActivo}`;
     return "";
-  }, [folioBitacora, idBitacora]);
+  }, [folioBitacora, resolverIdBitacoraActivo]);
 
   useEffect(() => {
     if (!documentos.length) {
       setDocumentosSeleccionados(new Set());
-      return;
     }
+  }, [documentos.length]);
 
-    setDocumentosSeleccionados(
-      new Set(
-        documentosFiltradosOrdenados.map(({ doc, originalIndex }) =>
-          documentoKey(doc, originalIndex),
-        ),
-      ),
+  const acotarSeleccionAlFiltro = useCallback(
+    (lista: DocumentoCobranzaGenerar[], seleccion: Set<string>) => {
+      const acotada = new Set<string>();
+      for (const doc of lista) {
+        if (documentoEstaPersistido(doc, clavesDocumentosPersistidos)) {
+          continue;
+        }
+        const clave = documentoCobranzaUnicoKey(doc);
+        if (
+          seleccion.has(clave) &&
+          documentoPasaFiltrosTabla(doc, filtroEstatus, filtroEstatusEntrega)
+        ) {
+          acotada.add(clave);
+        }
+      }
+      return acotada;
+    },
+    [clavesDocumentosPersistidos, filtroEstatus, filtroEstatusEntrega],
+  );
+
+  /** Al cambiar filtros, conserva seleccionados solo si coinciden con el filtro activo. */
+  useEffect(() => {
+    if (!documentos.length) return;
+    setDocumentosSeleccionados((prev) =>
+      acotarSeleccionAlFiltro(documentos, prev),
     );
-  }, [documentos.length, documentosFiltradosOrdenados]);
+  }, [filtroEstatus, filtroEstatusEntrega, acotarSeleccionAlFiltro, documentos]);
 
   const cargarBitacoraExistente = useCallback(async (id: number) => {
     setLoading(true);
@@ -428,12 +548,14 @@ export default function BitacoraCobranza() {
         }
       }
 
+      const clavesPersistidos = new Set(
+        documentosDetalle.map((doc) => documentoCobranzaUnicoKey(doc)),
+      );
+      setClavesDocumentosPersistidos(clavesPersistidos);
       setTotalRegistros(detalle.length);
       setDocumentos(documentosDetalle);
-      setDocumentosSeleccionados(
-        new Set(documentosDetalle.map((doc, idx) => documentoKey(doc, idx))),
-      );
-      setDetalleGuardado(detalle.length > 0);
+      setDocumentosSeleccionados(new Set());
+      setDetalleGuardado(clavesPersistidos.size > 0);
       const folioLabel =
         bitacora.folio != null && bitacora.folio > 0
           ? `folio ${bitacora.folio}`
@@ -525,9 +647,7 @@ export default function BitacoraCobranza() {
           setResultadosClientes([]);
           setTotalClientesBusqueda(0);
           setErrorBusquedaClientes(
-            err instanceof Error
-              ? err.message
-              : "No se pudo buscar clientes.",
+            err instanceof Error ? err.message : "No se pudo buscar clientes.",
           );
         } finally {
           setBuscandoClientes(false);
@@ -550,6 +670,17 @@ export default function BitacoraCobranza() {
       return "Seleccione al menos un día de visita.";
     return null;
   };
+
+  const limpiarVistaDocumentos = useCallback(() => {
+    setDocumentos((prev) =>
+      prev.filter((doc) =>
+        documentoEstaPersistido(doc, clavesDocumentosPersistidos),
+      ),
+    );
+    setDocumentosSeleccionados(new Set());
+    setCobroValidado(false);
+    setResumenValidacionCobro(null);
+  }, [clavesDocumentosPersistidos]);
 
   const crearEncabezado = async (): Promise<BitacoraCobranzaModel> => {
     const validacion = validarFiltros();
@@ -587,6 +718,49 @@ export default function BitacoraCobranza() {
     return creada;
   };
 
+  const sincronizarEncabezado = async (
+    bitacoraId: number,
+  ): Promise<BitacoraCobranzaModel> => {
+    if (!user?.idPersona) {
+      throw new Error(
+        "No hay sesión de usuario para actualizar la bitácora.",
+      );
+    }
+
+    const encabezado =
+      await bitacoraCobranzaService.getBitacoraPorId(bitacoraId);
+    const folioPrevio = encabezado.folio;
+    const payload = buildBitacoraUpdatePayload(encabezado, {
+      idUsuarioEdita: user.idPersona,
+      idVendedor:
+        typeof idVendedor === "number" ? idVendedor : encabezado.idVendedor,
+      idRuta:
+        idRutaEncabezado > 0
+          ? idRutaEncabezado
+          : (encabezado.idRutas[0] ?? encabezado.idRuta),
+      idRutas: idsRutasSeleccionadas,
+      observaciones: observaciones.trim() || null,
+    });
+    const actualizada = await bitacoraCobranzaService.actualizarBitacora(
+      bitacoraId,
+      payload,
+    );
+    const folioResuelto = resolverFolioVisual(
+      actualizada,
+      encabezado,
+      folioPrevio,
+    );
+    setFolioBitacora(folioResuelto);
+    setEstatusBitacora(actualizada.estatus ?? encabezado.estatus ?? "B");
+    setFechaCreacionBitacora(
+      actualizada.fechaCreacion ?? encabezado.fechaCreacion,
+    );
+    if (actualizada.idRutas.length > 0) {
+      setRutasSeleccionadas(new Set(actualizada.idRutas));
+    }
+    return { ...actualizada, folio: folioResuelto };
+  };
+
   const handleGenerar = async () => {
     const validacion = validarFiltros();
     if (validacion) {
@@ -598,9 +772,15 @@ export default function BitacoraCobranza() {
     setError(null);
     setMensaje(null);
     try {
-      let bitacoraId = idBitacora;
+      const idActivo = resolverIdBitacoraActivo();
+      let bitacoraId = idActivo;
       let bitacoraRef: BitacoraCobranzaModel | null = null;
-      if (!bitacoraId) {
+      if (idActivo) {
+        if (!idBitacora) {
+          setIdBitacora(idActivo);
+        }
+        bitacoraRef = await sincronizarEncabezado(idActivo);
+      } else {
         bitacoraRef = await crearEncabezado();
         bitacoraId = bitacoraRef.idBitacora;
       }
@@ -627,17 +807,31 @@ export default function BitacoraCobranza() {
         setSociedad(resultado.sociedad);
       }
 
-      setDocumentos(resultado.documentos);
-      setDocumentosSeleccionados(
-        new Set(resultado.documentos.map((doc, idx) => documentoKey(doc, idx))),
+      const { merged, nuevos } = combinarDocumentosGenerados(
+        documentos,
+        resultado.documentos,
+        clavesDocumentosPersistidos,
       );
-      setTotalRegistros(resultado.totalRegistros);
-      setDetalleGuardado(false);
+      setDocumentos(merged);
+      setDocumentosSeleccionados((prev) => {
+        const next = new Set(prev);
+        nuevos.forEach((doc) => {
+          if (!documentoEstaPersistido(doc, clavesDocumentosPersistidos)) {
+            next.add(documentoCobranzaUnicoKey(doc));
+          }
+        });
+        return acotarSeleccionAlFiltro(merged, next);
+      });
+      setTotalRegistros(merged.length);
       setCobroValidado(false);
       setResumenValidacionCobro(null);
-      const refFolio = bitacoraRef?.folio ?? folioBitacora;
+      const refFolio =
+        bitacoraRef?.folio ?? folioBitacora ?? null;
+      const omitidos = resultado.documentos.length - nuevos.length;
       setMensaje(
-        `Se generaron ${resultado.documentos.length} documento(s) para la bitácora ${etiquetaFolioBitacora(refFolio, bitacoraId)}. Revise el listado y guarde el detalle.`,
+        nuevos.length > 0
+          ? `Se cargaron ${nuevos.length} documento(s) nuevo(s) en la bitácora ${etiquetaFolioBitacora(refFolio, bitacoraId!)}.${omitidos > 0 ? ` ${omitidos} ya estaban en bitácora y se omitieron.` : ""} Vienen seleccionados; use filtros para afinar y guarde los marcados.`
+          : `No hay documentos nuevos para la bitácora ${etiquetaFolioBitacora(refFolio, bitacoraId!)}.${omitidos > 0 ? ` ${omitidos} ya estaban en bitácora.` : ""}`,
       );
     } catch (err) {
       console.error(err);
@@ -650,12 +844,14 @@ export default function BitacoraCobranza() {
   };
 
   const handleGuardarDetalle = async () => {
-    if (!documentos.length) {
-      setError("No hay documentos para guardar. Use Generar primero.");
-      return;
-    }
-    if (!documentosParaGuardar.length) {
-      setError("Seleccione al menos un documento para guardar.");
+    const aGuardar = documentos.filter(
+      (doc) =>
+        documentosSeleccionados.has(documentoCobranzaUnicoKey(doc)) &&
+        !documentoEstaPersistido(doc, clavesDocumentosPersistidos),
+    );
+
+    if (!aGuardar.length) {
+      setError("Seleccione al menos un documento nuevo para guardar.");
       return;
     }
 
@@ -663,28 +859,67 @@ export default function BitacoraCobranza() {
     setError(null);
     setMensaje(null);
     try {
-      let bitacoraId = idBitacora;
+      const idActivo = resolverIdBitacoraActivo();
+      let bitacoraId = idActivo;
       let bitacoraRef: BitacoraCobranzaModel | null = null;
-      if (!bitacoraId) {
+      if (!idActivo) {
         bitacoraRef = await crearEncabezado();
         bitacoraId = bitacoraRef.idBitacora;
+      } else if (!idBitacora) {
+        setIdBitacora(idActivo);
+      }
+
+      if (!bitacoraId) {
+        setError("No hay bitácora activa para guardar.");
+        return;
       }
 
       const idUsuario =
         user?.idPersona ?? (typeof idVendedor === "number" ? idVendedor : 0);
-      await bitacoraCobranzaService.guardarDetalleEnLote(
-        documentosParaGuardar,
+      const guardados = await bitacoraCobranzaService.guardarDetalleEnLote(
+        aGuardar,
         bitacoraId,
         idUsuario,
       );
+      const clavesGuardadas = aGuardar.map((doc) =>
+        documentoCobranzaUnicoKey(doc),
+      );
+      setClavesDocumentosPersistidos((prev) => {
+        const next = new Set(prev);
+        clavesGuardadas.forEach((clave) => next.add(clave));
+        return next;
+      });
+      setDocumentos((prev) =>
+        prev.map((doc) => {
+          const clave = documentoCobranzaUnicoKey(doc);
+          if (!clavesGuardadas.includes(clave)) return doc;
+          const registro = guardados.find(
+            (item) => documentoCobranzaUnicoKey(detalleToDocumentoGenerar(item)) === clave,
+          );
+          return registro
+            ? {
+                ...doc,
+                idBitacoraDetalle: registro.idBitacoraDetalle,
+              }
+            : doc;
+        }),
+      );
+      setDocumentosSeleccionados((prev) => {
+        const next = new Set(prev);
+        clavesGuardadas.forEach((clave) => next.delete(clave));
+        return next;
+      });
       const refFolio = bitacoraRef?.folio ?? folioBitacora;
       setMensaje(
-        `Se guardaron ${documentosParaGuardar.length} registro(s) en la bitácora ${etiquetaFolioBitacora(refFolio, bitacoraId)}.`,
+        `Se guardaron ${aGuardar.length} registro(s) nuevo(s) en la bitácora ${etiquetaFolioBitacora(refFolio, bitacoraId)}.`,
       );
       setDetalleGuardado(true);
 
       const actualizada =
         await bitacoraCobranzaService.getBitacoraPorId(bitacoraId);
+      setFolioBitacora((prev) =>
+        resolverFolioVisual(actualizada, actualizada, prev),
+      );
       setEstatusBitacora(actualizada.estatus ?? "B");
       setFechaCreacionBitacora(actualizada.fechaCreacion);
     } catch (err) {
@@ -698,12 +933,13 @@ export default function BitacoraCobranza() {
   };
 
   const handleTerminarBitacora = async () => {
-    if (!idBitacora) {
+    const idActivo = resolverIdBitacoraActivo();
+    if (!idActivo) {
       setError("No hay bitácora activa para terminar.");
       return;
     }
-    if (!detalleGuardado) {
-      setError("Guarde el detalle antes de terminar la bitácora.");
+    if (!tieneDetallePersistido) {
+      setError("Guarde al menos un detalle antes de terminar la bitácora.");
       return;
     }
     if (bitacoraTerminada) return;
@@ -720,7 +956,7 @@ export default function BitacoraCobranza() {
     setMensaje(null);
     try {
       const encabezado =
-        await bitacoraCobranzaService.getBitacoraPorId(idBitacora);
+        await bitacoraCobranzaService.getBitacoraPorId(idActivo);
       const payload = buildBitacoraUpdatePayload(encabezado, {
         idUsuarioEdita: idUsuario,
         idVendedor:
@@ -728,18 +964,25 @@ export default function BitacoraCobranza() {
         idRuta:
           idRutaEncabezado > 0
             ? idRutaEncabezado
-            : encabezado.idRutas[0] ?? encabezado.idRuta,
+            : (encabezado.idRutas[0] ?? encabezado.idRuta),
+        idRutas: idsRutasSeleccionadas,
         observaciones: observaciones.trim() || null,
         estatus: "T",
       });
       const actualizada = await bitacoraCobranzaService.actualizarBitacora(
-        idBitacora,
+        idActivo,
         payload,
       );
+      const folioResuelto = resolverFolioVisual(
+        actualizada,
+        encabezado,
+        folioBitacora,
+      );
+      setFolioBitacora(folioResuelto);
       setEstatusBitacora(actualizada.estatus ?? "T");
       setFechaCreacionBitacora(actualizada.fechaCreacion);
       setMensaje(
-        `Bitácora ${etiquetaFolioBitacora(actualizada.folio, idBitacora)} terminada. Ya puede generar el PDF.`,
+        `Bitácora ${etiquetaFolioBitacora(folioResuelto, idActivo)} creada. Ya puede generar el PDF.`,
       );
     } catch (err) {
       console.error(err);
@@ -748,6 +991,67 @@ export default function BitacoraCobranza() {
       );
     } finally {
       setTerminando(false);
+    }
+  };
+
+  const handleCerrarBitacora = async () => {
+    const idActivo = resolverIdBitacoraActivo();
+    if (!idActivo) {
+      setError("No hay bitácora activa para cerrar.");
+      return;
+    }
+    if (estatusEncabezado !== "T") {
+      setError("Solo puede cerrar una bitácora en estatus Creado.");
+      return;
+    }
+
+    const idUsuario =
+      user?.idPersona ?? (typeof idVendedor === "number" ? idVendedor : 0);
+    if (!idUsuario) {
+      setError("No hay sesión de usuario para cerrar la bitácora.");
+      return;
+    }
+
+    setCerrando(true);
+    setError(null);
+    setMensaje(null);
+    try {
+      const encabezado =
+        await bitacoraCobranzaService.getBitacoraPorId(idActivo);
+      const payload = buildBitacoraUpdatePayload(encabezado, {
+        idUsuarioEdita: idUsuario,
+        idVendedor:
+          typeof idVendedor === "number" ? idVendedor : encabezado.idVendedor,
+        idRuta:
+          idRutaEncabezado > 0
+            ? idRutaEncabezado
+            : (encabezado.idRutas[0] ?? encabezado.idRuta),
+        idRutas: idsRutasSeleccionadas,
+        observaciones: observaciones.trim() || null,
+        estatus: "C",
+      });
+      const actualizada = await bitacoraCobranzaService.actualizarBitacora(
+        idActivo,
+        payload,
+      );
+      const folioResuelto = resolverFolioVisual(
+        actualizada,
+        encabezado,
+        folioBitacora,
+      );
+      setFolioBitacora(folioResuelto);
+      setEstatusBitacora(actualizada.estatus ?? "C");
+      setFechaCreacionBitacora(actualizada.fechaCreacion);
+      setMensaje(
+        `Bitácora ${etiquetaFolioBitacora(folioResuelto, idActivo)} cerrada.`,
+      );
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error ? err.message : "No se pudo cerrar la bitácora.",
+      );
+    } finally {
+      setCerrando(false);
     }
   };
 
@@ -761,24 +1065,16 @@ export default function BitacoraCobranza() {
       }
       return next;
     });
-    setIdBitacora(null);
-    setDocumentos([]);
-    setDocumentosSeleccionados(new Set());
-    setDetalleGuardado(false);
+    limpiarVistaDocumentos();
   };
 
   const toggleTodosDiasVisita = () => {
     if (todosDiasSeleccionados) {
       setDiasVisitaSeleccionados(new Set());
     } else {
-      setDiasVisitaSeleccionados(
-        new Set(DIAS_VISITA.map((d) => d.value)),
-      );
+      setDiasVisitaSeleccionados(new Set(DIAS_VISITA.map((d) => d.value)));
     }
-    setIdBitacora(null);
-    setDocumentos([]);
-    setDocumentosSeleccionados(new Set());
-    setDetalleGuardado(false);
+    limpiarVistaDocumentos();
   };
 
   const toggleRutaSeleccionada = (idRuta: number) => {
@@ -791,10 +1087,7 @@ export default function BitacoraCobranza() {
       }
       return next;
     });
-    setIdBitacora(null);
-    setDocumentos([]);
-    setDocumentosSeleccionados(new Set());
-    setDetalleGuardado(false);
+    limpiarVistaDocumentos();
   };
 
   const toggleTodasRutas = () => {
@@ -803,15 +1096,12 @@ export default function BitacoraCobranza() {
     } else {
       setRutasSeleccionadas(new Set(rutasFiltradas.map((r) => r.idRuta)));
     }
-    setIdBitacora(null);
-    setDocumentos([]);
-    setDocumentosSeleccionados(new Set());
-    setDetalleGuardado(false);
+    limpiarVistaDocumentos();
   };
 
   const toggleSeleccionTodos = () => {
-    const keysVisibles = documentosFiltradosOrdenados.map(
-      ({ doc, originalIndex }) => documentoKey(doc, originalIndex),
+    const keysVisibles = documentosSeleccionablesFiltrados.map(({ doc }) =>
+      documentoCobranzaUnicoKey(doc),
     );
     if (todosSeleccionados) {
       setDocumentosSeleccionados((prev) => {
@@ -828,13 +1118,18 @@ export default function BitacoraCobranza() {
     });
   };
 
-  const toggleDocumento = (key: string) => {
+  const toggleDocumento = (
+    doc: DocumentoCobranzaGenerar,
+    persistido: boolean,
+  ) => {
+    if (persistido || bitacoraTerminada) return;
+    const clave = documentoCobranzaUnicoKey(doc);
     setDocumentosSeleccionados((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
+      if (next.has(clave)) {
+        next.delete(clave);
       } else {
-        next.add(key);
+        next.add(clave);
       }
       return next;
     });
@@ -855,6 +1150,7 @@ export default function BitacoraCobranza() {
     setFiltroEstatusEntrega(new Set());
     setDocumentos([]);
     setDocumentosSeleccionados(new Set());
+    setClavesDocumentosPersistidos(new Set());
     setTotalRegistros(0);
     setDetalleGuardado(false);
     setCobroValidado(false);
@@ -1035,7 +1331,13 @@ export default function BitacoraCobranza() {
     }
 
     setDocumentos((prev) => [...prev, ...nuevos]);
-    setDetalleGuardado(false);
+    setDocumentosSeleccionados((prev) => {
+      const next = new Set(prev);
+      nuevos.forEach((doc) => {
+        next.add(documentoCobranzaUnicoKey(doc));
+      });
+      return next;
+    });
     setMensaje(
       `Se agregaron ${nuevos.length} documento(s) de ${clienteActivo?.cardName ?? "el cliente"}.${duplicados > 0 ? ` ${duplicados} ya existían y se omitieron.` : ""} Guarde el detalle para persistir.`,
     );
@@ -1052,7 +1354,7 @@ export default function BitacoraCobranza() {
     }
     if (!bitacoraTerminada) {
       setError(
-        "La bitácora debe estar terminada para generar el PDF. Use el botón Terminar.",
+        "La bitácora debe estar creada para generar el PDF. Use el botón Crear.",
       );
       return;
     }
@@ -1079,11 +1381,11 @@ export default function BitacoraCobranza() {
     const rows = docsPdf
       .map(
         (doc, idx) => `
-          <tr>
+          <tr class="data-row">
             <td class="center col-num">${idx + 1}</td>
             <td class="col-cliente">
-              <strong>${escapeHtml(doc.cardCode)}</strong>
-              ${escapeHtml(doc.cardName)}
+              <strong>${escapeHtml(trimCampoBd(doc.cardCode))}</strong>
+              <span class="cliente-nombre">${escapeHtml(trimCampoBd(doc.cardName))}</span>
             </td>
             <td class="center col-referencia">${escapeHtml(etiquetaReferenciaDocumento(doc))}</td>
             <td class="col-doc">
@@ -1092,7 +1394,7 @@ export default function BitacoraCobranza() {
             </td>
             <td class="center col-compact">${escapeHtml(formatearFecha(doc.docDate))}</td>
             <td class="center col-compact">${escapeHtml(formatearFecha(doc.docDueDate))}</td>
-            <td class="center col-money">${escapeHtml(formatCurrency(doc.docTotal))}</td>
+            <td class="center col-money col-total">${escapeHtml(formatCurrency(doc.docTotal))}</td>
             <td class="center col-money">${escapeHtml(formatCurrency(montoCobrado(doc)))}</td>
             <td class="center col-status">${escapeHtml(estatusCartera(doc))}</td>
             <td class="center col-status">${escapeHtml(estatusLabel(doc.estatus))}</td>
@@ -1101,6 +1403,32 @@ export default function BitacoraCobranza() {
         `,
       )
       .join("");
+
+    const pdfEncabezadoHtml = `
+      <div class="header">
+        <div class="company">
+          <strong>CODIALUB</strong><br />
+          Bitácora de cobranza<br />
+          Generada desde Client App
+        </div>
+        <div class="title">Bitácora de Cobranza</div>
+        <div class="meta">
+          <strong>Folio:</strong> ${escapeHtml(etiquetaBitacora)}<br />
+          <strong>Fecha:</strong> ${escapeHtml(fecha)} ${escapeHtml(hora)}<br />
+          <strong>Registros:</strong> ${escapeHtml(docsPdf.length)}
+        </div>
+      </div>
+      <div class="summary">
+        <div class="box"><span class="label">Vendedor</span>${escapeHtml(vendedorSeleccionado?.nombre ?? "")}</div>
+        <div class="box"><span class="label">Código SAP</span>${escapeHtml(slpName)}</div>
+        <div class="box"><span class="label">Ruta(s)</span>${escapeHtml(etiquetaRutas)}</div>
+        <div class="box"><span class="label">Periodo</span>${escapeHtml(modoPeriodo === "semanal" ? "Semanal" : etiquetaPeriodoDia || "—")}</div>
+      </div>
+      <div class="legend">
+        <strong>Estatus:</strong> V = Vencido, OK = Al Corriente &nbsp;|&nbsp;
+        <strong>Estatus de entrega:</strong> S = Sí, N = No, P = Parcialmente
+      </div>
+    `;
 
     const html = `
       <!doctype html>
@@ -1115,7 +1443,7 @@ export default function BitacoraCobranza() {
               font-family: Arial, Helvetica, sans-serif;
               color: #111827;
               margin: 0;
-              font-size: 10px;
+              font-size: 12px;
             }
             .header {
               display: grid;
@@ -1130,7 +1458,7 @@ export default function BitacoraCobranza() {
             .title {
               text-align: center;
               font-weight: 700;
-              font-size: 16px;
+              font-size: 18px;
               text-transform: uppercase;
               letter-spacing: .04em;
             }
@@ -1152,7 +1480,7 @@ export default function BitacoraCobranza() {
             .label {
               display: block;
               color: #6b7280;
-              font-size: 8px;
+              font-size: 10px;
               text-transform: uppercase;
               margin-bottom: 2px;
             }
@@ -1161,43 +1489,102 @@ export default function BitacoraCobranza() {
               background: #f9fafb;
               padding: 5px 6px;
               margin-bottom: 8px;
-              font-size: 9px;
+              font-size: 11px;
             }
-            table {
+            /*
+              thead/tfoot: el navegador repite encabezado y firmas en cada hoja al imprimir.
+              No usar position:fixed (traslapa filas en páginas 2+).
+            */
+            table.report-print {
               width: 100%;
               border-collapse: collapse;
               table-layout: fixed;
             }
-            th, td {
+            table.report-print thead {
+              display: table-header-group;
+            }
+            table.report-print tfoot {
+              display: table-footer-group;
+            }
+            table.report-print tbody tr.data-row {
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+            .cell-banner,
+            .cell-footer {
+              border: none;
+              padding: 0;
+              vertical-align: top;
+              background: #fff;
+            }
+            .cell-banner {
+              padding-bottom: 4px;
+            }
+            .cell-footer {
+              padding-top: 20px;
+            }
+            table.report-print th,
+            table.report-print td {
               border: 1px solid #9ca3af;
               padding: 3px 4px;
-              vertical-align: top;
+              vertical-align: middle;
+              font-size: 9.5px;
+              line-height: 1.2;
+            }
+            table.report-print td:not(.col-cliente) {
               word-wrap: break-word;
             }
             th {
               background: #e5e7eb;
-              font-size: 7px;
+              font-size: 9px;
               text-transform: uppercase;
               line-height: 1.2;
+              vertical-align: middle;
             }
-            .col-num { width: 22px; }
-            .col-cliente {
-              width: 118px;
-              max-width: 118px;
-              font-size: 7.5px;
-              line-height: 1.2;
-              padding: 2px 3px;
-              overflow: hidden;
+            /* Anchos fijados con <colgroup> (más fiable al imprimir que width en td/th). */
+            table.report-print .col-num {
+              width: 10px !important;
+              min-width: 10px !important;
+              max-width: 10px !important;
+              padding: 1px 0 !important;
+              text-align: center;
+              white-space: nowrap;
+              font-size: 8px;
+            }
+            table.report-print th.col-num {
+              font-size: 9px;
+              line-height: 1.1;
+              padding: 1px 0 !important;
+            }
+            table.report-print td.col-cliente {
+              vertical-align: top;
+              white-space: normal;
+              word-wrap: normal;
+              overflow-wrap: normal;
+              word-break: normal;
+              overflow: visible;
+              padding: 3px 8px;
+              line-height: 1.3;
             }
             .col-cliente strong {
               display: block;
-              font-size: 7px;
-              margin-bottom: 1px;
+              font-size: 9px;
+              font-weight: 700;
+              margin-bottom: 3px;
+              white-space: nowrap;
+            }
+            .col-cliente .cliente-nombre {
+              display: block;
+              font-size: 10px;
+              line-height: 1.35;
+              word-break: normal;
+              overflow-wrap: normal;
+              hyphens: none;
             }
             .col-referencia {
-              width: 52px;
-              max-width: 52px;
-              font-size: 7px;
+              width: 48px;
+              max-width: 48px;
+              font-size: 9px;
               line-height: 1.2;
               padding: 2px 2px;
               overflow: hidden;
@@ -1206,7 +1593,7 @@ export default function BitacoraCobranza() {
             .col-doc {
               width: 54px;
               max-width: 54px;
-              font-size: 7.5px;
+              font-size: 9px;
               line-height: 1.2;
               padding: 2px 3px;
               text-align: center;
@@ -1214,33 +1601,47 @@ export default function BitacoraCobranza() {
             }
             .col-doc strong {
               display: block;
-              font-size: 7px;
+              font-size: 11.5px;
+              font-weight: 700;
               margin-bottom: 1px;
             }
             .col-compact {
-              width: 46px;
-              max-width: 46px;
-              font-size: 7.5px;
+              width: 36px;
+              max-width: 36px;
+              font-size: 9.5px;
               padding: 2px 2px;
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
             }
             .col-money {
-              width: 48px;
-              max-width: 48px;
-              font-size: 7px;
+              width: 44px;
+              max-width: 44px;
+              font-size: 9px;
               padding: 2px 2px;
               text-align: center;
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
             }
-            .col-status {
-              width: 30px;
-              max-width: 30px;
-              font-size: 7.5px;
-              padding: 2px 2px;
+            .col-money.col-total {
+              font-weight: 700;
+              font-size: 9.5px;
+            }
+            table.report-print .col-status {
+              width: 22px !important;
+              min-width: 22px !important;
+              max-width: 22px !important;
+              font-size: 9.5px;
+              padding: 1px 2px !important;
+              text-align: center;
+              white-space: nowrap;
+            }
+            table.report-print th.col-status {
+              white-space: normal;
+              word-wrap: break-word;
+              line-height: 1.2;
+              padding: 1px 0;
             }
             .col-folio {
               width: 52px;
@@ -1258,21 +1659,23 @@ export default function BitacoraCobranza() {
               display: grid;
               grid-template-columns: 1fr 1fr;
               gap: 48px;
-              margin-top: 36px;
+              margin-top: 0;
               page-break-inside: avoid;
             }
             .signature {
               text-align: center;
               border-top: 1px solid #111827;
-              padding-top: 6px;
-              font-size: 10px;
+              margin-top: 28px;
+              padding-top: 8px;
+              font-size: 12px;
+              font-weight: 600;
             }
             .footer {
               margin-top: 8px;
               display: flex;
               justify-content: space-between;
               color: #6b7280;
-              font-size: 8px;
+              font-size: 10px;
             }
             @media print {
               .no-print { display: none; }
@@ -1281,34 +1684,26 @@ export default function BitacoraCobranza() {
           </style>
         </head>
         <body>
-          <div class="header">
-            <div class="company">
-              <strong>CODIALUB</strong><br />
-              Bitácora de cobranza<br />
-              Generada desde Client App
-            </div>
-            <div class="title">Bitácora de Cobranza</div>
-            <div class="meta">
-              <strong>Folio:</strong> ${escapeHtml(etiquetaBitacora)}<br />
-              <strong>Fecha:</strong> ${escapeHtml(fecha)} ${escapeHtml(hora)}<br />
-              <strong>Registros:</strong> ${escapeHtml(docsPdf.length)}
-            </div>
-          </div>
-
-          <div class="summary">
-            <div class="box"><span class="label">Vendedor</span>${escapeHtml(vendedorSeleccionado?.nombre ?? "")}</div>
-            <div class="box"><span class="label">Código SAP</span>${escapeHtml(slpName)}</div>
-            <div class="box"><span class="label">Ruta(s)</span>${escapeHtml(etiquetaRutas)}</div>
-            <div class="box"><span class="label">Periodo</span>${escapeHtml(modoPeriodo === "semanal" ? "Semanal" : etiquetaPeriodoDia || "—")}</div>
-          </div>
-
-          <div class="legend">
-            <strong>Estatus:</strong> V = Vencido, OK = Al Corriente &nbsp;|&nbsp;
-            <strong>Estatus de entrega:</strong> S = Sí, N = No, P = Parcialmente
-          </div>
-
-          <table>
+          <table class="report-print">
+            <colgroup>
+              <col style="width:10px" />
+              <col style="width:25%" />
+              <col style="width:48px" />
+              <col style="width:54px" />
+              <col style="width:36px" />
+              <col style="width:36px" />
+              <col style="width:44px" />
+              <col style="width:44px" />
+              <col style="width:22px" />
+              <col style="width:22px" />
+              <col style="width:52px" />
+            </colgroup>
             <thead>
+              <tr>
+                <td colspan="11" class="cell-banner">
+                  ${pdfEncabezadoHtml}
+                </td>
+              </tr>
               <tr>
                 <th class="col-num">#</th>
                 <th class="col-cliente">Cliente</th>
@@ -1318,31 +1713,35 @@ export default function BitacoraCobranza() {
                 <th class="col-compact">Vence</th>
                 <th class="col-money">Total</th>
                 <th class="col-money">Cobr.</th>
-                <th class="col-status">Est.</th>
-                <th class="col-status">Ent.</th>
+                <th class="col-status">Estatus</th>
+                <th class="col-status">Entrega</th>
                 <th class="col-folio">Folio</th>
               </tr>
             </thead>
             <tbody>
               ${rows}
-              <tr class="totals">
+              <tr class="totals data-row">
                 <td colspan="6" class="right">Totales</td>
-                <td class="center col-money">${escapeHtml(formatCurrency(total))}</td>
+                <td class="center col-money col-total">${escapeHtml(formatCurrency(total))}</td>
                 <td class="center col-money">${escapeHtml(formatCurrency(totalCobrado))}</td>
                 <td colspan="3"></td>
               </tr>
             </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="11" class="cell-footer">
+                  <div class="signatures">
+                    <div class="signature">Nombre y Firma de Entrega</div>
+                    <div class="signature">Nombre y Firma de Recibo</div>
+                  </div>
+                  <div class="footer">
+                    <span>Bitácora ${escapeHtml(etiquetaBitacora)}</span>
+                    <span>Página generada para impresión/PDF</span>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
           </table>
-
-          <div class="signatures">
-            <div class="signature">Agente / Asesor de Entregas</div>
-            <div class="signature">Agente / Asesor de Retorno</div>
-          </div>
-
-          <div class="footer">
-            <span>Bitácora ${escapeHtml(etiquetaBitacora)}</span>
-            <span>Página generada para impresión/PDF</span>
-          </div>
         </body>
       </html>
     `;
@@ -1378,17 +1777,24 @@ export default function BitacoraCobranza() {
         </Link>
       </div>
 
-      {idBitacora && (
+      {resolverIdBitacoraActivo() && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
           Bitácora activa:{" "}
           <strong>
-            {folioBitacora != null && folioBitacora > 0
+            {folioBitacoraValido(folioBitacora)
               ? `Folio ${folioBitacora}`
-              : `#${idBitacora}`}
+              : `#${resolverIdBitacoraActivo()}`}
           </strong>
           {contextoOperativo?.sucursal && (
             <span className="ml-2 text-blue-700/80 dark:text-blue-200/80">
               ({contextoOperativo.sucursal})
+            </span>
+          )}
+          {!bitacoraTerminada && (
+            <span className="mt-1 block text-xs text-blue-700/90 dark:text-blue-200/90">
+              Puede cambiar rutas o periodo y volver a generar; los documentos
+              ya guardados se muestran en gris. Use &quot;Nueva bitácora&quot;
+              para crear otra.
             </span>
           )}
         </div>
@@ -1429,15 +1835,9 @@ export default function BitacoraCobranza() {
               onChange={(e) => {
                 setIdVendedor(e.target.value ? Number(e.target.value) : "");
                 setRutasSeleccionadas(new Set());
-                setIdBitacora(null);
-                setFolioBitacora(null);
-                setEstatusBitacora("B");
-                setFechaCreacionBitacora(null);
-                setDocumentos([]);
-                setDocumentosSeleccionados(new Set());
-                setDetalleGuardado(false);
+                limpiarVistaDocumentos();
               }}
-              disabled={loadingCatalogos || detalleGuardado}
+              disabled={loadingCatalogos || bitacoraTerminada || !!idBitacora}
             >
               <option value="">Seleccione vendedor</option>
               {vendedores.map((v) => (
@@ -1464,7 +1864,7 @@ export default function BitacoraCobranza() {
                     type="checkbox"
                     checked={todasRutasSeleccionadas}
                     onChange={toggleTodasRutas}
-                    disabled={loadingCatalogos || detalleGuardado}
+                    disabled={loadingCatalogos || bitacoraTerminada}
                     className="h-3.5 w-3.5 rounded border-gray-300"
                   />
                   Todas
@@ -1496,7 +1896,7 @@ export default function BitacoraCobranza() {
                     type="checkbox"
                     checked={rutasSeleccionadas.has(r.idRuta)}
                     onChange={() => toggleRutaSeleccionada(r.idRuta)}
-                    disabled={loadingCatalogos || detalleGuardado}
+                    disabled={loadingCatalogos || bitacoraTerminada}
                     className="mt-0.5 h-4 w-4 rounded border-gray-300"
                   />
                   <span className="text-sm leading-snug">
@@ -1542,12 +1942,9 @@ export default function BitacoraCobranza() {
                 if (modo === "semanal") {
                   setDiasVisitaSeleccionados(new Set());
                 }
-                setIdBitacora(null);
-                setDocumentos([]);
-                setDocumentosSeleccionados(new Set());
-                setDetalleGuardado(false);
+                limpiarVistaDocumentos();
               }}
-              disabled={detalleGuardado}
+              disabled={bitacoraTerminada}
             >
               <option value="semanal">Semanal (según ruta)</option>
               <option value="dia">Día específico SAP</option>
@@ -1563,7 +1960,7 @@ export default function BitacoraCobranza() {
                     type="checkbox"
                     checked={todosDiasSeleccionados}
                     onChange={toggleTodosDiasVisita}
-                    disabled={loadingCatalogos || detalleGuardado}
+                    disabled={loadingCatalogos || bitacoraTerminada}
                     className="h-3.5 w-3.5 rounded border-gray-300"
                   />
                   Todos
@@ -1584,7 +1981,7 @@ export default function BitacoraCobranza() {
                       type="checkbox"
                       checked={diasVisitaSeleccionados.has(d.value)}
                       onChange={() => toggleDiaVisitaSeleccionado(d.value)}
-                      disabled={loadingCatalogos || detalleGuardado}
+                      disabled={loadingCatalogos || bitacoraTerminada}
                       className="mt-0.5 h-4 w-4 rounded border-gray-300"
                     />
                     <span className="text-sm leading-snug">{d.label}</span>
@@ -1607,7 +2004,7 @@ export default function BitacoraCobranza() {
               value={observaciones}
               onChange={(e) => setObservaciones(e.target.value)}
               placeholder="Notas generales de la bitácora"
-              disabled={detalleGuardado}
+              disabled={bitacoraTerminada}
             />
           </div>
         </div>
@@ -1616,7 +2013,7 @@ export default function BitacoraCobranza() {
           <button
             type="button"
             onClick={() => void handleGenerar()}
-            disabled={loading || loadingCatalogos || detalleGuardado}
+            disabled={loading || loadingCatalogos || bitacoraTerminada}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -1625,7 +2022,7 @@ export default function BitacoraCobranza() {
           <button
             type="button"
             onClick={() => void handleGuardarDetalle()}
-            disabled={guardando || !documentos.length || detalleGuardado}
+            disabled={guardando || documentosParaGuardar.length === 0 || bitacoraTerminada}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
           >
             {guardando ? (
@@ -1633,18 +2030,18 @@ export default function BitacoraCobranza() {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            Guardar detalle ({documentosParaGuardar.length})
+            Guardar nuevos ({documentosParaGuardar.length})
           </button>
           <button
             type="button"
             onClick={() => void handleTerminarBitacora()}
             disabled={!puedeTerminar}
             title={
-              !detalleGuardado
-                ? "Guarde el detalle primero"
+              !tieneDetallePersistido
+                ? "Guarde al menos un detalle primero"
                 : bitacoraTerminada
-                  ? "La bitácora ya está terminada"
-                  : "Finalizar bitácora y cambiar estatus a Terminado"
+                  ? "La bitácora ya está creada"
+                  : "Crear bitácora y cambiar estatus a Creado"
             }
             className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
           >
@@ -1653,7 +2050,7 @@ export default function BitacoraCobranza() {
             ) : (
               <CheckCircle2 className="h-4 w-4" />
             )}
-            Terminar
+            Crear
           </button>
           <button
             type="button"
@@ -1661,7 +2058,7 @@ export default function BitacoraCobranza() {
             disabled={!puedeGenerarPdf}
             title={
               !bitacoraTerminada
-                ? "Termine la bitácora para habilitar el PDF"
+                ? "Cree la bitácora (botón Crear) para habilitar el PDF"
                 : "Generar PDF"
             }
             className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
@@ -1669,6 +2066,22 @@ export default function BitacoraCobranza() {
             <FileText className="h-4 w-4" />
             Generar PDF
           </button>
+          {bitacoraPuedeCerrar && (
+            <button
+              type="button"
+              onClick={() => void handleCerrarBitacora()}
+              disabled={cerrando}
+              title="Cerrar bitácora (estatus C) en el servidor"
+              className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-600 dark:hover:bg-slate-500"
+            >
+              {cerrando ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Lock className="h-4 w-4" />
+              )}
+              Cerrar bitácora
+            </button>
+          )}
           {puedeAgregarCliente && (
             <button
               type="button"
@@ -1703,12 +2116,21 @@ export default function BitacoraCobranza() {
             {documentos.length > 0 && (
               <div className="flex flex-col gap-1 text-sm text-gray-500 dark:text-gray-400 sm:items-end">
                 <span>
-                  Seleccionados: {documentosParaGuardar.length} de{" "}
-                  {documentos.length}
+                  Nuevos seleccionados: {documentosParaGuardar.length}
+                  {totalDocumentosPersistidos > 0
+                    ? ` | En bitácora: ${totalDocumentosPersistidos}`
+                    : ""}{" "}
+                  | Total en lista: {documentos.length}
                   {documentosFiltradosOrdenados.length !== documentos.length
                     ? ` | Mostrando: ${documentosFiltradosOrdenados.length}`
                     : ""}
                 </span>
+                {(filtroEstatus !== "todos" || filtroEstatusEntrega.size > 0) && (
+                  <span className="text-gray-500 dark:text-gray-400">
+                    El filtro define qué filas se muestran y cuáles quedan
+                    seleccionados para guardar.
+                  </span>
+                )}
                 <span>
                   Estatus: <strong>OK</strong>=sin saldo por vencer/vencido,{" "}
                   <strong>V</strong>=con saldo por vencer o vencido. Estatus de
@@ -1849,6 +2271,10 @@ export default function BitacoraCobranza() {
                         type="checkbox"
                         checked={todosSeleccionados}
                         onChange={toggleSeleccionTodos}
+                        disabled={
+                          bitacoraTerminada ||
+                          documentosSeleccionablesFiltrados.length === 0
+                        }
                         className="h-4 w-4 rounded border-gray-300"
                       />
                       Check
@@ -1885,39 +2311,53 @@ export default function BitacoraCobranza() {
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {documentosFiltradosOrdenados.map(({ doc, originalIndex }) => {
                   const key = documentoKey(doc, originalIndex);
-                  const seleccionado = documentosSeleccionados.has(key);
+                  const claveSeleccion = documentoCobranzaUnicoKey(doc);
+                  const persistido = documentoEstaPersistido(
+                    doc,
+                    clavesDocumentosPersistidos,
+                  );
+                  const seleccionado =
+                    documentosSeleccionados.has(claveSeleccion);
                   const estatus = estatusCartera(doc);
                   const filaCobro =
-                    cobroValidado && seleccionado
+                    cobroValidado && seleccionado && !persistido
                       ? claseFilaEstatusCobro(doc.estatusCobro)
                       : "";
                   return (
                     <tr
                       key={key}
                       className={
-                        seleccionado
-                          ? filaCobro
-                          : "bg-gray-50 text-gray-400 dark:bg-gray-900/30"
+                        persistido
+                          ? "bg-gray-200/80 text-gray-500 dark:bg-gray-800/80 dark:text-gray-400"
+                          : seleccionado
+                            ? filaCobro
+                            : "bg-gray-50 text-gray-400 dark:bg-gray-900/30"
                       }
                     >
                       <td className="px-2 py-2">
                         <input
                           type="checkbox"
-                          checked={seleccionado}
-                          onChange={() => toggleDocumento(key)}
-                          className="h-4 w-4 rounded border-gray-300"
+                          checked={persistido ? false : seleccionado}
+                          disabled={persistido || bitacoraTerminada}
+                          onChange={() => toggleDocumento(doc, persistido)}
+                          className="h-4 w-4 rounded border-gray-300 disabled:opacity-60"
                           aria-label={`Seleccionar documento ${doc.docNum}`}
                         />
                       </td>
                       <td className="px-2 py-2">
                         <div
-                          className="max-w-[260px] truncate font-medium text-gray-900 dark:text-white"
+                          className="max-w-[260px] truncate font-medium"
                           title={doc.cardName}
                         >
                           {doc.cardName}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs">
                           {doc.cardCode}
+                          {persistido && (
+                            <span className="ml-2 rounded bg-gray-300/80 px-1.5 py-0.5 text-[10px] font-medium text-gray-700 dark:bg-gray-600 dark:text-gray-200">
+                              En bitácora
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-2 py-2">
@@ -2042,7 +2482,9 @@ export default function BitacoraCobranza() {
               {etapaModalAgregar === 1 ? (
                 <>
                   <div>
-                    <label className={labelClass}>Paso 1 · Buscar cliente</label>
+                    <label className={labelClass}>
+                      Paso 1 · Buscar cliente
+                    </label>
                     <div className="relative">
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                       <input
@@ -2332,7 +2774,8 @@ export default function BitacoraCobranza() {
                                     </span>
                                     <span className="text-xs text-gray-500 dark:text-gray-400">
                                       Total: {formatCurrency(doc.docTotal)} ·
-                                      Cobrado: {formatCurrency(montoCobrado(doc))}
+                                      Cobrado:{" "}
+                                      {formatCurrency(montoCobrado(doc))}
                                     </span>
                                     {doc.u_BXP_RUTA ? (
                                       <span className="text-xs text-gray-500 dark:text-gray-400">

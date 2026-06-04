@@ -34,6 +34,7 @@ export interface BitacoraCobranzaUpdatePayload {
   idEmpresa: number;
   idVendedor: number;
   idRuta: number;
+  idRutas?: number[];
   idUsuarioEdita: number;
   observaciones?: string | null;
   estatus?: string | null;
@@ -46,16 +47,30 @@ export function buildBitacoraUpdatePayload(
     idUsuarioEdita: number;
     idVendedor?: number;
     idRuta?: number;
+    idRutas?: number[];
     observaciones?: string | null;
     estatus?: string | null;
     activo?: boolean;
   },
 ): BitacoraCobranzaUpdatePayload {
+  const idRutas =
+    options.idRutas !== undefined
+      ? options.idRutas
+      : encabezado.idRutas.length > 0
+        ? encabezado.idRutas
+        : encabezado.idRuta > 0
+          ? [encabezado.idRuta]
+          : [];
+  const idRuta =
+    options.idRuta ??
+    (idRutas[0] > 0 ? idRutas[0] : encabezado.idRuta);
+
   return {
     idSucursal: encabezado.idSucursal,
     idEmpresa: encabezado.idEmpresa,
     idVendedor: options.idVendedor ?? encabezado.idVendedor,
-    idRuta: options.idRuta ?? encabezado.idRuta,
+    idRuta,
+    idRutas,
     idUsuarioEdita: options.idUsuarioEdita,
     observaciones:
       options.observaciones !== undefined
@@ -281,10 +296,7 @@ export function mergeEstatusCobroEnDocumentos(
     if (item.idBitacoraDetalle > 0) {
       mapa.set(`id:${item.idBitacoraDetalle}`, item);
     }
-    mapa.set(
-      `${item.sociedad ?? ""}|${item.cardCode}|${item.docNum}`,
-      item,
-    );
+    mapa.set(`${item.sociedad ?? ""}|${item.cardCode}|${item.docNum}`, item);
   }
 
   return documentos.map((doc) => {
@@ -346,14 +358,14 @@ export function etiquetaDiasVisita(values: Iterable<string>): string {
 
 export type ModoPeriodoBitacora = "dia" | "semanal";
 
-/** Estatus del encabezado de bitácora: B = Borrador, T = Terminado */
-export type EstatusBitacoraEncabezado = "B" | "T";
+/** Estatus del encabezado: B = Borrador, T = Creado, C = Cerrado */
+export type EstatusBitacoraEncabezado = "B" | "T" | "C";
 
 export function normalizarEstatusBitacora(
   estatus: string | null | undefined,
 ): EstatusBitacoraEncabezado | null {
   const valor = (estatus ?? "").trim().toUpperCase();
-  if (valor === "B" || valor === "T") return valor;
+  if (valor === "B" || valor === "T" || valor === "C") return valor;
   return null;
 }
 
@@ -361,7 +373,8 @@ export function etiquetaEstatusBitacora(
   estatus: string | null | undefined,
 ): string {
   const codigo = normalizarEstatusBitacora(estatus);
-  if (codigo === "T") return "Terminado";
+  if (codigo === "C") return "Cerrado";
+  if (codigo === "T") return "Creado";
   if (codigo === "B") return "Borrador";
   return estatus?.trim() || "Borrador";
 }
@@ -370,6 +383,9 @@ export function claseBadgeEstatusBitacora(
   estatus: string | null | undefined,
 ): string {
   const codigo = normalizarEstatusBitacora(estatus) ?? "B";
+  if (codigo === "C") {
+    return "rounded-full bg-slate-200 px-3 py-1 text-sm font-medium text-slate-800 dark:bg-slate-700/60 dark:text-slate-200";
+  }
   if (codigo === "T") {
     return "rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";
   }
@@ -805,7 +821,9 @@ export function detalleToDocumentoGenerar(
   };
 }
 
-function detalleToValidarCobroItem(d: BitacoraDetalle): ValidarCobroDetalleItem {
+function detalleToValidarCobroItem(
+  d: BitacoraDetalle,
+): ValidarCobroDetalleItem {
   return {
     idBitacoraDetalle: d.idBitacoraDetalle,
     cardCode: d.cardCode,

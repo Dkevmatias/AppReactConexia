@@ -9,6 +9,7 @@ import { FcDataConfiguration } from "react-icons/fc";
 import { FaPersonWalkingArrowRight } from "react-icons/fa6";
 import { RxActivityLog } from "react-icons/rx";
 import { GiProcessor } from "react-icons/gi";
+import { HiMiniClipboardDocumentCheck } from "react-icons/hi2";
 
 import {
   Inicio,
@@ -120,6 +121,13 @@ const navItems: NavItem[] = [
         name: "Lista de Bitacoras de Cobranza",
         path: "/operaciones/ListaBitacorasCobranza",
         icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+
+      {
+        name: "Recepción de Rutas",
+        path: "/operaciones/RecepcionRutas",
+        icon: <HiMiniClipboardDocumentCheck className="w-4 h-4 shrink-0" />,
         pro: false,
       },
     ],
