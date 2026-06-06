@@ -102,6 +102,7 @@ export interface BitacoraDetalle {
   idUsuarioCreacion: number;
   idUsuarioEdita: number | null;
   observaciones: string | null;
+  condicion: string | null;
   estatus: string | null;
   estatusCobro: string | null;
   saldoAlCapturar: number | null;
@@ -131,6 +132,7 @@ export interface BitacoraDetallePayload {
   folio?: number | null;
   idUsuarioCreacion: number;
   observaciones?: string | null;
+  condicion?: string | null;
   estatus?: string | null;
   activo: boolean;
 }
@@ -158,6 +160,7 @@ export interface BitacoraDetalleUpdatePayload {
   folio?: number | null;
   idUsuarioEdita: number;
   observaciones?: string | null;
+  condicion?: string | null;
   estatus?: string | null;
   activo: boolean;
 }
@@ -182,6 +185,7 @@ export interface DocumentoCobranzaGenerar {
   paidToDate: number;
   saldoDocumento: number;
   pymntGroup: string | null;
+  condicion: string | null;
   u_BXP_RUTA: string | null;
   slpName: string | null;
   uDiaVisita: string | null;
@@ -335,6 +339,8 @@ export interface GenerarBitacoraParams {
   /** Días SAP 1-7 (modo día específico); query: uDiaVisita=1&uDiaVisita=3 */
   uDiaVisitas?: string[];
   sociedad?: string;
+  /** Incluye documentos Contado del vendedor aunque no pertenezcan a la ruta */
+  incluirContado?: boolean;
 }
 
 export const DIAS_VISITA = [
@@ -607,6 +613,7 @@ function normalizeDetalle(raw: unknown): BitacoraDetalle {
       pickNumber(o, "idUsuarioCreacion", "IdUsuarioCreacion") ?? 0,
     idUsuarioEdita: pickNumber(o, "idUsuarioEdita", "IdUsuarioEdita"),
     observaciones: pickString(o, "observaciones", "Observaciones"),
+    condicion: pickString(o, "condicion", "Condicion"),
     estatus: pickString(o, "estatus", "Estatus"),
     estatusCobro: pickString(o, "estatusCobro", "EstatusCobro"),
     saldoAlCapturar: pickNumber(o, "saldoAlCapturar", "SaldoAlCapturar"),
@@ -644,6 +651,9 @@ function normalizeDocumento(raw: unknown): DocumentoCobranzaGenerar {
     paidToDate: pickNumber(o, "paidToDate", "PaidToDate") ?? 0,
     saldoDocumento: pickNumber(o, "saldoDocumento", "SaldoDocumento") ?? 0,
     pymntGroup: pickString(o, "pymntGroup", "PymntGroup"),
+    condicion:
+      pickString(o, "condicion", "Condicion") ??
+      pickString(o, "pymntGroup", "PymntGroup"),
     u_BXP_RUTA: pickString(o, "u_BXP_RUTA", "U_BXP_RUTA"),
     slpName: pickString(o, "slpName", "SlpName"),
     uDiaVisita: pickString(o, "uDiaVisita", "UDiaVisita"),
@@ -767,6 +777,7 @@ export function documentoToDetallePayload(
     folio: doc.docNum,
     idUsuarioCreacion,
     observaciones: "",
+    condicion: (doc.condicion ?? doc.pymntGroup ?? "").trim() || null,
     estatus: doc.estatus || "P",
     activo: true,
   };
@@ -811,7 +822,8 @@ export function detalleToDocumentoGenerar(
         ? d.pagoPrizma
         : Math.max(d.total - d.porCobrar, 0)),
     saldoDocumento: d.saldoSap ?? d.porCobrar,
-    pymntGroup: null,
+    pymntGroup: d.condicion,
+    condicion: d.condicion,
     u_BXP_RUTA: null,
     slpName: null,
     uDiaVisita: null,
@@ -819,6 +831,48 @@ export function detalleToDocumentoGenerar(
     estatusCobro: d.estatusCobro,
     idBitacoraDetalle: d.idBitacoraDetalle,
   };
+}
+
+/** Condición de pago para pantalla/PDF (prioriza condicion del API/BD). */
+export function valorCondicionDocumento(
+  doc: Pick<DocumentoCobranzaGenerar, "condicion" | "pymntGroup">,
+): string {
+  return (doc.condicion ?? doc.pymntGroup ?? "").trim();
+}
+
+export function etiquetaCondicionDocumento(
+  doc: Pick<DocumentoCobranzaGenerar, "condicion" | "pymntGroup">,
+): string {
+  return valorCondicionDocumento(doc) || "—";
+}
+
+const CONDICIONES_CONTADO_PRIORITARIAS = new Set(["CONTADO-COD", "CONTADO-S"]);
+
+/** Contado-COD y Contado-S: prioridad visual al generar. */
+export function esCondicionContadoPrioritaria(
+  doc: Pick<DocumentoCobranzaGenerar, "condicion" | "pymntGroup">,
+): boolean {
+  const valor = valorCondicionDocumento(doc).toUpperCase();
+  return CONDICIONES_CONTADO_PRIORITARIAS.has(valor);
+}
+
+/** Cualquier condición Contado (Contado-COD, Contado-S, etc.). */
+export function esCondicionContado(
+  doc: Pick<DocumentoCobranzaGenerar, "condicion" | "pymntGroup">,
+): boolean {
+  return valorCondicionDocumento(doc).toLowerCase().startsWith("contado");
+}
+
+export function prioridadOrdenCondicionContado(
+  doc: Pick<DocumentoCobranzaGenerar, "condicion" | "pymntGroup">,
+): number {
+  if (esCondicionContadoPrioritaria(doc)) return 0;
+  if (esCondicionContado(doc)) return 1;
+  return 2;
+}
+
+export function claseFilaContadoPrioritario(): string {
+  return "bg-pink-100/80 dark:bg-pink-900/35";
 }
 
 function detalleToValidarCobroItem(
@@ -1027,6 +1081,9 @@ export const bitacoraCobranzaService = {
     appendQueryList(qs, "uBxpRuta", params.uBxpRutas);
     appendQueryList(qs, "uDiaVisita", params.uDiaVisitas);
     if (params.sociedad) qs.append("sociedad", params.sociedad);
+    if (params.incluirContado !== false) {
+      qs.append("incluirContado", "true");
+    }
     const response = await api.get<unknown>(
       `/api/BitacoraCobranzaDetalle/generar?${qs.toString()}`,
     );
@@ -1039,6 +1096,16 @@ export const bitacoraCobranzaService = {
     params: Omit<GenerarBitacoraParams, "uDiaVisitas">,
   ): Promise<GenerarBitacoraResponse> => {
     return bitacoraCobranzaService.generarDocumentos(params);
+  },
+
+  /** Generar desde pantalla de bitácora: siempre incluye documentos Contado. */
+  generarDocumentosParaBitacora: async (
+    params: GenerarBitacoraParams,
+  ): Promise<GenerarBitacoraResponse> => {
+    return bitacoraCobranzaService.generarDocumentos({
+      ...params,
+      incluirContado: true,
+    });
   },
 
   guardarDetalleEnLote: async (

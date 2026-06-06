@@ -25,19 +25,23 @@ import {
   buildBitacoraUpdatePayload,
   calcularVencidas,
   claseBadgeEstatusBitacora,
+  claseFilaContadoPrioritario,
   claseFilaEstatusCobro,
   ClienteBitacoraBusqueda,
+  esCondicionContadoPrioritaria,
   clienteBitacoraBusquedaKey,
   documentoCobranzaUnicoKey,
   detalleToDocumentoGenerar,
   DIAS_VISITA,
   DocumentoCobranzaGenerar,
+  etiquetaCondicionDocumento,
   etiquetaDiasVisita,
   etiquetaEstatusBitacora,
   etiquetaEstatusCobro,
   mergeEstatusCobroEnDocumentos,
   ModoPeriodoBitacora,
   normalizarEstatusBitacora,
+  prioridadOrdenCondicionContado,
   prioridadOrdenEstatusCobro,
   ValidarCobroBitacoraResponse,
 } from "../../services/bitacoraCobranzaService";
@@ -127,6 +131,18 @@ function estatusLabel(estatus: string | null | undefined): string {
 
 function estatusCartera(doc: DocumentoCobranzaGenerar): "OK" | "V" {
   return doc.porVencer > 0 || calcularVencidas(doc) > 0 ? "V" : "OK";
+}
+
+function ordenarDocumentosParaPdf(
+  documentos: DocumentoCobranzaGenerar[],
+): DocumentoCobranzaGenerar[] {
+  return [...documentos].sort((a, b) => {
+    const cliente = a.cardName.localeCompare(b.cardName, "es", {
+      sensitivity: "base",
+    });
+    if (cliente !== 0) return cliente;
+    return a.docNum - b.docNum;
+  });
 }
 
 function documentoPasaFiltrosTabla(
@@ -261,9 +277,8 @@ export default function BitacoraCobranza() {
     Set<string>
   >(new Set());
   const [totalRegistros, setTotalRegistros] = useState(0);
-  const [clavesDocumentosPersistidos, setClavesDocumentosPersistidos] = useState<
-    Set<string>
-  >(new Set());
+  const [clavesDocumentosPersistidos, setClavesDocumentosPersistidos] =
+    useState<Set<string>>(new Set());
   const [detalleGuardado, setDetalleGuardado] = useState(false);
   const [cobroValidado, setCobroValidado] = useState(false);
   const [validandoCobro, setValidandoCobro] = useState(false);
@@ -404,6 +419,10 @@ export default function BitacoraCobranza() {
         documentoPasaFiltrosTabla(doc, filtroEstatus, filtroEstatusEntrega),
       )
       .sort((a, b) => {
+        const ordenContado =
+          prioridadOrdenCondicionContado(a.doc) -
+          prioridadOrdenCondicionContado(b.doc);
+        if (ordenContado !== 0) return ordenContado;
         if (cobroValidado) {
           const ordenCobro =
             prioridadOrdenEstatusCobro(a.doc.estatusCobro) -
@@ -482,7 +501,12 @@ export default function BitacoraCobranza() {
     setDocumentosSeleccionados((prev) =>
       acotarSeleccionAlFiltro(documentos, prev),
     );
-  }, [filtroEstatus, filtroEstatusEntrega, acotarSeleccionAlFiltro, documentos]);
+  }, [
+    filtroEstatus,
+    filtroEstatusEntrega,
+    acotarSeleccionAlFiltro,
+    documentos,
+  ]);
 
   const cargarBitacoraExistente = useCallback(async (id: number) => {
     setLoading(true);
@@ -722,9 +746,7 @@ export default function BitacoraCobranza() {
     bitacoraId: number,
   ): Promise<BitacoraCobranzaModel> => {
     if (!user?.idPersona) {
-      throw new Error(
-        "No hay sesión de usuario para actualizar la bitácora.",
-      );
+      throw new Error("No hay sesión de usuario para actualizar la bitácora.");
     }
 
     const encabezado =
@@ -799,9 +821,7 @@ export default function BitacoraCobranza() {
       };
 
       const resultado =
-        modoPeriodo === "semanal"
-          ? await bitacoraCobranzaService.generarDocumentosSemanal(params)
-          : await bitacoraCobranzaService.generarDocumentos(params);
+        await bitacoraCobranzaService.generarDocumentosParaBitacora(params);
 
       if (resultado.sociedad && !sociedad.trim()) {
         setSociedad(resultado.sociedad);
@@ -825,8 +845,7 @@ export default function BitacoraCobranza() {
       setTotalRegistros(merged.length);
       setCobroValidado(false);
       setResumenValidacionCobro(null);
-      const refFolio =
-        bitacoraRef?.folio ?? folioBitacora ?? null;
+      const refFolio = bitacoraRef?.folio ?? folioBitacora ?? null;
       const omitidos = resultado.documentos.length - nuevos.length;
       setMensaje(
         nuevos.length > 0
@@ -894,7 +913,9 @@ export default function BitacoraCobranza() {
           const clave = documentoCobranzaUnicoKey(doc);
           if (!clavesGuardadas.includes(clave)) return doc;
           const registro = guardados.find(
-            (item) => documentoCobranzaUnicoKey(detalleToDocumentoGenerar(item)) === clave,
+            (item) =>
+              documentoCobranzaUnicoKey(detalleToDocumentoGenerar(item)) ===
+              clave,
           );
           return registro
             ? {
@@ -1345,9 +1366,9 @@ export default function BitacoraCobranza() {
   };
 
   const handleGenerarPdf = () => {
-    const docsPdf = documentosParaGuardar.length
-      ? documentosParaGuardar
-      : documentos;
+    const docsPdf = ordenarDocumentosParaPdf(
+      documentosParaGuardar.length ? documentosParaGuardar : documentos,
+    );
     if (!idBitacora || !docsPdf.length) {
       setError("No hay detalle para generar el PDF.");
       return;
@@ -1392,6 +1413,7 @@ export default function BitacoraCobranza() {
               <strong>${escapeHtml(doc.docNum)}</strong>
               ${escapeHtml(etiquetaSociedad(doc.sociedad))}
             </td>
+            <td class="center col-condicion">${escapeHtml(etiquetaCondicionDocumento(doc))}</td>
             <td class="center col-compact">${escapeHtml(formatearFecha(doc.docDate))}</td>
             <td class="center col-compact">${escapeHtml(formatearFecha(doc.docDueDate))}</td>
             <td class="center col-money col-total">${escapeHtml(formatCurrency(doc.docTotal))}</td>
@@ -1404,6 +1426,7 @@ export default function BitacoraCobranza() {
       )
       .join("");
 
+    // El encabezado se repite en cada página al imprimir gracias a thead, sin usar position:fixed que traslapa filas en páginas 2+.
     const pdfEncabezadoHtml = `
       <div class="header">
         <div class="company">
@@ -1437,7 +1460,17 @@ export default function BitacoraCobranza() {
           <meta charset="utf-8" />
           <title>Bitácora de Cobranza ${escapeHtml(etiquetaBitacora)}</title>
           <style>
-            @page { size: letter landscape; margin: 10mm; }
+            @page {
+              size: letter landscape;
+              margin: 10mm 10mm 14mm 10mm;
+
+              @bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 9px;
+                color: #6b7280;
+              }
+            }
             * { box-sizing: border-box; }
             body {
               font-family: Arial, Helvetica, sans-serif;
@@ -1605,6 +1638,16 @@ export default function BitacoraCobranza() {
               font-weight: 700;
               margin-bottom: 1px;
             }
+            .col-condicion {
+              width: 52px;
+              max-width: 52px;
+              font-size: 8.5px;
+              line-height: 1.15;
+              padding: 2px 2px;
+              text-align: center;
+              word-wrap: break-word;
+              overflow-wrap: break-word;
+            }
             .col-compact {
               width: 36px;
               max-width: 36px;
@@ -1674,12 +1717,19 @@ export default function BitacoraCobranza() {
               margin-top: 8px;
               display: flex;
               justify-content: space-between;
+              align-items: center;
               color: #6b7280;
               font-size: 10px;
+            }
+            .print-page-label::after {
+              content: "Vista previa · al imprimir se numera cada hoja";
             }
             @media print {
               .no-print { display: none; }
               body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+              .print-page-label::after {
+                content: "";
+              }
             }
           </style>
         </head>
@@ -1690,6 +1740,7 @@ export default function BitacoraCobranza() {
               <col style="width:25%" />
               <col style="width:48px" />
               <col style="width:54px" />
+              <col style="width:52px" />
               <col style="width:36px" />
               <col style="width:36px" />
               <col style="width:44px" />
@@ -1700,7 +1751,7 @@ export default function BitacoraCobranza() {
             </colgroup>
             <thead>
               <tr>
-                <td colspan="11" class="cell-banner">
+                <td colspan="12" class="cell-banner">
                   ${pdfEncabezadoHtml}
                 </td>
               </tr>
@@ -1709,6 +1760,7 @@ export default function BitacoraCobranza() {
                 <th class="col-cliente">Cliente</th>
                 <th class="col-referencia">Referencias</th>
                 <th class="col-doc">Doc</th>
+                <th class="col-condicion">Condición</th>
                 <th class="col-compact">Fecha</th>
                 <th class="col-compact">Vence</th>
                 <th class="col-money">Total</th>
@@ -1721,7 +1773,7 @@ export default function BitacoraCobranza() {
             <tbody>
               ${rows}
               <tr class="totals data-row">
-                <td colspan="6" class="right">Totales</td>
+                <td colspan="7" class="right">Totales</td>
                 <td class="center col-money col-total">${escapeHtml(formatCurrency(total))}</td>
                 <td class="center col-money">${escapeHtml(formatCurrency(totalCobrado))}</td>
                 <td colspan="3"></td>
@@ -1729,14 +1781,14 @@ export default function BitacoraCobranza() {
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="11" class="cell-footer">
+                <td colspan="12" class="cell-footer">
                   <div class="signatures">
                     <div class="signature">Nombre y Firma de Entrega</div>
                     <div class="signature">Nombre y Firma de Recibo</div>
                   </div>
                   <div class="footer">
                     <span>Bitácora ${escapeHtml(etiquetaBitacora)}</span>
-                    <span>Página generada para impresión/PDF</span>
+                    <span class="print-page-label"></span>
                   </div>
                 </td>
               </tr>
@@ -2022,7 +2074,11 @@ export default function BitacoraCobranza() {
           <button
             type="button"
             onClick={() => void handleGuardarDetalle()}
-            disabled={guardando || documentosParaGuardar.length === 0 || bitacoraTerminada}
+            disabled={
+              guardando ||
+              documentosParaGuardar.length === 0 ||
+              bitacoraTerminada
+            }
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
           >
             {guardando ? (
@@ -2125,7 +2181,8 @@ export default function BitacoraCobranza() {
                     ? ` | Mostrando: ${documentosFiltradosOrdenados.length}`
                     : ""}
                 </span>
-                {(filtroEstatus !== "todos" || filtroEstatusEntrega.size > 0) && (
+                {(filtroEstatus !== "todos" ||
+                  filtroEstatusEntrega.size > 0) && (
                   <span className="text-gray-500 dark:text-gray-400">
                     El filtro define qué filas se muestran y cuáles quedan
                     seleccionados para guardar.
@@ -2289,6 +2346,9 @@ export default function BitacoraCobranza() {
                   <th className="w-36 px-2 py-2 text-left font-medium text-gray-600 dark:text-gray-300">
                     Fechas
                   </th>
+                  <th className="w-24 px-2 py-2 text-left font-medium text-gray-600 dark:text-gray-300">
+                    Condición
+                  </th>
                   <th className="w-28 px-2 py-2 text-right font-medium text-gray-600 dark:text-gray-300">
                     Total
                   </th>
@@ -2319,21 +2379,26 @@ export default function BitacoraCobranza() {
                   const seleccionado =
                     documentosSeleccionados.has(claveSeleccion);
                   const estatus = estatusCartera(doc);
-                  const filaCobro =
-                    cobroValidado && seleccionado && !persistido
-                      ? claseFilaEstatusCobro(doc.estatusCobro)
-                      : "";
+                  const esBorrador = estatusEncabezado === "B";
+                  const esContadoPrioritario =
+                    esBorrador &&
+                    esCondicionContadoPrioritaria(doc) &&
+                    !persistido;
+                  const filaPorEstatusCobro = cobroValidado
+                    ? claseFilaEstatusCobro(doc.estatusCobro) ||
+                      "bg-white dark:bg-gray-800"
+                    : "";
+                  const claseFila = esContadoPrioritario
+                    ? claseFilaContadoPrioritario()
+                    : esBorrador
+                      ? persistido
+                        ? "bg-gray-200/80 text-gray-500 dark:bg-gray-800/80 dark:text-gray-400"
+                        : seleccionado
+                          ? filaPorEstatusCobro || "bg-white dark:bg-gray-800"
+                          : "bg-gray-50 text-gray-400 dark:bg-gray-900/30"
+                      : filaPorEstatusCobro || "bg-white dark:bg-gray-800";
                   return (
-                    <tr
-                      key={key}
-                      className={
-                        persistido
-                          ? "bg-gray-200/80 text-gray-500 dark:bg-gray-800/80 dark:text-gray-400"
-                          : seleccionado
-                            ? filaCobro
-                            : "bg-gray-50 text-gray-400 dark:bg-gray-900/30"
-                      }
-                    >
+                    <tr key={key} className={claseFila}>
                       <td className="px-2 py-2">
                         <input
                           type="checkbox"
@@ -2377,6 +2442,12 @@ export default function BitacoraCobranza() {
                         <div className="text-gray-500">
                           {doc.diasVencido} días
                         </div>
+                      </td>
+                      <td
+                        className="max-w-[96px] px-2 py-2 text-[11px] leading-5"
+                        title={etiquetaCondicionDocumento(doc)}
+                      >
+                        {etiquetaCondicionDocumento(doc)}
                       </td>
                       <td className="whitespace-nowrap px-2 py-2 text-right">
                         {formatCurrency(doc.docTotal)}
