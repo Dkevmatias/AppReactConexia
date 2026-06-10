@@ -153,6 +153,17 @@ export interface Vendedor {
   cardCode: string;
 }
 
+export interface Vendedores {
+  idVendedor: number;
+  nombre: string;
+  slpName: string;
+  idUsuarioPrizma: number;
+  idUsuarioPrizma2: number;
+  idEmpresa: number;
+  idSucursal: number;
+  activo: boolean;
+}
+
 export interface Marca {
   idMarca: number;
   firmName: string;
@@ -188,7 +199,10 @@ function pickString(
 }
 
 function normalizeVendedor(raw: unknown): Vendedor {
-  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
   const username = pickString(o, "username", "Username", "userName") ?? "";
   const slpName =
     pickString(o, "slpName", "SlpName", "slpCode", "SlpCode") ?? username;
@@ -208,7 +222,9 @@ function normalizeVendedor(raw: unknown): Vendedor {
 function normalizeVendedoresArray(raw: unknown): Vendedor[] {
   const list = Array.isArray(raw)
     ? raw
-    : raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
+    : raw &&
+        typeof raw === "object" &&
+        Array.isArray((raw as { data?: unknown }).data)
       ? (raw as { data: unknown[] }).data
       : [];
   return list.map(normalizeVendedor).filter((v) => v.idUsuario > 0);
@@ -430,6 +446,31 @@ export const getReportesService = {
   getVendedores: async (): Promise<Vendedor[]> => {
     const response = await api.get<unknown>(`/api/Usuarios/GetVendedores`);
     return normalizeVendedoresArray(response.data);
+  },
+
+  // Endpoint específico para obtener vendedores con estructura y datos necesarios para Prizma
+  getVendedoresPrizma: async (): Promise<Vendedores[]> => {
+    const response = await api.get<unknown>(`/api/Vendedores/`);
+    const raw = response.data;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((item) => {
+      const o = (item && typeof item === "object" ? item : {}) as Record<
+        string,
+        unknown
+      >;
+      return {
+        idVendedor: pickNumber(o, "idVendedor", "IdVendedor") ?? 0,
+        nombre: pickString(o, "nombre", "Nombre") ?? "",
+        slpName: pickString(o, "slpName", "SlpName") ?? "",
+        idUsuarioPrizma:
+          pickNumber(o, "idUsuarioPrizma", "IdUsuarioPrizma") ?? 0,
+        idUsuarioPrizma2:
+          pickNumber(o, "idUsuarioPrizma2", "IdUsuarioPrizma2") ?? 0,
+        idEmpresa: pickNumber(o, "idEmpresa", "IdEmpresa") ?? 0,
+        idSucursal: pickNumber(o, "idSucursal", "IdSucursal") ?? 0,
+        activo: typeof o.activo === "boolean" ? o.activo : o.Activo === true,
+      } satisfies Vendedores;
+    });
   },
 
   getMarcas: async () => {

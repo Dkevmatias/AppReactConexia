@@ -10,17 +10,24 @@ import {
   etiquetaEstatusBitacora,
 } from "../../services/bitacoraCobranzaService";
 import { rutasService, Ruta } from "../../services/rutasService";
-import { getReportesService, Vendedor } from "../../services/reportesService";
+import {
+  getReportesService,
+  Vendedor,
+  Vendedores,
+} from "../../services/reportesService";
 
 const inputClass =
   "rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white";
-const labelClass = "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
+const labelClass =
+  "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
 
 function formatearFecha(valor: string | number | null | undefined): string {
   if (valor == null || valor === "") return "—";
   if (typeof valor === "number") {
     const d = new Date(valor);
-    return Number.isNaN(d.getTime()) ? String(valor) : d.toLocaleString("es-MX");
+    return Number.isNaN(d.getTime())
+      ? String(valor)
+      : d.toLocaleString("es-MX");
   }
   const d = new Date(valor);
   return Number.isNaN(d.getTime()) ? valor : d.toLocaleString("es-MX");
@@ -29,7 +36,7 @@ function formatearFecha(valor: string | number | null | undefined): string {
 export default function ListaBitacorasCobranza() {
   const { user } = useAuth();
   const [bitacoras, setBitacoras] = useState<BitacoraCobranza[]>([]);
-  const [vendedores, setVendedores] = useState<Vendedor[]>([]);
+  const [vendedores, setVendedores] = useState<Vendedores[]>([]);
   const [rutas, setRutas] = useState<Ruta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +46,7 @@ export default function ListaBitacorasCobranza() {
   const mapaVendedores = useMemo(() => {
     const m = new Map<number, string>();
     for (const v of vendedores) {
-      m.set(v.idUsuario, v.nombre);
+      m.set(v.idVendedor, v.nombre);
     }
     return m;
   }, [vendedores]);
@@ -65,7 +72,7 @@ export default function ListaBitacorasCobranza() {
     try {
       const [listaBase, vendedoresData, rutasData] = await Promise.all([
         bitacoraCobranzaService.getBitacorasPorUsuario(user.idPersona, true),
-        getReportesService.getVendedores(),
+        getReportesService.getVendedoresPrizma(),
         rutasService.getRutas(),
       ]);
 
@@ -82,7 +89,11 @@ export default function ListaBitacorasCobranza() {
       setRutas(rutasData ?? []);
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "No se pudieron cargar las bitácoras.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudieron cargar las bitácoras.",
+      );
     } finally {
       setLoading(false);
     }
@@ -94,7 +105,9 @@ export default function ListaBitacorasCobranza() {
 
   const eliminar = async (row: BitacoraCobranza) => {
     const folioLabel =
-      row.folio != null && row.folio > 0 ? `folio ${row.folio}` : `#${row.idBitacora}`;
+      row.folio != null && row.folio > 0
+        ? `folio ${row.folio}`
+        : `#${row.idBitacora}`;
     if (!window.confirm(`¿Eliminar la bitácora ${folioLabel}?`)) return;
     try {
       await bitacoraCobranzaService.eliminarBitacora(row.idBitacora);
@@ -118,7 +131,8 @@ export default function ListaBitacorasCobranza() {
             Lista de Bitácoras de Cobranza
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Solo sus bitácoras creadas. Filtre por vendedor o ruta dentro de su listado.
+            Solo sus bitácoras creadas. Filtre por vendedor o ruta dentro de su
+            listado.
           </p>
         </div>
         <Link
@@ -143,7 +157,7 @@ export default function ListaBitacorasCobranza() {
           >
             <option value="">Todos</option>
             {vendedores.map((v) => (
-              <option key={v.idUsuario} value={v.idUsuario}>
+              <option key={v.idVendedor} value={v.idVendedor}>
                 {v.nombre}
               </option>
             ))}
@@ -189,7 +203,9 @@ export default function ListaBitacorasCobranza() {
             Cargando bitácoras...
           </div>
         ) : bitacoras.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-gray-500">No hay bitácoras registradas.</p>
+          <p className="px-4 py-8 text-center text-sm text-gray-500">
+            No hay bitácoras registradas.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
@@ -222,7 +238,9 @@ export default function ListaBitacorasCobranza() {
                 {bitacoras.map((b) => (
                   <tr key={b.idBitacora}>
                     <td className="px-4 py-2 font-medium">
-                      {b.folio != null && b.folio > 0 ? b.folio : `#${b.idBitacora}`}
+                      {b.folio != null && b.folio > 0
+                        ? b.folio
+                        : `#${b.idBitacora}`}
                     </td>
                     <td className="px-4 py-2">
                       {mapaVendedores.get(b.idVendedor) ?? `#${b.idVendedor}`}
@@ -233,7 +251,10 @@ export default function ListaBitacorasCobranza() {
                     <td className="px-4 py-2 whitespace-nowrap">
                       {formatearFecha(b.fechaCreacion)}
                     </td>
-                    <td className="px-4 py-2 max-w-xs truncate" title={b.observaciones ?? ""}>
+                    <td
+                      className="px-4 py-2 max-w-xs truncate"
+                      title={b.observaciones ?? ""}
+                    >
                       {b.observaciones || "—"}
                     </td>
                     <td className="px-4 py-2">
