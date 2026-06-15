@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -23,7 +23,6 @@ import {
   bitacoraCobranzaService,
   BitacoraCobranza as BitacoraCobranzaModel,
   buildBitacoraUpdatePayload,
-  calcularVencidas,
   claseBadgeEstatusBitacora,
   claseFilaContadoPrioritario,
   claseFilaEstatusCobro,
@@ -134,7 +133,7 @@ function estatusLabel(estatus: string | null | undefined): string {
 }
 
 function estatusCartera(doc: DocumentoCobranzaGenerar): "OK" | "V" {
-  return doc.porVencer > 0 || calcularVencidas(doc) > 0 ? "V" : "OK";
+  return doc.diasVencido > 0 ? "V" : "OK";
 }
 
 function ordenarDocumentosParaPdf(
@@ -193,6 +192,21 @@ function estatusClass(estatus: string | null | undefined): string {
     return "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200";
   }
   return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200";
+}
+
+function normalizarFolioEscaneo(texto: string): string {
+  const limpio = texto.trim();
+  if (!limpio) return "";
+  const soloDigitos = limpio.replace(/\D/g, "");
+  if (soloDigitos) {
+    const numerico = Number(soloDigitos);
+    if (Number.isFinite(numerico) && numerico > 0) return String(numerico);
+  }
+  return limpio;
+}
+
+function claseFilaEscaneoValidado(): string {
+  return "bg-emerald-100 text-gray-900 ring-1 ring-inset ring-emerald-400 dark:bg-emerald-900/45 dark:text-emerald-50 dark:ring-emerald-600";
 }
 
 function folioBitacoraValido(folio: number | null | undefined): boolean {
@@ -324,6 +338,21 @@ export default function BitacoraCobranza() {
     string | null
   >(null);
 
+  const [folioEscaneoInput, setFolioEscaneoInput] = useState("");
+  const [foliosEscaneadosValidados, setFoliosEscaneadosValidados] = useState<
+    Set<string>
+  >(new Set());
+  const [mensajeEscaneoExito, setMensajeEscaneoExito] = useState<string | null>(
+    null,
+  );
+  const [modalDocNoEncontrado, setModalDocNoEncontrado] = useState<{
+    abierto: boolean;
+    folio: string;
+  }>({ abierto: false, folio: "" });
+
+  const inputEscaneoFolioRef = useRef<HTMLInputElement>(null);
+  const filaEscaneoRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+
   const vendedorSeleccionado = useMemo(
     () => vendedores.find((v) => v.idVendedor === idVendedor) ?? null,
     [vendedores, idVendedor],
@@ -426,6 +455,10 @@ export default function BitacoraCobranza() {
     () => documentosPersistidos.length,
     [documentosPersistidos],
   );
+  const puedeValidarEscaneoFisico =
+    estatusEncabezado === "B" &&
+    tieneDetallePersistido &&
+    documentosPersistidos.length > 0;
   const puedeGenerarPdf =
     (estatusEncabezado === "T" || estatusEncabezado === "C") &&
     !!idBitacora &&
@@ -1292,6 +1325,63 @@ export default function BitacoraCobranza() {
       return next;
     });
   };
+
+  const procesarEscaneoFolio = useCallback(() => {
+    const folio = normalizarFolioEscaneo(folioEscaneoInput);
+    if (!folio) return;
+
+    const encontrado = documentosPersistidos.find(
+      (doc) => String(doc.docNum) === folio,
+    );
+
+    setFolioEscaneoInput("");
+
+    if (encontrado) {
+      setFoliosEscaneadosValidados((prev) => {
+        const next = new Set(prev);
+        next.add(folio);
+        return next;
+      });
+      setMensajeEscaneoExito(
+        `Documento ${folio} encontrado en la bitácora.`,
+      );
+      const clave = documentoCobranzaUnicoKey(encontrado);
+      window.setTimeout(() => {
+        filaEscaneoRefs.current
+          .get(clave)
+          ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        inputEscaneoFolioRef.current?.focus();
+      }, 0);
+      return;
+    }
+
+    setModalDocNoEncontrado({ abierto: true, folio });
+    inputEscaneoFolioRef.current?.blur();
+  }, [documentosPersistidos, folioEscaneoInput]);
+
+  const cerrarModalDocNoEncontrado = useCallback(() => {
+    setModalDocNoEncontrado({ abierto: false, folio: "" });
+    window.setTimeout(() => inputEscaneoFolioRef.current?.focus(), 0);
+  }, []);
+
+  useEffect(() => {
+    if (!mensajeEscaneoExito) return;
+    const timer = window.setTimeout(() => setMensajeEscaneoExito(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [mensajeEscaneoExito]);
+
+  useEffect(() => {
+    if (!puedeValidarEscaneoFisico) return;
+    inputEscaneoFolioRef.current?.focus();
+  }, [puedeValidarEscaneoFisico]);
+
+  useEffect(() => {
+    setFolioEscaneoInput("");
+    setFoliosEscaneadosValidados(new Set());
+    setMensajeEscaneoExito(null);
+    setModalDocNoEncontrado({ abierto: false, folio: "" });
+    filaEscaneoRefs.current.clear();
+  }, [idBitacora]);
 
   const handleNuevaBitacora = () => {
     setIdBitacora(null);
@@ -2423,6 +2513,51 @@ export default function BitacoraCobranza() {
                 </button>
               </div>
             </div>
+            {puedeValidarEscaneoFisico && (
+              <div className="min-w-[240px] flex-1">
+                <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
+                  Validar folio (escáner / Doc.)
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative min-w-[180px] flex-1">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      ref={inputEscaneoFolioRef}
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      value={folioEscaneoInput}
+                      onChange={(e) => setFolioEscaneoInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          procesarEscaneoFolio();
+                        }
+                      }}
+                      placeholder="Escanee o escriba folio..."
+                      className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={procesarEscaneoFolio}
+                    className="rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                  >
+                    Buscar
+                  </button>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    {foliosEscaneadosValidados.size}/{documentosPersistidos.length}{" "}
+                    validados
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {mensajeEscaneoExito && (
+          <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+            {mensajeEscaneoExito}
           </div>
         )}
 
@@ -2558,6 +2693,9 @@ export default function BitacoraCobranza() {
                     documentosSeleccionados.has(claveSeleccion);
                   const estatus = estatusCartera(doc);
                   const esBorrador = estatusEncabezado === "B";
+                  const validadoPorEscaneo =
+                    persistido &&
+                    foliosEscaneadosValidados.has(String(doc.docNum));
                   const esContadoPrioritario =
                     esBorrador &&
                     esCondicionContadoPrioritaria(doc) &&
@@ -2566,17 +2704,30 @@ export default function BitacoraCobranza() {
                     ? claseFilaEstatusCobro(doc.estatusCobro) ||
                       "bg-white dark:bg-gray-800"
                     : "";
-                  const claseFila = esContadoPrioritario
-                    ? claseFilaContadoPrioritario()
-                    : esBorrador
-                      ? persistido
-                        ? "bg-gray-200/80 text-gray-500 dark:bg-gray-800/80 dark:text-gray-400"
-                        : seleccionado
-                          ? filaPorEstatusCobro || "bg-white dark:bg-gray-800"
-                          : "bg-gray-50 text-gray-400 dark:bg-gray-900/30"
-                      : filaPorEstatusCobro || "bg-white dark:bg-gray-800";
+                  const claseFila = validadoPorEscaneo
+                    ? claseFilaEscaneoValidado()
+                    : esContadoPrioritario
+                      ? claseFilaContadoPrioritario()
+                      : esBorrador
+                        ? persistido
+                          ? "bg-gray-200/80 text-gray-500 dark:bg-gray-800/80 dark:text-gray-400"
+                          : seleccionado
+                            ? filaPorEstatusCobro ||
+                              "bg-white dark:bg-gray-800"
+                            : "bg-gray-50 text-gray-400 dark:bg-gray-900/30"
+                        : filaPorEstatusCobro || "bg-white dark:bg-gray-800";
                   return (
-                    <tr key={key} className={claseFila}>
+                    <tr
+                      key={key}
+                      ref={(el) => {
+                        if (el) {
+                          filaEscaneoRefs.current.set(claveSeleccion, el);
+                        } else {
+                          filaEscaneoRefs.current.delete(claveSeleccion);
+                        }
+                      }}
+                      className={claseFila}
+                    >
                       <td className="px-2 py-2">
                         <input
                           type="checkbox"
@@ -3112,6 +3263,38 @@ export default function BitacoraCobranza() {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalDocNoEncontrado.abierto && (
+        <div
+          className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50 p-4"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="modal-doc-no-encontrado-titulo"
+        >
+          <div className="w-full max-w-md rounded-lg border border-red-200 bg-white p-5 shadow-xl dark:border-red-800 dark:bg-gray-800">
+            <h3
+              id="modal-doc-no-encontrado-titulo"
+              className="text-lg font-semibold text-gray-900 dark:text-white"
+            >
+              Documento no encontrado
+            </h3>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              El folio{" "}
+              <strong>{modalDocNoEncontrado.folio}</strong> no se encuentra en
+              los detalles guardados de esta bitácora.
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={cerrarModalDocNoEncontrado}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Aceptar
+              </button>
             </div>
           </div>
         </div>
