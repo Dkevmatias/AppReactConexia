@@ -18,8 +18,10 @@ export interface BitacoraCobranza {
   activo: boolean;
   /** Check Prizma al crear/consultar encabezado */
   prizma?: boolean | null;
-  /** idSalesRoute Prizma asociado al encabezado */
+  /** idSalesRoute Prizma asociado al encabezado (primera ruta, compatibilidad) */
   idSalesRoute?: number | null;
+  /** Rutas Prizma devueltas por el API (idSalesRoute) */
+  idSalesRoutes?: number[];
 }
 
 export interface BitacoraCobranzaPayload {
@@ -102,46 +104,113 @@ export function buildBitacoraUpdatePayload(
 
 const RUTA_PRIZMA_STORAGE_PREFIX = "bitacoraCobranza:rutaPrizma:";
 const ID_SALES_ROUTE_STORAGE_PREFIX = "bitacoraCobranza:idSalesRoute:";
+const ID_RUTAS_PRIZMA_STORAGE_PREFIX = "bitacoraCobranza:idRutasPrizma:";
 
 export function guardarPreferenciasRutaPrizmaBitacora(
   idBitacora: number,
-  prefs: { prizma: boolean; idSalesRoute?: number | null },
+  prefs: { prizma: boolean; idRutas?: number[] },
 ): void {
   if (idBitacora <= 0) return;
   const rutaKey = `${RUTA_PRIZMA_STORAGE_PREFIX}${idBitacora}`;
   const salesRouteKey = `${ID_SALES_ROUTE_STORAGE_PREFIX}${idBitacora}`;
+  const rutasKey = `${ID_RUTAS_PRIZMA_STORAGE_PREFIX}${idBitacora}`;
   if (prefs.prizma) {
     sessionStorage.setItem(rutaKey, "1");
-    if (prefs.idSalesRoute != null && prefs.idSalesRoute > 0) {
-      sessionStorage.setItem(salesRouteKey, String(Math.trunc(prefs.idSalesRoute)));
+    const rutas = uniquePositiveIds(prefs.idRutas ?? []);
+    if (rutas.length > 0) {
+      sessionStorage.setItem(rutasKey, JSON.stringify(rutas));
+      sessionStorage.setItem(salesRouteKey, String(rutas[0]));
     } else {
+      sessionStorage.removeItem(rutasKey);
       sessionStorage.removeItem(salesRouteKey);
     }
     return;
   }
   sessionStorage.removeItem(rutaKey);
   sessionStorage.removeItem(salesRouteKey);
+  sessionStorage.removeItem(rutasKey);
 }
 
 export function leerPreferenciasRutaPrizmaBitacora(idBitacora: number): {
   prizma: boolean;
-  idSalesRoute: number | null;
+  idRutas: number[];
 } {
   if (idBitacora <= 0) {
-    return { prizma: false, idSalesRoute: null };
+    return { prizma: false, idRutas: [] };
   }
   const prizma =
     sessionStorage.getItem(`${RUTA_PRIZMA_STORAGE_PREFIX}${idBitacora}`) ===
     "1";
+  const rawList = sessionStorage.getItem(
+    `${ID_RUTAS_PRIZMA_STORAGE_PREFIX}${idBitacora}`,
+  );
+  if (rawList) {
+    try {
+      const parsed = JSON.parse(rawList) as unknown;
+      if (Array.isArray(parsed)) {
+        return {
+          prizma,
+          idRutas: uniquePositiveIds(
+            parsed.filter((item): item is number => typeof item === "number"),
+          ),
+        };
+      }
+    } catch {
+      /* fallback a clave legada */
+    }
+  }
   const raw = sessionStorage.getItem(
     `${ID_SALES_ROUTE_STORAGE_PREFIX}${idBitacora}`,
   );
   const parsed = raw != null ? Number(raw) : NaN;
   return {
     prizma,
-    idSalesRoute:
-      Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : null,
+    idRutas:
+      Number.isFinite(parsed) && parsed > 0 ? [Math.trunc(parsed)] : [],
   };
+}
+
+function uniquePositiveIds(values: Iterable<number>): number[] {
+  const seen = new Set<number>();
+  const result: number[] = [];
+  for (const raw of values) {
+    const id = Math.trunc(raw);
+    if (Number.isFinite(id) && id > 0 && !seen.has(id)) {
+      seen.add(id);
+      result.push(id);
+    }
+  }
+  return result;
+}
+
+/** Misma lógica de rutas seleccionadas para modo local y Prizma al consultar encabezado. */
+export function resolverRutasSeleccionadasBitacora(
+  bitacora: Pick<
+    BitacoraCobranza,
+    | "idRutas"
+    | "idRuta"
+    | "idSalesRoute"
+    | "idSalesRoutes"
+    | "idBitacora"
+    | "prizma"
+  >,
+): number[] {
+  if (bitacora.idRutas.length > 0) {
+    return uniquePositiveIds(bitacora.idRutas);
+  }
+  if (bitacora.idRuta > 0) {
+    return [bitacora.idRuta];
+  }
+  if (bitacora.idSalesRoutes?.length) {
+    return uniquePositiveIds(bitacora.idSalesRoutes);
+  }
+  if (bitacora.idSalesRoute != null && bitacora.idSalesRoute > 0) {
+    return [bitacora.idSalesRoute];
+  }
+  if (bitacora.prizma === true) {
+    return leerPreferenciasRutaPrizmaBitacora(bitacora.idBitacora).idRutas;
+  }
+  return [];
 }
 
 export function resolverRutaPrizmaBitacora(
@@ -153,7 +222,7 @@ export function resolverRutaPrizmaBitacora(
     idSalesRoute:
       bitacora.idSalesRoute != null && bitacora.idSalesRoute > 0
         ? bitacora.idSalesRoute
-        : local.idSalesRoute,
+        : (local.idRutas[0] ?? null),
   };
 }
 
@@ -419,8 +488,8 @@ export interface GenerarBitacoraParams {
   incluirContado?: boolean;
   /** Check Prizma → query rutaPrizma (GenerarDesdeVista) */
   rutaPrizma?: boolean;
-  /** idSalesRoute Prizma seleccionado (int único en backend) */
-  idSalesRoute?: number | null;
+  /** idSalesRoute Prizma seleccionados; query: idSalesRoute=271&idSalesRoute=285 */
+  idSalesRoutes?: number[];
 }
 
 export const DIAS_VISITA = [
@@ -654,6 +723,14 @@ function normalizeBitacora(raw: unknown): BitacoraCobranza {
   const idRutaLegacy = pickNumber(o, "idRuta", "IdRuta") ?? 0;
   const rutas =
     idRutas.length > 0 ? idRutas : idRutaLegacy > 0 ? [idRutaLegacy] : [];
+  const idSalesRoutes = pickNumberArray(o, "idSalesRoutes", "IdSalesRoutes");
+  const idSalesRouteLegacy = pickNumber(o, "idSalesRoute", "IdSalesRoute");
+  const salesRoutes =
+    idSalesRoutes.length > 0
+      ? idSalesRoutes
+      : idSalesRouteLegacy != null && idSalesRouteLegacy > 0
+        ? [idSalesRouteLegacy]
+        : [];
 
   return {
     idBitacora: pickNumber(o, "idBitacora", "IdBitacora") ?? 0,
@@ -674,7 +751,8 @@ function normalizeBitacora(raw: unknown): BitacoraCobranza {
     estatus: pickString(o, "estatus", "Estatus"),
     activo: pickBool(o, "activo", "Activo"),
     prizma: pickBoolOptional(o, "prizma", "Prizma", "rutaPrizma", "RutaPrizma"),
-    idSalesRoute: pickNumber(o, "idSalesRoute", "IdSalesRoute"),
+    idSalesRoute: salesRoutes[0] ?? idSalesRouteLegacy,
+    idSalesRoutes: salesRoutes,
   };
 }
 
@@ -1188,12 +1266,8 @@ export const bitacoraCobranzaService = {
     if (params.sociedad) qs.append("sociedad", params.sociedad);
     const rutaPrizmaActiva = params.rutaPrizma === true;
     qs.append("rutaPrizma", rutaPrizmaActiva ? "true" : "false");
-    if (
-      rutaPrizmaActiva &&
-      params.idSalesRoute != null &&
-      params.idSalesRoute > 0
-    ) {
-      qs.append("idSalesRoute", String(Math.trunc(params.idSalesRoute)));
+    if (rutaPrizmaActiva) {
+      appendQueryNumberList(qs, "idSalesRoute", params.idSalesRoutes);
     }
     if (params.incluirContado !== false) {
       qs.append("incluirContado", "true");

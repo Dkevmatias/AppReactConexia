@@ -126,7 +126,7 @@ const navItems: NavItem[] = [
 
       {
         name: "Comprobación de Rutas",
-        path: "/operaciones/RecepcionRutas",
+        path: "/operaciones/ComprobacionRutas",
         icon: <HiMiniClipboardDocumentCheck className="w-4 h-4 shrink-0" />,
         pro: false,
       },

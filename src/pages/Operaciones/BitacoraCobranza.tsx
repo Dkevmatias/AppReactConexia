@@ -44,6 +44,7 @@ import {
   prioridadOrdenCondicionContado,
   prioridadOrdenEstatusCobro,
   resolverRutaPrizmaBitacora,
+  resolverRutasSeleccionadasBitacora,
   ValidarCobroBitacoraResponse,
 } from "../../services/bitacoraCobranzaService";
 import {
@@ -456,7 +457,7 @@ export default function BitacoraCobranza() {
     [documentosPersistidos],
   );
   const puedeValidarEscaneoFisico =
-    estatusEncabezado === "B" &&
+    (estatusEncabezado === "B" || estatusEncabezado === "T") &&
     tieneDetallePersistido &&
     documentosPersistidos.length > 0;
   const puedeGenerarPdf =
@@ -515,12 +516,12 @@ export default function BitacoraCobranza() {
     (
       bitacoraId: number,
       prizmaActivo: boolean,
-      idSalesRoute?: number | null,
+      idRutas?: number[],
     ) => {
       if (bitacoraId <= 0) return;
       guardarPreferenciasRutaPrizmaBitacora(bitacoraId, {
         prizma: prizmaActivo,
-        idSalesRoute: prizmaActivo ? idSalesRoute : null,
+        idRutas: prizmaActivo ? (idRutas ?? []) : [],
       });
       if (prizmaActivo) {
         setUsarRutasPrizma(true);
@@ -590,19 +591,9 @@ export default function BitacoraCobranza() {
       setObservaciones(bitacora.observaciones ?? "");
       const prefsPrizma = resolverRutaPrizmaBitacora(bitacora);
       setUsarRutasPrizma(prefsPrizma.prizma);
-      if (prefsPrizma.prizma && prefsPrizma.idSalesRoute != null) {
-        setRutasSeleccionadas(new Set([prefsPrizma.idSalesRoute]));
-      } else {
-        setRutasSeleccionadas(
-          new Set(
-            bitacora.idRutas.length > 0
-              ? bitacora.idRutas
-              : bitacora.idRuta > 0
-                ? [bitacora.idRuta]
-                : [],
-          ),
-        );
-      }
+      setRutasSeleccionadas(
+        new Set(resolverRutasSeleccionadasBitacora(bitacora)),
+      );
       const detalle = await bitacoraCobranzaService.getDetallePorBitacora(id);
       let documentosDetalle = detalle.map((item) =>
         detalleToDocumentoGenerar(item),
@@ -858,12 +849,15 @@ export default function BitacoraCobranza() {
     persistirPreferenciasPrizma(
       creada.idBitacora,
       usarRutasPrizma,
-      idSalesRoutePrizma,
+      resolverRutasSeleccionadasBitacora(creada),
     );
-    if (creada.idRutas.length > 0 && !usarRutasPrizma) {
+    if (creada.idRutas.length > 0) {
       setRutasSeleccionadas(new Set(creada.idRutas));
-    } else if (usarRutasPrizma && idSalesRoutePrizma != null) {
-      setRutasSeleccionadas(new Set([idSalesRoutePrizma]));
+    } else {
+      const rutasResueltas = resolverRutasSeleccionadasBitacora(creada);
+      if (rutasResueltas.length > 0) {
+        setRutasSeleccionadas(new Set(rutasResueltas));
+      }
     }
     return creada;
   };
@@ -914,10 +908,13 @@ export default function BitacoraCobranza() {
     persistirPreferenciasPrizma(
       bitacoraId,
       prizmaActiva,
-      idSalesRoutePrizma,
+      idsRutasEncabezado.length > 0
+        ? idsRutasEncabezado
+        : resolverRutasSeleccionadasBitacora(actualizada),
     );
-    if (actualizada.idRutas.length > 0 && !prizmaActiva) {
-      setRutasSeleccionadas(new Set(actualizada.idRutas));
+    const rutasResueltas = resolverRutasSeleccionadasBitacora(actualizada);
+    if (rutasResueltas.length > 0) {
+      setRutasSeleccionadas(new Set(rutasResueltas));
     }
     return { ...actualizada, folio: folioResuelto };
   };
@@ -970,7 +967,7 @@ export default function BitacoraCobranza() {
             : undefined,
         sociedad: sociedad.trim() || undefined,
         rutaPrizma: prizmaActivo,
-        idSalesRoute: prizmaActivo ? idsSalesRoutePrizma[0] : undefined,
+        idSalesRoutes: prizmaActivo ? idsSalesRoutePrizma : undefined,
       };
 
       const resultado =
@@ -1100,7 +1097,9 @@ export default function BitacoraCobranza() {
       persistirPreferenciasPrizma(
         bitacoraId,
         usarRutasPrizma === true || prefsPrizma.prizma,
-        idsRutasSeleccionadas[0] ?? prefsPrizma.idSalesRoute,
+        idsRutasSeleccionadas.length > 0
+          ? idsRutasSeleccionadas
+          : resolverRutasSeleccionadasBitacora(actualizada),
       );
     } catch (err) {
       console.error(err);
@@ -1170,7 +1169,9 @@ export default function BitacoraCobranza() {
       persistirPreferenciasPrizma(
         idActivo,
         prizmaActiva,
-        idSalesRoutePrizma,
+        idsRutasSeleccionadas.length > 0
+          ? idsRutasSeleccionadas
+          : resolverRutasSeleccionadasBitacora(encabezado),
       );
       setMensaje(
         `Bitácora ${etiquetaFolioBitacora(folioResuelto, idActivo)} creada. Ya puede generar el PDF.`,
