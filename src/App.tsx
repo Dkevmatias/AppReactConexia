@@ -35,6 +35,7 @@ import Articulos from "./pages/Ventas/Articulos";
 import ListaPrecios from "./pages/Ventas/ListaPrecios";
 import BitacoraCobranza from "./pages/Operaciones/BitacoraCobranza";
 import ListaBitacorasCobranza from "./pages/Operaciones/ListaBitacorasCobranza";
+import ComprobacionRutas from "./pages/Operaciones/ComprobacionRutas";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -157,6 +158,10 @@ export default function App() {
             <Route
               path="/operaciones/ListaBitacorasCobranza"
               element={<ListaBitacorasCobranza />}
+            />
+            <Route
+              path="/operaciones/ComprobacionRutas"
+              element={<ComprobacionRutas />}
             />
           </Route>
         </Routes>

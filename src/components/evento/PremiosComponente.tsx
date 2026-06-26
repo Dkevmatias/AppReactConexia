@@ -12,6 +12,13 @@ import { usePeriodoActivo } from "../../hooks/usePeriodoActivo";
 import { useCanjeControl } from "../../hooks/useCanjeControl";
 import PeriodoCountdown from "../../components/evento/PeriodoCount";
 import PremioCard from "../../components/evento/PremioCard";
+import {
+  cantidadValidaCanjePlayera,
+  esPremioPlayeraPromo,
+  puntosMinimosPlayera,
+  siguienteCantidadPlayera,
+  anteriorCantidadPlayera,
+} from "./promoPlayeraTemp";
 
 type Premio = {
   idPremio: number;
@@ -58,10 +65,22 @@ export default function PremiosCarousel({
   const canjear = async (premio: Premio) => {
     if (canjeandoPremioId !== null) return;
 
-    const qty = selected[premio.idPremio] || 1;
-    const puntosRequeridos = premio.puntos * qty;
+    const esPlayeraPromo = esPremioPlayeraPromo(premio.idPremio);
+    const yaCanjeados = getCantidadHistorial(premio.idPremio);
+    const qtySeleccionada = selected[premio.idPremio] || 0;
+    const qty = esPlayeraPromo ? qtySeleccionada : qtySeleccionada || 1;
+
+    if (esPlayeraPromo && !cantidadValidaCanjePlayera(qty, premio.limite, yaCanjeados)) {
+      setMensajeModal(
+        "Selecciona cantidad en múltiplos de 2 (mínimo 2 playeras por canje).",
+      );
+      setMostrarModal(true);
+      return;
+    }
 
     if (!qty) return;
+
+    const puntosRequeridos = premio.puntos * qty;
 
     setCanjeandoPremioId(premio.idPremio);
     try {
@@ -154,6 +173,23 @@ export default function PremiosCarousel({
 
   const getQty = (premio: Premio) => selected[premio.idPremio] || 0;
 
+  const puedeCanjearPremio = (premio: Premio, qty: number) => {
+    if (!puedeInteractuar(premio, qty)) return false;
+
+    if (!esPremioPlayeraPromo(premio.idPremio)) return true;
+
+    const yaCanjeados = getCantidadHistorial(premio.idPremio);
+
+    if (qty > 0) {
+      return cantidadValidaCanjePlayera(qty, premio.limite, yaCanjeados);
+    }
+
+    return (
+      puntosMinimosPlayera(premio.puntos, premio.limite, yaCanjeados) <=
+      restante
+    );
+  };
+
   //Acciones del Selector
   const add = (premio: Premio) => {
     if (bloqueoGlobal) return;
@@ -161,9 +197,28 @@ export default function PremiosCarousel({
     const qtyActual = getQty(premio);
     const yaCanjeados = getCantidadHistorial(premio.idPremio);
 
-    if (sinPuntos(premio)) return;
     if (sinStock(premio)) return;
     if (yaCanjeados + qtyActual >= premio.limite) return;
+
+    if (esPremioPlayeraPromo(premio.idPremio)) {
+      const next = siguienteCantidadPlayera(
+        qtyActual,
+        premio.limite,
+        yaCanjeados,
+      );
+      if (next === null) return;
+
+      const puntosExtra = premio.puntos * (next - qtyActual);
+      if (puntosExtra > restante) return;
+
+      setSelected((prev) => ({
+        ...prev,
+        [premio.idPremio]: next,
+      }));
+      return;
+    }
+
+    if (sinPuntos(premio)) return;
 
     setSelected((prev) => ({
       ...prev,
@@ -173,6 +228,17 @@ export default function PremiosCarousel({
 
   const remove = (premio: Premio) => {
     if (bloqueoGlobal) return;
+
+    const qtyActual = getQty(premio);
+
+    if (esPremioPlayeraPromo(premio.idPremio)) {
+      setSelected((prev) => ({
+        ...prev,
+        [premio.idPremio]: anteriorCantidadPlayera(qtyActual),
+      }));
+      return;
+    }
+
     setSelected((prev) => ({
       ...prev,
       [premio.idPremio]: Math.max((prev[premio.idPremio] || 0) - 1, 0),
@@ -185,7 +251,23 @@ export default function PremiosCarousel({
 
   const sinStock = (premio: Premio) => premio.existencia <= 0;
 
-  const sinPuntos = (premio: Premio) => premio.puntos > restante;
+  const sinPuntos = (premio: Premio) => {
+    if (esPremioPlayeraPromo(premio.idPremio)) {
+      const yaCanjeados = getCantidadHistorial(premio.idPremio);
+      return (
+        puntosMinimosPlayera(premio.puntos, premio.limite, yaCanjeados) >
+        restante
+      );
+    }
+    return premio.puntos > restante;
+  };
+
+  const noPuedeIncrementarPlayera = (premio: Premio, qty: number) => {
+    const yaCanjeados = getCantidadHistorial(premio.idPremio);
+    const next = siguienteCantidadPlayera(qty, premio.limite, yaCanjeados);
+    if (next === null) return true;
+    return premio.puntos * (next - qty) > restante;
+  };
 
   return (
     <div className="w-full max-w-6xl mx-auto bg-white dark:bg-[#6F706C] p-6 rounded-2xl">
@@ -224,10 +306,14 @@ export default function PremiosCarousel({
         {premios.map((premio) => {
           const qty = getQty(premio);
           const yaCanjeados = getCantidadHistorial(premio.idPremio);
-          const puedeCanjear = puedeInteractuar(premio, qty);
+          const esPlayeraPromo = esPremioPlayeraPromo(premio.idPremio);
+          const puedeCanjear = puedeCanjearPremio(premio, qty);
           const canjeBloqueado = canjeandoPremioId !== null;
           const canjeActivoEnEstaTarjeta =
             canjeandoPremioId === premio.idPremio;
+          const cantidadValida =
+            !esPlayeraPromo ||
+            cantidadValidaCanjePlayera(qty, premio.limite, yaCanjeados);
           return (
             <PremioCard
               key={premio.idPremio}
@@ -242,6 +328,26 @@ export default function PremiosCarousel({
               onAdd={() => add(premio)}
               onRemove={() => remove(premio)}
               onCanjear={() => canjear(premio)}
+              puntosObjetivoBarra={
+                esPlayeraPromo
+                  ? puntosMinimosPlayera(
+                      premio.puntos,
+                      premio.limite,
+                      yaCanjeados,
+                    )
+                  : undefined
+              }
+              noPuedeIncrementar={
+                esPlayeraPromo
+                  ? noPuedeIncrementarPlayera(premio, qty)
+                  : undefined
+              }
+              canjeCantidadValida={cantidadValida}
+              promoCantidadHint={
+                esPlayeraPromo
+                  ? "Promo: canje en pares (2 o 4 playeras)"
+                  : null
+              }
             />
           );
         })}

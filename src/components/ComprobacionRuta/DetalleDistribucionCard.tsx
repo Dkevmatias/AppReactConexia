@@ -1,0 +1,86 @@
+import { AlertTriangle } from "lucide-react";
+import { DocODistribucionDetalle } from "../../services/oDistribucionService";
+import { formatCurrency } from "../../utils/format";
+import {
+  btnIncidenciaClass,
+  clasesTarjetaDetalleTraspasoTipoOD,
+} from "./constants";
+import { esTipoODTraspaso, formatearDocRelacionado, formatearFecha } from "./utils";
+
+export interface DetalleDistribucionCardProps {
+  item: DocODistribucionDetalle;
+  crearIncidenciaInactivo?: boolean;
+  onCrearIncidencia: (item: DocODistribucionDetalle) => void;
+}
+
+export default function DetalleDistribucionCard({
+  item,
+  crearIncidenciaInactivo = false,
+  onCrearIncidencia,
+}: DetalleDistribucionCardProps) {
+  const esTraspaso = esTipoODTraspaso(item.tipoOD);
+
+  return (
+    <article
+      className={`rounded-lg border p-3 ${
+        esTraspaso
+          ? clasesTarjetaDetalleTraspasoTipoOD
+          : "border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-900/40"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate font-medium text-gray-900 dark:text-white">
+            {item.cardName ?? "—"}
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {item.cardCode ?? "—"}
+          </p>
+        </div>
+        <p className="shrink-0 text-sm font-semibold text-gray-900 dark:text-white">
+          {formatCurrency(item.total)}
+        </p>
+      </div>
+      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
+        <div>
+          <dt className="text-gray-500 dark:text-gray-400">Entrega</dt>
+          <dd className="font-medium">{item.entrega || "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500 dark:text-gray-400">Doc. Relacionado</dt>
+          <dd className="font-medium">{formatearDocRelacionado(item)}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500 dark:text-gray-400">Documento</dt>
+          <dd className="font-medium">{item.documento || "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500 dark:text-gray-400">Fecha</dt>
+          <dd className="font-medium">{formatearFecha(item.fechaDoc)}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500 dark:text-gray-400">Condición</dt>
+          <dd className="font-medium">{item.condicion ?? "—"}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500 dark:text-gray-400">Vendedor</dt>
+          <dd className="font-medium">{item.slpName ?? "—"}</dd>
+        </div>
+      </dl>
+      <button
+        type="button"
+        onClick={() => onCrearIncidencia(item)}
+        disabled={crearIncidenciaInactivo}
+        title={
+          crearIncidenciaInactivo
+            ? "La orden está registrada sin incidencias (Estatus Sistema T)"
+            : "Crear incidencia"
+        }
+        className={`${btnIncidenciaClass} mt-3 w-full disabled:cursor-not-allowed disabled:opacity-50`}
+      >
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        Crear incidencia
+      </button>
+    </article>
+  );
+}

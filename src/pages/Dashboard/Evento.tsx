@@ -74,6 +74,7 @@ export default function Evento() {
         const puntosAcumulados = await getPuntosAcumulados(user.idPersona);
         const saldo = await getSaldoClientes(cardCodes);
         const mesesCompras = await getValidarClientesVentas(cardCodes);
+
         setVentaTotal(puntosAcumulados.puntosDisponibles);
         setSaldoVencido(saldo?.vencido);
         setMesesCompras(mesesCompras);

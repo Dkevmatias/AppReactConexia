@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { BarraProgreso } from "./BarraProgreso";
 import { EstadoPremio } from "../../types/EstadoPremio";
+import { puntosDisplayPremio } from "./promoPlayeraTemp";
 
 type Premio = {
   idPremio: number;
@@ -24,6 +25,11 @@ type Props = {
   onAdd: () => void;
   onRemove: () => void;
   onCanjear: () => void;
+  /** PROMO TEMPORAL PLAYERA — remover props opcionales al terminar promoción */
+  puntosObjetivoBarra?: number;
+  noPuedeIncrementar?: boolean;
+  canjeCantidadValida?: boolean;
+  promoCantidadHint?: string | null;
 };
 
 export default function PremioCard({
@@ -38,11 +44,17 @@ export default function PremioCard({
   onAdd,
   onRemove,
   onCanjear,
+  puntosObjetivoBarra,
+  noPuedeIncrementar: noPuedeIncrementarProp,
+  canjeCantidadValida = true,
+  promoCantidadHint = null,
 }: Props) {
 
   const sinStock = premio.existencia <= 0;
   const limiteAlcanzado = yaCanjeados >= premio.limite;
-  const noPuedeIncrementar = yaCanjeados + qty >= premio.limite;
+  const noPuedeIncrementar =
+    noPuedeIncrementarProp ?? yaCanjeados + qty >= premio.limite;
+  const puntosBarra = puntosObjetivoBarra ?? premio.puntos;
 
   let estado: EstadoPremio;
 
@@ -132,14 +144,15 @@ export default function PremioCard({
 
       {/* Puntos */}
       <p className="text-yellow-400 font-bold text-base">
-        {premio.puntos.toLocaleString()} pts
+        {puntosDisplayPremio(premio.idPremio, premio.puntos).toLocaleString()}{" "}
+        pts
       </p>
 
       {/* Barra progreso */}
       <div className="w-full mt-1">
         <BarraProgreso
           puntosActuales={restante}
-          puntosObjetivo={premio.puntos}
+          puntosObjetivo={puntosBarra}
           estado={estado}
           onCanjear={onCanjear}
         />
@@ -150,7 +163,7 @@ export default function PremioCard({
         <button
           type="button"
           onClick={onCanjear}
-          disabled={canjeBloqueado}
+          disabled={canjeBloqueado || !canjeCantidadValida}
           className="mt-2 px-4 py-2 text-sm min-w-[10.5rem] inline-flex items-center justify-center gap-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:bg-green-600"
         >
           {canjeActivoEnEstaTarjeta ? (
@@ -184,6 +197,12 @@ export default function PremioCard({
         </button>
       )}
       
+
+      {promoCantidadHint && (
+        <p className="mt-1 text-center text-[10px] text-gray-400">
+          {promoCantidadHint}
+        </p>
+      )}
 
       {/* Selector cantidad */}
       {premio.limite > 1 && (
