@@ -100,10 +100,6 @@ export default function Evento() {
     return () => clearTimeout(timer);
   }, []);
 
-  // ================================
-  // WINDOW SIZE
-  // ================================
-
   useEffect(() => {
     const handleResize = () =>
       setWindowSize({
