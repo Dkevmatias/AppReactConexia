@@ -26,13 +26,17 @@ export interface DocODistribucionDetalle {
   tipoRegistro: string | null;
   folio: number;
   entrega: number;
-  documento: number;
+  documento: number | null;
   facturaReserva: number | null;
   facturaDeudor: number | null;
   origenFactura: string | null;
   devolucionEntrega: number | null;
   numTraspaso: number | null;
   tieneDevolucion: string | null;
+  tieneIncidencia: string | null;
+  idIncidencia: number | null;
+  cantidadIncidencias: number;
+  idsIncidencia: number[];
   cardCode: string | null;
   cardName: string | null;
   fechaDoc: string | null;
@@ -71,6 +75,27 @@ function pickNumber(
     if (typeof v === "number" && !Number.isNaN(v)) return v;
   }
   return null;
+}
+
+function pickNumberArray(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): number[] {
+  for (const key of keys) {
+    const v = o[key];
+    if (!Array.isArray(v)) continue;
+    return v
+      .map((item) => {
+        if (typeof item === "number" && !Number.isNaN(item)) return item;
+        if (typeof item === "string" && item.trim()) {
+          const n = Number(item);
+          return Number.isFinite(n) ? n : null;
+        }
+        return null;
+      })
+      .filter((n): n is number => n != null && n > 0);
+  }
+  return [];
 }
 
 function pickString(
@@ -118,14 +143,19 @@ function normalizeDetalle(raw: unknown): DocODistribucionDetalle {
     tipoOD: pickString(o, "tipoOD", "TipoOD", "tipoOd"),
     tipoRegistro: pickString(o, "tipoRegistro", "TipoRegistro"),
     folio: pickNumber(o, "folio", "Folio") ?? 0,
-    entrega: pickNumber(o, "entrega") ?? 0,
-    documento: pickNumber(o, "documento", "Documento") ?? 0,
+    entrega: pickNumber(o, "entrega", "Entrega") ?? 0,
+    documento: pickNumber(o, "documento", "Documento"),
     facturaReserva: pickNumber(o, "facturaReserva", "FacturaReserva"),
     facturaDeudor: pickNumber(o, "facturaDeudor", "FacturaDeudor"),
     origenFactura: pickString(o, "origenFactura", "OrigenFactura"),
     devolucionEntrega: pickNumber(o, "devolucionEntrega", "DevolucionEntrega"),
     numTraspaso: pickNumber(o, "numTraspaso", "NumTraspaso"),
     tieneDevolucion: pickString(o, "tieneDevolucion", "TieneDevolucion"),
+    tieneIncidencia: pickString(o, "tieneIncidencia", "TieneIncidencia"),
+    idIncidencia: pickNumber(o, "idIncidencia", "IdIncidencia"),
+    cantidadIncidencias:
+      pickNumber(o, "cantidadIncidencias", "CantidadIncidencias") ?? 0,
+    idsIncidencia: pickNumberArray(o, "idsIncidencia", "IdsIncidencia"),
     cardCode: pickString(o, "cardCode", "CardCode"),
     cardName: pickString(o, "cardName", "CardName"),
     fechaDoc: pickString(o, "fechaDoc", "FechaDoc"),

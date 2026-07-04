@@ -2,21 +2,50 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Plus, Trash2, X } from "lucide-react";
 import { DocODistribucionDetalle } from "../../services/oDistribucionService";
 import {
-  ESTADOS_ARTICULO_INCIDENCIA,
+  etiquetaEstadoItem,
+  EstadoItem,
+  IncidenciaCompleta,
   incidenciaService,
   resolverEstatusIncidencia,
   TIPO_INCIDENCIA_SIN_DETALLE,
+  tipoIncidenciaConDetalleArticulos,
   TipoIncidencia,
+  valorEstadoItem,
 } from "../../services/incidenciaService";
+import {
+  ItemEntrega,
+  itemEntregaService,
+} from "../../services/itemEntregaService";
 
 const inputClass =
   "w-full min-h-[40px] rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white touch-manipulation";
+const inputReadonlyClass = `${inputClass} cursor-default bg-gray-100 dark:bg-gray-800`;
 const labelClass =
   "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
+
+function formDesdeIncidencia(incidencia: IncidenciaCompleta) {
+  return {
+    idTipoIncidencia: String(incidencia.idTipoIncidencia),
+    observacionesEncabezado: incidencia.observaciones,
+    lineas: incidencia.detalles.map((detalle, index) => ({
+      idLocal: `ver-${incidencia.idIncidencia}-${index}`,
+      articulo: detalle.itemCode,
+      descripcion: detalle.itemName,
+      cantidad: String(detalle.cantidad > 0 ? detalle.cantidad : 1),
+      idEstado:
+        detalle.idEstado > 0 ? String(detalle.idEstado) : "",
+      observaciones: detalle.observaciones,
+    })),
+  };
+}
+
+export type ModoModalIncidencia = "crear" | "ver";
 
 export type ContextoIncidenciaDistribucion = {
   folioOrden: number;
   documento: DocODistribucionDetalle;
+  modo?: ModoModalIncidencia;
+  idIncidencia?: number;
 };
 
 type LineaDetalleIncidencia = {
@@ -24,17 +53,17 @@ type LineaDetalleIncidencia = {
   articulo: string;
   descripcion: string;
   cantidad: string;
-  estado: string;
+  idEstado: string;
   observaciones: string;
 };
 
-function nuevaLineaDetalle(): LineaDetalleIncidencia {
+function nuevaLineaDetalle(idEstadoDefault = ""): LineaDetalleIncidencia {
   return {
     idLocal: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     articulo: "",
     descripcion: "",
     cantidad: "1",
-    estado: ESTADOS_ARTICULO_INCIDENCIA[0],
+    idEstado: idEstadoDefault,
     observaciones: "",
   };
 }
@@ -45,6 +74,31 @@ function formularioVacio() {
     observacionesEncabezado: "",
     lineas: [] as LineaDetalleIncidencia[],
   };
+}
+
+function itemsDisponiblesParaLinea(
+  lineaId: string,
+  itemsEntrega: ItemEntrega[],
+  lineas: LineaDetalleIncidencia[],
+): ItemEntrega[] {
+  const usadosEnOtrasFilas = new Set(
+    lineas
+      .filter((linea) => linea.idLocal !== lineaId && linea.articulo.trim())
+      .map((linea) => linea.articulo),
+  );
+  return itemsEntrega.filter((item) => !usadosEnOtrasFilas.has(item.item));
+}
+
+function itemsDisponiblesNuevaLinea(
+  itemsEntrega: ItemEntrega[],
+  lineas: LineaDetalleIncidencia[],
+): ItemEntrega[] {
+  const usados = new Set(
+    lineas
+      .filter((linea) => linea.articulo.trim())
+      .map((linea) => linea.articulo),
+  );
+  return itemsEntrega.filter((item) => !usados.has(item.item));
 }
 
 export interface ModalIncidenciaDistribucionProps {
@@ -67,10 +121,20 @@ export default function ModalIncidenciaDistribucion({
   onGuardado,
 }: ModalIncidenciaDistribucionProps) {
   const [tiposIncidencia, setTiposIncidencia] = useState<TipoIncidencia[]>([]);
+  const [estadosArticulo, setEstadosArticulo] = useState<EstadoItem[]>([]);
+  const [itemsEntrega, setItemsEntrega] = useState<ItemEntrega[]>([]);
   const [loadingTipos, setLoadingTipos] = useState(false);
+  const [loadingEstados, setLoadingEstados] = useState(false);
+  const [loadingItems, setLoadingItems] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [loadingIncidencia, setLoadingIncidencia] = useState(false);
+  const [incidenciaVer, setIncidenciaVer] = useState<IncidenciaCompleta | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(formularioVacio());
+
+  const modoVer = contexto?.modo === "ver";
 
   const cargarTipos = useCallback(async () => {
     setLoadingTipos(true);
@@ -97,12 +161,94 @@ export default function ModalIncidenciaDistribucion({
     }
   }, []);
 
-  useEffect(() => {
-    if (!abierto) return;
+  const cargarEstadosArticulo = useCallback(async () => {
+    setLoadingEstados(true);
+    try {
+      const estados = await incidenciaService.getEstadosItemsActivos();
+      setEstadosArticulo(estados);
+    } catch (err) {
+      console.error(err);
+      setEstadosArticulo([]);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudieron cargar los estados de artículo.",
+      );
+    } finally {
+      setLoadingEstados(false);
+    }
+  }, []);
+
+  const cargarItemsEntrega = useCallback(async (idOrdenEntrega: number) => {
+    setLoadingItems(true);
+    try {
+      const items = await itemEntregaService.getByOrdenEntrega(idOrdenEntrega);
+      setItemsEntrega(items);
+    } catch (err) {
+      console.error(err);
+      setItemsEntrega([]);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudieron cargar los artículos de la entrega.",
+      );
+    } finally {
+      setLoadingItems(false);
+    }
+  }, []);
+
+  const cargarIncidenciaParaVer = useCallback(async (idIncidencia: number) => {
+    setLoadingIncidencia(true);
+    setError(null);
+    setIncidenciaVer(null);
     setForm(formularioVacio());
+    try {
+      const incidencia = await incidenciaService.getById(idIncidencia);
+      setIncidenciaVer(incidencia);
+      setForm(formDesdeIncidencia(incidencia));
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo cargar la incidencia.",
+      );
+    } finally {
+      setLoadingIncidencia(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!abierto || !contexto) return;
+
+    void cargarEstadosArticulo();
+
+    if (contexto.modo === "ver" && contexto.idIncidencia) {
+      setItemsEntrega([]);
+      void cargarIncidenciaParaVer(contexto.idIncidencia);
+      return;
+    }
+
+    setIncidenciaVer(null);
+    setForm(formularioVacio());
+    setItemsEntrega([]);
     setError(null);
     void cargarTipos();
-  }, [abierto, contexto?.folioOrden, contexto?.documento.entrega, cargarTipos]);
+    const idOrdenEntrega = contexto.documento.entrega;
+    if (idOrdenEntrega && idOrdenEntrega > 0) {
+      void cargarItemsEntrega(idOrdenEntrega);
+    }
+  }, [
+    abierto,
+    contexto?.folioOrden,
+    contexto?.documento.entrega,
+    contexto?.modo,
+    contexto?.idIncidencia,
+    cargarTipos,
+    cargarEstadosArticulo,
+    cargarItemsEntrega,
+    cargarIncidenciaParaVer,
+  ]);
 
   useEffect(() => {
     if (!abierto) return;
@@ -114,9 +260,29 @@ export default function ModalIncidenciaDistribucion({
   }, [abierto, onCerrar]);
 
   const agregarLinea = () => {
+    if (itemsDisponiblesNuevaLinea(itemsEntrega, form.lineas).length === 0)
+      return;
+    const idEstadoDefault =
+      estadosArticulo.length > 0 ? valorEstadoItem(estadosArticulo[0]) : "";
     setForm((prev) => ({
       ...prev,
-      lineas: [...prev.lineas, nuevaLineaDetalle()],
+      lineas: [...prev.lineas, nuevaLineaDetalle(idEstadoDefault)],
+    }));
+  };
+
+  const seleccionarArticuloLinea = (idLocal: string, itemCode: string) => {
+    const item = itemsEntrega.find((row) => row.item === itemCode);
+    setForm((prev) => ({
+      ...prev,
+      lineas: prev.lineas.map((linea) =>
+        linea.idLocal === idLocal
+          ? {
+              ...linea,
+              articulo: itemCode,
+              descripcion: item?.descripcion ?? "",
+            }
+          : linea,
+      ),
     }));
   };
 
@@ -141,7 +307,7 @@ export default function ModalIncidenciaDistribucion({
   };
 
   const handleGuardar = async () => {
-    if (!contexto) return;
+    if (!contexto || modoVer) return;
     const idTipo = Number(form.idTipoIncidencia);
     if (!idTipo || idTipo <= 0) {
       setError("Seleccione un tipo de incidencia.");
@@ -156,7 +322,7 @@ export default function ModalIncidenciaDistribucion({
       return;
     }
     const idOrdenEntrega =
-      contexto.documento.entrega || contexto.documento.factura;
+      contexto.documento.entrega || contexto.documento.documento;
     if (!idOrdenEntrega || idOrdenEntrega <= 0) {
       setError("La entrega seleccionada no tiene un identificador válido.");
       return;
@@ -167,16 +333,16 @@ export default function ModalIncidenciaDistribucion({
       return;
     }
 
-    const esTipoSinDetalle = idTipo === TIPO_INCIDENCIA_SIN_DETALLE;
+    const esTipoConDetalle = tipoIncidenciaConDetalleArticulos(idTipo);
 
-    if (!esTipoSinDetalle) {
+    if (esTipoConDetalle) {
       if (form.lineas.length === 0) {
         setError("Agregue al menos un artículo al detalle.");
         return;
       }
       for (const [index, linea] of form.lineas.entries()) {
         if (!linea.articulo.trim()) {
-          setError(`Indique el artículo en la fila ${index + 1}.`);
+          setError(`Seleccione el artículo en la fila ${index + 1}.`);
           return;
         }
         const cantidad = Number(linea.cantidad);
@@ -184,8 +350,16 @@ export default function ModalIncidenciaDistribucion({
           setError(`Cantidad inválida en la fila ${index + 1}.`);
           return;
         }
+        const idEstado = Number(linea.idEstado);
+        if (!Number.isFinite(idEstado) || idEstado <= 0) {
+          setError(`Seleccione el estado en la fila ${index + 1}.`);
+          return;
+        }
       }
     }
+
+    const estatusIncidencia = resolverEstatusIncidencia(idTipo);
+    const vendedor = contexto.documento.slpName?.trim() ?? "";
 
     setGuardando(true);
     setError(null);
@@ -198,8 +372,21 @@ export default function ModalIncidenciaDistribucion({
         idEmpresa,
         idSucursal,
         observaciones: form.observacionesEncabezado.trim(),
-        estatus: resolverEstatusIncidencia(idTipo),
+        estatus: estatusIncidencia,
         activo: true,
+        detalles: esTipoConDetalle
+          ? form.lineas.map((linea) => ({
+              idOrdenEntrega,
+              itemCode: linea.articulo.trim(),
+              itemName: linea.descripcion.trim(),
+              cantidad: Number(linea.cantidad),
+              idEstado: Number(linea.idEstado),
+              vendedor,
+              observaciones: linea.observaciones.trim(),
+              estatus: estatusIncidencia,
+              activo: true,
+            }))
+          : undefined,
       });
       onGuardado?.(
         `Incidencia guardada para la entrega ${contexto.documento.entrega}.`,
@@ -221,7 +408,83 @@ export default function ModalIncidenciaDistribucion({
 
   const { folioOrden, documento } = contexto;
   const idTipoSeleccionado = Number(form.idTipoIncidencia);
-  const esTipoSinDetalle = idTipoSeleccionado === TIPO_INCIDENCIA_SIN_DETALLE;
+  const esTipoConDetalle =
+    tipoIncidenciaConDetalleArticulos(idTipoSeleccionado);
+  const puedeAgregarArticulo =
+    !modoVer &&
+    esTipoConDetalle &&
+    !loadingItems &&
+    itemsDisponiblesNuevaLinea(itemsEntrega, form.lineas).length > 0;
+
+  const renderCampoArticulo = (linea: LineaDetalleIncidencia) => {
+    if (modoVer || !esTipoConDetalle) {
+      return (
+        <input
+          className={inputReadonlyClass}
+          value={linea.articulo}
+          readOnly
+        />
+      );
+    }
+
+    const opciones = itemsDisponiblesParaLinea(
+      linea.idLocal,
+      itemsEntrega,
+      form.lineas,
+    );
+
+    return (
+      <select
+        className={inputClass}
+        value={linea.articulo}
+        onChange={(e) =>
+          seleccionarArticuloLinea(linea.idLocal, e.target.value)
+        }
+        disabled={loadingItems || opciones.length === 0}
+      >
+        <option value="">
+          {loadingItems ? "Cargando artículos..." : "Seleccione artículo"}
+        </option>
+        {opciones.map((item) => (
+          <option key={item.item} value={item.item}>
+            {item.item}
+          </option>
+        ))}
+      </select>
+    );
+  };
+
+  const renderCampoEstado = (linea: LineaDetalleIncidencia) => {
+    if (modoVer) {
+      return (
+        <input
+          className={inputReadonlyClass}
+          value={etiquetaEstadoItem(linea.idEstado, estadosArticulo)}
+          readOnly
+        />
+      );
+    }
+
+    return (
+      <select
+        className={inputClass}
+        value={linea.idEstado}
+        onChange={(e) =>
+          actualizarLinea(linea.idLocal, "idEstado", e.target.value)
+        }
+        disabled={loadingEstados || estadosArticulo.length === 0}
+      >
+        <option value="">
+          {loadingEstados ? "Cargando..." : "Seleccione estado"}
+        </option>
+        {estadosArticulo.map((estado) => (
+          <option key={estado.idEstado} value={valorEstadoItem(estado)}>
+            {estado.nombre}
+          </option>
+        ))}
+      </select>
+    );
+  };
 
   return (
     <div
@@ -240,10 +503,13 @@ export default function ModalIncidenciaDistribucion({
               id="modal-incidencia-titulo"
               className="text-lg font-semibold text-gray-900 dark:text-white"
             >
-              Crear incidencia
+              {modoVer ? "Ver incidencia" : "Crear incidencia"}
             </h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Orden {folioOrden} · Entrega {documento.entrega}
+              {modoVer && contexto.idIncidencia
+                ? ` · Folio ${contexto.idIncidencia}`
+                : ""}
             </p>
             <p className="truncate text-sm text-gray-700 dark:text-gray-300">
               {documento.cardName ?? "—"}
@@ -261,6 +527,13 @@ export default function ModalIncidenciaDistribucion({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {loadingIncidencia ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-gray-500">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Cargando incidencia...
+            </div>
+          ) : (
+            <>
           {error && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
               {error}
@@ -274,39 +547,61 @@ export default function ModalIncidenciaDistribucion({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-1">
                 <label className={labelClass}>Tipo incidencia</label>
-                <select
-                  className={inputClass}
-                  value={form.idTipoIncidencia}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const idTipo = Number(value);
-                    setForm((prev) => ({
-                      ...prev,
-                      idTipoIncidencia: value,
-                      lineas:
-                        idTipo === TIPO_INCIDENCIA_SIN_DETALLE ? [] : prev.lineas,
-                    }));
-                  }}
-                  disabled={loadingTipos}
-                >
-                  <option value="">
-                    {loadingTipos ? "Cargando..." : "Seleccione tipo"}
-                  </option>
-                  {tiposIncidencia.map((tipo) => (
-                    <option
-                      key={tipo.idTipoIncidencia}
-                      value={tipo.idTipoIncidencia}
-                    >
-                      {tipo.nombre}
+                {modoVer ? (
+                  <input
+                    className={inputReadonlyClass}
+                    value={incidenciaVer?.tipoIncidencia ?? "—"}
+                    readOnly
+                  />
+                ) : (
+                  <select
+                    className={inputClass}
+                    value={form.idTipoIncidencia}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const idTipo = Number(value);
+                      setForm((prev) => ({
+                        ...prev,
+                        idTipoIncidencia: value,
+                        lineas:
+                          idTipo === TIPO_INCIDENCIA_SIN_DETALLE ||
+                          !tipoIncidenciaConDetalleArticulos(idTipo)
+                            ? []
+                            : prev.lineas,
+                      }));
+                    }}
+                    disabled={loadingTipos}
+                  >
+                    <option value="">
+                      {loadingTipos ? "Cargando..." : "Seleccione tipo"}
                     </option>
-                  ))}
-                </select>
+                    {tiposIncidencia.map((tipo) => (
+                      <option
+                        key={tipo.idTipoIncidencia}
+                        value={tipo.idTipoIncidencia}
+                      >
+                        {tipo.nombre}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
+              {modoVer && (
+                <div className="sm:col-span-1">
+                  <label className={labelClass}>Estatus</label>
+                  <input
+                    className={inputReadonlyClass}
+                    value={incidenciaVer?.estatus ?? "—"}
+                    readOnly
+                  />
+                </div>
+              )}
               <div className="sm:col-span-2">
                 <label className={labelClass}>Observaciones</label>
                 <textarea
-                  className={`${inputClass} min-h-[88px] resize-y`}
+                  className={`${modoVer ? inputReadonlyClass : inputClass} min-h-[88px] resize-y`}
                   value={form.observacionesEncabezado}
+                  readOnly={modoVer}
                   onChange={(e) =>
                     setForm((prev) => ({
                       ...prev,
@@ -325,22 +620,39 @@ export default function ModalIncidenciaDistribucion({
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                 Detalle de artículos
               </h3>
+              {!modoVer && (
               <button
                 type="button"
                 onClick={agregarLinea}
-                disabled={esTipoSinDetalle}
+                disabled={!puedeAgregarArticulo}
                 className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-200 dark:hover:bg-blue-900/50 touch-manipulation"
               >
                 <Plus className="h-4 w-4" />
                 Agregar artículo
               </button>
+              )}
             </div>
+
+            {esTipoConDetalle && !modoVer && loadingItems && (
+              <p className="mb-3 flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Cargando artículos de la entrega...
+              </p>
+            )}
+
+            {esTipoConDetalle && !modoVer && !loadingItems && itemsEntrega.length === 0 && (
+              <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                No hay artículos disponibles para esta orden de entrega.
+              </p>
+            )}
 
             {form.lineas.length === 0 ? (
               <p className="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500 dark:border-gray-600">
-                {esTipoSinDetalle
+                {!esTipoConDetalle
                   ? "Este tipo de incidencia no requiere detalle de artículos."
-                  : 'No hay artículos. Use "Agregar artículo" para registrar el detalle.'}
+                  : modoVer
+                    ? "Sin artículos registrados en el detalle."
+                    : 'No hay artículos. Use "Agregar artículo" para registrar el detalle.'}
               </p>
             ) : (
               <>
@@ -354,35 +666,33 @@ export default function ModalIncidenciaDistribucion({
                         <span className="text-xs font-medium text-gray-500">
                           Artículo #{index + 1}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => eliminarLinea(linea.idLocal)}
-                          className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          aria-label="Eliminar artículo"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {!modoVer && (
+                          <button
+                            type="button"
+                            onClick={() => eliminarLinea(linea.idLocal)}
+                            className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            aria-label="Eliminar artículo"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                       <div className="grid gap-2">
                         <div>
                           <label className={labelClass}>Artículo</label>
-                          <input
-                            className={inputClass}
-                            value={linea.articulo}
-                            onChange={(e) =>
-                              actualizarLinea(
-                                linea.idLocal,
-                                "articulo",
-                                e.target.value,
-                              )
-                            }
-                          />
+                          {(esTipoConDetalle || modoVer) &&
+                            renderCampoArticulo(linea)}
                         </div>
                         <div>
                           <label className={labelClass}>Descripción</label>
                           <input
-                            className={inputClass}
+                            className={
+                              modoVer || esTipoConDetalle
+                                ? inputReadonlyClass
+                                : inputClass
+                            }
                             value={linea.descripcion}
+                            readOnly={modoVer || esTipoConDetalle}
                             onChange={(e) =>
                               actualizarLinea(
                                 linea.idLocal,
@@ -399,8 +709,11 @@ export default function ModalIncidenciaDistribucion({
                               type="number"
                               min={1}
                               step={1}
-                              className={inputClass}
+                              className={
+                                modoVer ? inputReadonlyClass : inputClass
+                              }
                               value={linea.cantidad}
+                              readOnly={modoVer}
                               onChange={(e) =>
                                 actualizarLinea(
                                   linea.idLocal,
@@ -412,30 +725,17 @@ export default function ModalIncidenciaDistribucion({
                           </div>
                           <div>
                             <label className={labelClass}>Estado</label>
-                            <select
-                              className={inputClass}
-                              value={linea.estado}
-                              onChange={(e) =>
-                                actualizarLinea(
-                                  linea.idLocal,
-                                  "estado",
-                                  e.target.value,
-                                )
-                              }
-                            >
-                              {ESTADOS_ARTICULO_INCIDENCIA.map((estado) => (
-                                <option key={estado} value={estado}>
-                                  {estado}
-                                </option>
-                              ))}
-                            </select>
+                            {renderCampoEstado(linea)}
                           </div>
                         </div>
                         <div>
                           <label className={labelClass}>Observaciones</label>
                           <input
-                            className={inputClass}
+                            className={
+                              modoVer ? inputReadonlyClass : inputClass
+                            }
                             value={linea.observaciones}
+                            readOnly={modoVer}
                             onChange={(e) =>
                               actualizarLinea(
                                 linea.idLocal,
@@ -469,29 +769,27 @@ export default function ModalIncidenciaDistribucion({
                         <th className="min-w-[140px] px-2 py-2 text-left font-medium text-gray-600 dark:text-gray-300">
                           Observaciones
                         </th>
-                        <th className="w-12 px-2 py-2" />
+                        {!modoVer && (
+                          <th className="w-12 px-2 py-2" />
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                       {form.lineas.map((linea) => (
                         <tr key={linea.idLocal}>
                           <td className="px-2 py-2">
-                            <input
-                              className={inputClass}
-                              value={linea.articulo}
-                              onChange={(e) =>
-                                actualizarLinea(
-                                  linea.idLocal,
-                                  "articulo",
-                                  e.target.value,
-                                )
-                              }
-                            />
+                            {(esTipoConDetalle || modoVer) &&
+                              renderCampoArticulo(linea)}
                           </td>
                           <td className="px-2 py-2">
                             <input
-                              className={inputClass}
+                              className={
+                                modoVer || esTipoConDetalle
+                                  ? inputReadonlyClass
+                                  : inputClass
+                              }
                               value={linea.descripcion}
+                              readOnly={modoVer || esTipoConDetalle}
                               onChange={(e) =>
                                 actualizarLinea(
                                   linea.idLocal,
@@ -506,8 +804,11 @@ export default function ModalIncidenciaDistribucion({
                               type="number"
                               min={1}
                               step={1}
-                              className={inputClass}
+                              className={
+                                modoVer ? inputReadonlyClass : inputClass
+                              }
                               value={linea.cantidad}
+                              readOnly={modoVer}
                               onChange={(e) =>
                                 actualizarLinea(
                                   linea.idLocal,
@@ -518,28 +819,15 @@ export default function ModalIncidenciaDistribucion({
                             />
                           </td>
                           <td className="px-2 py-2">
-                            <select
-                              className={inputClass}
-                              value={linea.estado}
-                              onChange={(e) =>
-                                actualizarLinea(
-                                  linea.idLocal,
-                                  "estado",
-                                  e.target.value,
-                                )
-                              }
-                            >
-                              {ESTADOS_ARTICULO_INCIDENCIA.map((estado) => (
-                                <option key={estado} value={estado}>
-                                  {estado}
-                                </option>
-                              ))}
-                            </select>
+                            {renderCampoEstado(linea)}
                           </td>
                           <td className="px-2 py-2">
                             <input
-                              className={inputClass}
+                              className={
+                                modoVer ? inputReadonlyClass : inputClass
+                              }
                               value={linea.observaciones}
+                              readOnly={modoVer}
                               onChange={(e) =>
                                 actualizarLinea(
                                   linea.idLocal,
@@ -549,16 +837,18 @@ export default function ModalIncidenciaDistribucion({
                               }
                             />
                           </td>
-                          <td className="px-2 py-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => eliminarLinea(linea.idLocal)}
-                              className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                              aria-label="Eliminar artículo"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </td>
+                          {!modoVer && (
+                            <td className="px-2 py-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => eliminarLinea(linea.idLocal)}
+                                className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                aria-label="Eliminar artículo"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -567,9 +857,21 @@ export default function ModalIncidenciaDistribucion({
               </>
             )}
           </section>
+            </>
+          )}
         </div>
 
         <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-gray-200 px-4 py-3 sm:flex-row sm:justify-end dark:border-gray-700">
+          {modoVer ? (
+            <button
+              type="button"
+              onClick={onCerrar}
+              className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 touch-manipulation"
+            >
+              Cerrar
+            </button>
+          ) : (
+            <>
           <button
             type="button"
             onClick={onCerrar}
@@ -587,6 +889,8 @@ export default function ModalIncidenciaDistribucion({
             {guardando ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Guardar incidencia
           </button>
+            </>
+          )}
         </div>
       </div>
     </div>

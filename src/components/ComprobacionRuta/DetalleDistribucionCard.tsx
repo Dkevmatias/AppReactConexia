@@ -5,20 +5,29 @@ import {
   btnIncidenciaClass,
   clasesTarjetaDetalleTraspasoTipoOD,
 } from "./constants";
-import { esTipoODTraspaso, formatearDocRelacionado, formatearFecha } from "./utils";
+import { BotonVerIncidencia } from "./ModalVerIncidenciasEntrega";
+import {
+  documentoTieneIncidencia,
+  esTipoODTraspaso,
+  formatearDocRelacionado,
+  formatearFecha,
+} from "./utils";
 
 export interface DetalleDistribucionCardProps {
   item: DocODistribucionDetalle;
   crearIncidenciaInactivo?: boolean;
   onCrearIncidencia: (item: DocODistribucionDetalle) => void;
+  onVerIncidencia?: (item: DocODistribucionDetalle) => void;
 }
 
 export default function DetalleDistribucionCard({
   item,
   crearIncidenciaInactivo = false,
   onCrearIncidencia,
+  onVerIncidencia,
 }: DetalleDistribucionCardProps) {
   const esTraspaso = esTipoODTraspaso(item.tipoOD);
+  const tieneIncidencia = documentoTieneIncidencia(item);
 
   return (
     <article
@@ -67,20 +76,28 @@ export default function DetalleDistribucionCard({
           <dd className="font-medium">{item.slpName ?? "—"}</dd>
         </div>
       </dl>
-      <button
-        type="button"
-        onClick={() => onCrearIncidencia(item)}
-        disabled={crearIncidenciaInactivo}
-        title={
-          crearIncidenciaInactivo
-            ? "La orden está registrada sin incidencias (Estatus Sistema T)"
-            : "Crear incidencia"
-        }
-        className={`${btnIncidenciaClass} mt-3 w-full disabled:cursor-not-allowed disabled:opacity-50`}
-      >
-        <AlertTriangle className="h-4 w-4 shrink-0" />
-        Crear incidencia
-      </button>
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <button
+          type="button"
+          onClick={() => onCrearIncidencia(item)}
+          disabled={crearIncidenciaInactivo}
+          title={
+            crearIncidenciaInactivo
+              ? "La orden está registrada sin incidencias (Estatus Sistema T)"
+              : "Crear incidencia"
+          }
+          className={`${btnIncidenciaClass} flex-1 disabled:cursor-not-allowed disabled:opacity-50`}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          Crear incidencia
+        </button>
+        {tieneIncidencia && onVerIncidencia ? (
+          <BotonVerIncidencia
+            className="flex-1"
+            onClick={() => onVerIncidencia(item)}
+          />
+        ) : null}
+      </div>
     </article>
   );
 }

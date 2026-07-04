@@ -123,6 +123,8 @@ export default function ComprobacionRutas() {
     null,
   );
 
+  const [detalleRefreshKey, setDetalleRefreshKey] = useState(0);
+
   const [contextoOperativo, setContextoOperativo] =
     useState<ContextoOperativoPersona | null>(null);
 
@@ -162,6 +164,8 @@ export default function ComprobacionRutas() {
     setModalIncidenciaAbierto(false);
 
     setContextoIncidencia(null);
+
+    setDetalleRefreshKey(0);
   }, []);
 
   const abrirModalIncidencia = useCallback(
@@ -172,6 +176,7 @@ export default function ComprobacionRutas() {
         folioOrden: folioSeleccionado,
 
         documento,
+        modo: "crear",
       });
 
       setModalIncidenciaAbierto(true);
@@ -179,6 +184,23 @@ export default function ComprobacionRutas() {
       setMensajeIncidencia(null);
     },
 
+    [folioSeleccionado],
+  );
+
+  const abrirVerIncidenciaCompleta = useCallback(
+    (documento: DocODistribucionDetalle, idIncidencia: number) => {
+      if (!folioSeleccionado) return;
+
+      setContextoIncidencia({
+        folioOrden: folioSeleccionado,
+        documento,
+        modo: "ver",
+        idIncidencia,
+      });
+
+      setModalIncidenciaAbierto(true);
+      setMensajeIncidencia(null);
+    },
     [folioSeleccionado],
   );
 
@@ -547,12 +569,14 @@ export default function ComprobacionRutas() {
         folio={folioSeleccionado}
         estatusSistema={estatusSSeleccionado}
         incidenciaModalAbierto={modalIncidenciaAbierto}
+        detalleRefreshKey={detalleRefreshKey}
         mensajeExito={mensajeIncidencia}
         idUsuarioCreacion={user?.idPersona ?? null}
         idEmpresa={contextoOperativo?.idEmpresa ?? null}
         idSucursal={contextoOperativo?.idSucursal ?? null}
         onCerrar={cerrarModalDetalle}
         onCrearIncidencia={abrirModalIncidencia}
+        onVerIncidenciaCompleta={abrirVerIncidenciaCompleta}
         onMensajeExitoChange={setMensajeIncidencia}
         onEstatusSistemaChange={actualizarEstatusSistemaOrden}
       />
@@ -564,7 +588,10 @@ export default function ComprobacionRutas() {
         idEmpresa={contextoOperativo?.idEmpresa ?? null}
         idSucursal={contextoOperativo?.idSucursal ?? null}
         onCerrar={cerrarModalIncidencia}
-        onGuardado={setMensajeIncidencia}
+        onGuardado={(mensaje) => {
+          setMensajeIncidencia(mensaje);
+          setDetalleRefreshKey((key) => key + 1);
+        }}
       />
     </>
   );
