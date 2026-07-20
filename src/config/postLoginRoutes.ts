@@ -9,6 +9,7 @@ const POST_LOGIN_BY_ROLE: Record<number, string> = {
   2: "/ventas/articulos",
   7: "/ventas/articulos",
   8: "/configPage/entregasPremios",
+  10: "/operaciones/ComprobacionRutas",
 };
 
 function getPostLoginPath(role: number): string {
