@@ -5,24 +5,38 @@ import {
   oDistribucionService,
 } from "../../services/oDistribucionService";
 import {
+  ESTATUS_COBRANZA,
+  ESTATUS_FINALIZADO,
   ESTATUS_PROCESADO,
+  OBSERVACIONES_REVISION_COBRANZA,
+  OBSERVACIONES_REVISION_FINALIZADA,
   OBSERVACIONES_SIN_INCIDENCIAS_RUTA,
   procesarODService,
 } from "../../services/procesarODService";
 import { formatCurrency } from "../../utils/format";
-import { btnIncidenciaClass, clasesFilaTraspasoTipoOD } from "./constants";
+import {
+  btnIncidenciaClass,
+  clasesFilaPagoEfectivo,
+  clasesFilaPagoOtros,
+  clasesFilaPagoTransferencia,
+  clasesFilaTraspasoTipoOD,
+} from "./constants";
 import DetalleDistribucionCard from "./DetalleDistribucionCard";
 import ModalVerIncidenciasEntrega, {
   BotonVerIncidencia,
 } from "./ModalVerIncidenciasEntrega";
 import {
   bloquearCrearIncidenciaPorEstatus,
+  bloquearFinalizadoPorEstatus,
+  bloquearRCobranzaPorEstatus,
   bloquearSinIncidenciasPorEstatus,
   documentoTieneIncidencia,
   esTipoODTraspaso,
   formatearDocRelacionado,
   formatearFecha,
   idsIncidenciaDocumento,
+  ordenarDocumentosPorCondicion,
+  resolverTipoPagoPrioridad,
 } from "./utils";
 
 export interface ModalDetalleOrdenDistribucionProps {
@@ -67,6 +81,8 @@ export default function ModalDetalleOrdenDistribucion({
   const [error, setError] = useState<string | null>(null);
   const [procesandoSinIncidencias, setProcesandoSinIncidencias] =
     useState(false);
+  const [procesandoRCobranza, setProcesandoRCobranza] = useState(false);
+  const [procesandoFinalizado, setProcesandoFinalizado] = useState(false);
   const [verIncidenciasCtx, setVerIncidenciasCtx] = useState<{
     entrega: number;
     idsIncidencia: number[];
@@ -77,14 +93,48 @@ export default function ModalDetalleOrdenDistribucion({
     [documentos],
   );
 
+  const totalEfectivo = useMemo(
+    () => documentos.reduce((sum, item) => sum + (item.efectivo || 0), 0),
+    [documentos],
+  );
+
+  const totalTransferencia = useMemo(
+    () =>
+      documentos.reduce((sum, item) => sum + (item.transferencia || 0), 0),
+    [documentos],
+  );
+
+  const totalOtros = useMemo(
+    () => documentos.reduce((sum, item) => sum + (item.otros || 0), 0),
+    [documentos],
+  );
+
   const sinIncidenciasInactivo = useMemo(
     () => bloquearSinIncidenciasPorEstatus(estatusSistema),
+    [estatusSistema],
+  );
+
+  const rCobranzaInactivo = useMemo(
+    () => bloquearRCobranzaPorEstatus(estatusSistema),
+    [estatusSistema],
+  );
+
+  const finalizadoInactivo = useMemo(
+    () => bloquearFinalizadoPorEstatus(estatusSistema),
     [estatusSistema],
   );
 
   const crearIncidenciaInactivo = useMemo(
     () => bloquearCrearIncidenciaPorEstatus(estatusSistema),
     [estatusSistema],
+  );
+
+  const procesandoEstatus =
+    procesandoSinIncidencias || procesandoRCobranza || procesandoFinalizado;
+
+  const documentosOrdenados = useMemo(
+    () => ordenarDocumentosPorCondicion(documentos),
+    [documentos],
   );
 
   const cargarDetalle = useCallback(async (idFolio: number) => {
@@ -113,6 +163,8 @@ export default function ModalDetalleOrdenDistribucion({
       setError(null);
       setLoading(false);
       setProcesandoSinIncidencias(false);
+      setProcesandoRCobranza(false);
+      setProcesandoFinalizado(false);
       setVerIncidenciasCtx(null);
       return;
     }
@@ -120,12 +172,7 @@ export default function ModalDetalleOrdenDistribucion({
   }, [abierto, folio, cargarDetalle]);
 
   useEffect(() => {
-    if (
-      !detalleRefreshKey ||
-      !abierto ||
-      !folio ||
-      folio <= 0
-    ) {
+    if (!detalleRefreshKey || !abierto || !folio || folio <= 0) {
       return;
     }
     void cargarDetalle(folio);
@@ -183,6 +230,90 @@ export default function ModalDetalleOrdenDistribucion({
     }
   };
 
+  const marcarRCobranza = async () => {
+    if (!folio || folio <= 0) {
+      setError("No hay una orden de distribución seleccionada.");
+      return;
+    }
+    if (!idUsuarioCreacion || idUsuarioCreacion <= 0) {
+      setError("No se pudo identificar al usuario de la sesión.");
+      return;
+    }
+    if (!idEmpresa || idEmpresa <= 0 || !idSucursal || idSucursal <= 0) {
+      setError("No se pudo cargar el contexto operativo (empresa/sucursal).");
+      return;
+    }
+
+    setProcesandoRCobranza(true);
+    setError(null);
+    onMensajeExitoChange(null);
+    try {
+      await procesarODService.actualizar({
+        idODistribucion: folio,
+        idUsuarioEdicion: idUsuarioCreacion,
+        idEmpresa,
+        idSucursal,
+        observaciones: OBSERVACIONES_REVISION_COBRANZA,
+        estatus: ESTATUS_COBRANZA,
+        activo: true,
+      });
+      onMensajeExitoChange(
+        `Orden ${folio} marcada como revisada por cobranza (R-COD).`,
+      );
+      onEstatusSistemaChange?.(ESTATUS_COBRANZA);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo actualizar la revisión de cobranza.",
+      );
+    } finally {
+      setProcesandoRCobranza(false);
+    }
+  };
+
+  const marcarFinalizado = async () => {
+    if (!folio || folio <= 0) {
+      setError("No hay una orden de distribución seleccionada.");
+      return;
+    }
+    if (!idUsuarioCreacion || idUsuarioCreacion <= 0) {
+      setError("No se pudo identificar al usuario de la sesión.");
+      return;
+    }
+    if (!idEmpresa || idEmpresa <= 0 || !idSucursal || idSucursal <= 0) {
+      setError("No se pudo cargar el contexto operativo (empresa/sucursal).");
+      return;
+    }
+
+    setProcesandoFinalizado(true);
+    setError(null);
+    onMensajeExitoChange(null);
+    try {
+      await procesarODService.actualizar({
+        idODistribucion: folio,
+        idUsuarioEdicion: idUsuarioCreacion,
+        idEmpresa,
+        idSucursal,
+        observaciones: OBSERVACIONES_REVISION_FINALIZADA,
+        estatus: ESTATUS_FINALIZADO,
+        activo: true,
+      });
+      onMensajeExitoChange(`Orden ${folio} marcada como finalizada (R-F).`);
+      onEstatusSistemaChange?.(ESTATUS_FINALIZADO);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo finalizar la orden de distribución.",
+      );
+    } finally {
+      setProcesandoFinalizado(false);
+    }
+  };
+
   if (!abierto) return null;
 
   const abrirVerIncidencias = (item: DocODistribucionDetalle) => {
@@ -218,7 +349,7 @@ export default function ModalDetalleOrdenDistribucion({
           if (e.target === e.currentTarget) onCerrar();
         }}
       >
-        <div className="flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[90vh] sm:max-w-6xl sm:rounded-xl dark:border-gray-600 dark:bg-gray-800">
+        <div className="flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[90vh] sm:max-w-7xl sm:rounded-xl dark:border-gray-600 dark:bg-gray-800">
           <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-200 px-4 py-4 dark:border-gray-700">
             <div className="min-w-0">
               <h2
@@ -265,21 +396,66 @@ export default function ModalDetalleOrdenDistribucion({
               </p>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="mb-4 flex shrink-0 items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
-                  <span
-                    className="h-3 w-8 shrink-0 rounded border border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/40"
-                    aria-hidden
-                  />
-                  <span>
-                    Verde = traspaso{" "}
-                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                      (TipoOD = T)
-                    </span>
+                <div className="mb-4 flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 dark:text-gray-400">
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="h-3 w-8 shrink-0 rounded border border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/40"
+                      aria-hidden
+                    />
+                    Verde = Efectivo
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="h-3 w-8 shrink-0 rounded border border-sky-400 bg-sky-50 dark:border-sky-700 dark:bg-sky-950/40"
+                      aria-hidden
+                    />
+                    Azul = Transferencia
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="h-3 w-8 shrink-0 rounded border border-amber-400 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40"
+                      aria-hidden
+                    />
+                    Amarillo = Otros
+                  </span>
+                  <span className="inline-flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                    <span
+                      className="h-3 w-8 shrink-0 rounded border border-emerald-400 bg-emerald-50/60 dark:border-emerald-700 dark:bg-emerald-950/30"
+                      aria-hidden
+                    />
+                    Traspaso (TipoOD = T) si no hay pago
                   </span>
                 </div>
 
+                <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-950/40">
+                    <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                      Total Efectivo:
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-emerald-800 dark:text-emerald-200">
+                      {formatCurrency(totalEfectivo)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-800 dark:bg-sky-950/40">
+                    <p className="text-xs font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300">
+                      Total Transferencia:
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-sky-800 dark:text-sky-200">
+                      {formatCurrency(totalTransferencia)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/40">
+                    <p className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                      Total Otros:
+                    </p>
+                    <p className="mt-1 text-lg font-bold text-amber-800 dark:text-amber-200">
+                      {formatCurrency(totalOtros)}
+                    </p>
+                  </div>
+                </div>
+
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto md:hidden">
-                  {documentos.map((item, index) => (
+                  {documentosOrdenados.map((item, index) => (
                     <DetalleDistribucionCard
                       key={`${item.entrega}-${item.documento}-${index}`}
                       item={item}
@@ -309,6 +485,15 @@ export default function ModalDetalleOrdenDistribucion({
                         <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                           Total
                         </th>
+                        <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                          Efectivo
+                        </th>
+                        <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                          Transferencias
+                        </th>
+                        <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                          Otros
+                        </th>
                         <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-left font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                           Condición
                         </th>
@@ -330,17 +515,24 @@ export default function ModalDetalleOrdenDistribucion({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      {documentos.map((item, index) => {
+                      {documentosOrdenados.map((item, index) => {
+                        const tipoPago = resolverTipoPagoPrioridad(item);
                         const esTraspaso = esTipoODTraspaso(item.tipoOD);
                         const tieneIncidencia = documentoTieneIncidencia(item);
+                        const claseFila =
+                          tipoPago === "efectivo"
+                            ? clasesFilaPagoEfectivo
+                            : tipoPago === "transferencia"
+                              ? clasesFilaPagoTransferencia
+                              : tipoPago === "otros"
+                                ? clasesFilaPagoOtros
+                                : esTraspaso
+                                  ? clasesFilaTraspasoTipoOD
+                                  : "hover:bg-gray-50 dark:hover:bg-gray-900/30";
                         return (
                           <tr
                             key={`${item.entrega}-${item.documento}-${index}`}
-                            className={
-                              esTraspaso
-                                ? clasesFilaTraspasoTipoOD
-                                : "hover:bg-gray-50 dark:hover:bg-gray-900/30"
-                            }
+                            className={claseFila}
                           >
                             <td className="whitespace-nowrap px-3 py-2 font-medium">
                               {item.entrega || "—"}
@@ -362,6 +554,15 @@ export default function ModalDetalleOrdenDistribucion({
                             <td className="whitespace-nowrap px-3 py-2 text-right font-medium">
                               {formatCurrency(item.total)}
                             </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right">
+                              {formatCurrency(item.efectivo)}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right">
+                              {formatCurrency(item.transferencia)}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right">
+                              {formatCurrency(item.otros)}
+                            </td>
                             <td className="px-3 py-2">
                               {item.condicion ?? "—"}
                             </td>
@@ -380,7 +581,7 @@ export default function ModalDetalleOrdenDistribucion({
                                 className={`${btnIncidenciaClass} disabled:cursor-not-allowed disabled:opacity-50`}
                                 title={
                                   crearIncidenciaInactivo
-                                    ? "La orden está registrada sin incidencias (Estatus Sistema T)"
+                                    ? "La orden ya está procesada (Sin Incidencias R-AM)"
                                     : "Crear incidencia"
                                 }
                               >
@@ -407,7 +608,7 @@ export default function ModalDetalleOrdenDistribucion({
             )}
           </div>
 
-          <div className="flex shrink-0 gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+          <div className="flex shrink-0 flex-col gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700 sm:flex-row sm:flex-wrap">
             <button
               type="button"
               onClick={onCerrar}
@@ -419,12 +620,10 @@ export default function ModalDetalleOrdenDistribucion({
             <button
               type="button"
               onClick={() => void marcarSinIncidencias()}
-              disabled={
-                procesandoSinIncidencias || loading || sinIncidenciasInactivo
-              }
+              disabled={procesandoEstatus || loading || sinIncidenciasInactivo}
               title={
                 sinIncidenciasInactivo
-                  ? "La orden ya está registrada como Sin Incidencias (T) o Con Incidencia (I)"
+                  ? "La orden ya está procesada (Sin Incidencias R-AM o con incidencia)"
                   : "Registrar orden sin incidencias en ruta"
               }
               className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-700 dark:hover:bg-emerald-600 touch-manipulation sm:w-auto"
@@ -433,6 +632,40 @@ export default function ModalDetalleOrdenDistribucion({
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : null}
               Sin Incidencias
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void marcarRCobranza()}
+              disabled={procesandoEstatus || loading || rCobranzaInactivo}
+              title={
+                rCobranzaInactivo
+                  ? "Disponible cuando la orden esté en R-AM (revisada por almacén)"
+                  : "Actualizar estatus a R-COD (revisada por cobranza)"
+              }
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50 dark:bg-sky-700 dark:hover:bg-sky-600 touch-manipulation sm:w-auto"
+            >
+              {procesandoRCobranza ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
+              R. Cobranza
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void marcarFinalizado()}
+              disabled={procesandoEstatus || loading || finalizadoInactivo}
+              title={
+                finalizadoInactivo
+                  ? "Disponible cuando la orden esté en R-COD (revisada por cobranza)"
+                  : "Finalizar orden (actualizar estatus a R-F)"
+              }
+              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 dark:bg-violet-700 dark:hover:bg-violet-600 touch-manipulation sm:w-auto"
+            >
+              {procesandoFinalizado ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : null}
+              Finalizado
             </button>
           </div>
         </div>
@@ -444,7 +677,9 @@ export default function ModalDetalleOrdenDistribucion({
         idsIncidencia={verIncidenciasCtx?.idsIncidencia ?? []}
         onCerrar={() => setVerIncidenciasCtx(null)}
         onVerDetalle={
-          onVerIncidenciaCompleta ? abrirDetalleIncidenciaDesdeListado : undefined
+          onVerIncidenciaCompleta
+            ? abrirDetalleIncidenciaDesdeListado
+            : undefined
         }
       />
     </>

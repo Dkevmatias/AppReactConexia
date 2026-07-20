@@ -130,6 +130,12 @@ const navItems: NavItem[] = [
         icon: <HiMiniClipboardDocumentCheck className="w-4 h-4 shrink-0" />,
         pro: false,
       },
+      {
+        name: "Listado de Incidencias",
+        path: "/operaciones/ManagerComprobacionRuta",
+        icon: <HiMiniClipboardDocumentCheck className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
     ],
   },
   {

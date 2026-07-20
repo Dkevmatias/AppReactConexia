@@ -31,6 +31,10 @@ export interface DocODistribucionDetalle {
   facturaDeudor: number | null;
   origenFactura: string | null;
   devolucionEntrega: number | null;
+  tienePago: string | null;
+  efectivo: number;
+  transferencia: number;
+  otros: number;
   numTraspaso: number | null;
   tieneDevolucion: string | null;
   tieneIncidencia: string | null;
@@ -152,6 +156,11 @@ function normalizeDetalle(raw: unknown): DocODistribucionDetalle {
     numTraspaso: pickNumber(o, "numTraspaso", "NumTraspaso"),
     tieneDevolucion: pickString(o, "tieneDevolucion", "TieneDevolucion"),
     tieneIncidencia: pickString(o, "tieneIncidencia", "TieneIncidencia"),
+    tienePago: pickString(o, "tienePago", "TienePago"),
+    efectivo: pickNumber(o, "efectivo", "Efectivo") ?? 0,
+    transferencia:
+      pickNumber(o, "transferencia", "Transferencia", "transferencias", "Transferencias") ?? 0,
+    otros: pickNumber(o, "otros", "Otros") ?? 0,
     idIncidencia: pickNumber(o, "idIncidencia", "IdIncidencia"),
     cantidadIncidencias:
       pickNumber(o, "cantidadIncidencias", "CantidadIncidencias") ?? 0,

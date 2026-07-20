@@ -4,6 +4,9 @@ import { formatCurrency } from "../../utils/format";
 import {
   btnIncidenciaClass,
   clasesTarjetaDetalleTraspasoTipoOD,
+  clasesTarjetaPagoEfectivo,
+  clasesTarjetaPagoOtros,
+  clasesTarjetaPagoTransferencia,
 } from "./constants";
 import { BotonVerIncidencia } from "./ModalVerIncidenciasEntrega";
 import {
@@ -11,6 +14,7 @@ import {
   esTipoODTraspaso,
   formatearDocRelacionado,
   formatearFecha,
+  resolverTipoPagoPrioridad,
 } from "./utils";
 
 export interface DetalleDistribucionCardProps {
@@ -26,17 +30,23 @@ export default function DetalleDistribucionCard({
   onCrearIncidencia,
   onVerIncidencia,
 }: DetalleDistribucionCardProps) {
+  const tipoPago = resolverTipoPagoPrioridad(item);
   const esTraspaso = esTipoODTraspaso(item.tipoOD);
   const tieneIncidencia = documentoTieneIncidencia(item);
 
+  const claseTarjeta =
+    tipoPago === "efectivo"
+      ? clasesTarjetaPagoEfectivo
+      : tipoPago === "transferencia"
+        ? clasesTarjetaPagoTransferencia
+        : tipoPago === "otros"
+          ? clasesTarjetaPagoOtros
+          : esTraspaso
+            ? clasesTarjetaDetalleTraspasoTipoOD
+            : "border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-900/40";
+
   return (
-    <article
-      className={`rounded-lg border p-3 ${
-        esTraspaso
-          ? clasesTarjetaDetalleTraspasoTipoOD
-          : "border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-900/40"
-      }`}
-    >
+    <article className={`rounded-lg border p-3 ${claseTarjeta}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate font-medium text-gray-900 dark:text-white">
@@ -72,6 +82,18 @@ export default function DetalleDistribucionCard({
           <dd className="font-medium">{item.condicion ?? "—"}</dd>
         </div>
         <div>
+          <dt className="text-gray-500 dark:text-gray-400">Efectivo</dt>
+          <dd className="font-medium">{formatCurrency(item.efectivo)}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500 dark:text-gray-400">Transferencias</dt>
+          <dd className="font-medium">{formatCurrency(item.transferencia)}</dd>
+        </div>
+        <div>
+          <dt className="text-gray-500 dark:text-gray-400">Otros</dt>
+          <dd className="font-medium">{formatCurrency(item.otros)}</dd>
+        </div>
+        <div>
           <dt className="text-gray-500 dark:text-gray-400">Vendedor</dt>
           <dd className="font-medium">{item.slpName ?? "—"}</dd>
         </div>
@@ -83,7 +105,7 @@ export default function DetalleDistribucionCard({
           disabled={crearIncidenciaInactivo}
           title={
             crearIncidenciaInactivo
-              ? "La orden está registrada sin incidencias (Estatus Sistema T)"
+              ? "La orden ya está procesada (Sin Incidencias R-AM)"
               : "Crear incidencia"
           }
           className={`${btnIncidenciaClass} flex-1 disabled:cursor-not-allowed disabled:opacity-50`}

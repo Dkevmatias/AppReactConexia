@@ -22,16 +22,48 @@ import {
   ContextoOperativoPersona,
   getContextoOperativoPersona,
 } from "../../services/authService";
+import { getReportesService, Vendedores } from "../../services/reportesService";
 import { useAuth } from "../../hooks/useAuth";
 
 const inputClass =
-  "w-full min-h-[44px] rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white touch-manipulation";
+  "box-border w-full max-w-full min-w-0 min-h-[44px] rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white touch-manipulation";
+
+const selectClass = `${inputClass} appearance-auto truncate`;
 
 const labelClass =
   "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
 
 const btnPrimaryClass =
   "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 touch-manipulation";
+
+const ESTATUS_SISTEMA_OPCIONES = [
+  { value: "PDT", label: "Pendiente Sin Revisar" },
+  { value: "R-AM", label: "Revisado por Almacen" },
+  { value: "R-COD", label: "Revisado por Cobranza" },
+  { value: "R-F", label: "Revisión Finalizada" },
+] as const;
+
+type EstatusSistemaFiltro = (typeof ESTATUS_SISTEMA_OPCIONES)[number]["value"];
+
+const ESTATUS_SISTEMA_TODOS = new Set<EstatusSistemaFiltro>(
+  ESTATUS_SISTEMA_OPCIONES.map((opcion) => opcion.value),
+);
+
+function normalizarEstatusSistema(
+  estatusS: string | null | undefined,
+): string {
+  const valor = (estatusS ?? "").trim().toUpperCase();
+  return valor || "PDT";
+}
+
+function documentoPasaFiltroEstatusSistema(
+  doc: ODistribucionDocumento,
+  filtroEstatus: Set<EstatusSistemaFiltro>,
+): boolean {
+  if (filtroEstatus.size === 0) return false;
+  const estatus = normalizarEstatusSistema(doc.estatusS);
+  return filtroEstatus.has(estatus as EstatusSistemaFiltro);
+}
 
 const FILTROS_STORAGE_KEY = "comprobacionRutas:filtros";
 
@@ -94,6 +126,8 @@ export default function ComprobacionRutas() {
 
   const [rutas, setRutas] = useState<Ruta[]>([]);
 
+  const [repartidores, setRepartidores] = useState<Vendedores[]>([]);
+
   const [documentos, setDocumentos] = useState<ODistribucionDocumento[]>([]);
 
   const [loading, setLoading] = useState(true);
@@ -124,6 +158,10 @@ export default function ComprobacionRutas() {
   );
 
   const [detalleRefreshKey, setDetalleRefreshKey] = useState(0);
+
+  const [filtroEstatusSistema, setFiltroEstatusSistema] = useState<
+    Set<EstatusSistemaFiltro>
+  >(() => new Set(ESTATUS_SISTEMA_TODOS));
 
   const [contextoOperativo, setContextoOperativo] =
     useState<ContextoOperativoPersona | null>(null);
@@ -247,7 +285,7 @@ export default function ComprobacionRutas() {
 
       setError(null);
 
-      setAviso("Indique repartidor ");
+      setAviso("Seleccione un repartidor");
 
       setLoading(false);
 
@@ -304,13 +342,21 @@ export default function ComprobacionRutas() {
       setLoadingCatalogos(true);
 
       try {
-        const rutasData = await rutasService.getRutas();
+        const [rutasData, repartidoresData] = await Promise.all([
+          rutasService.getRutas(),
+          getReportesService.getVendedoresReparto(true),
+        ]);
 
         setRutas((rutasData ?? []).filter((r) => r.activo));
+        setRepartidores(
+          (repartidoresData ?? []).filter(
+            (v) => v.activo && v.slpName.trim().length > 0,
+          ),
+        );
       } catch (err) {
         console.error(err);
 
-        setError("No se pudieron cargar las rutas.");
+        setError("No se pudieron cargar rutas o repartidores.");
       } finally {
         setLoadingCatalogos(false);
       }
@@ -320,8 +366,31 @@ export default function ComprobacionRutas() {
   }, []);
 
   useEffect(() => {
+    if (loadingCatalogos || !repartidor) return;
+    const existe = repartidores.some((v) => v.slpName === repartidor);
+    if (!existe) setRepartidor("");
+  }, [loadingCatalogos, repartidores, repartidor]);
+
+  useEffect(() => {
     void cargarDocumentos();
   }, [cargarDocumentos]);
+
+  const documentosFiltrados = useMemo(
+    () =>
+      documentos.filter((doc) =>
+        documentoPasaFiltroEstatusSistema(doc, filtroEstatusSistema),
+      ),
+    [documentos, filtroEstatusSistema],
+  );
+
+  const toggleFiltroEstatusSistema = (value: EstatusSistemaFiltro) => {
+    setFiltroEstatusSistema((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  };
 
   return (
     <>
@@ -330,6 +399,7 @@ export default function ComprobacionRutas() {
         description="Consulta de documentos de distribución por repartidor y ruta"
       />
 
+      <div className="w-full max-w-full min-w-0 overflow-x-hidden">
       <div className="mb-4 sm:mb-6">
         <h1 className="text-xl font-semibold text-gray-900 sm:text-2xl dark:text-white">
           Comprobación de Rutas
@@ -341,26 +411,32 @@ export default function ComprobacionRutas() {
         </p>
       </div>
 
-      <div className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-white p-3 sm:space-y-0 sm:p-4 lg:grid lg:grid-cols-5 lg:gap-4 dark:border-gray-700 dark:bg-gray-800">
-        <div className="lg:col-span-1">
+      <div className="mb-4 w-full max-w-full min-w-0 space-y-3 overflow-hidden rounded-xl border border-gray-200 bg-white p-3 sm:p-4 lg:grid lg:grid-cols-5 lg:gap-4 lg:space-y-0 dark:border-gray-700 dark:bg-gray-800">
+        <div className="min-w-0 max-w-full lg:col-span-1">
           <label className={labelClass}>Repartidor</label>
 
-          <input
-            type="text"
-            className={inputClass}
+          <select
+            className={selectClass}
             value={repartidor}
             onChange={(e) => setRepartidor(e.target.value)}
-            placeholder="Ej. RTX03"
-            autoComplete="off"
-            enterKeyHint="search"
-          />
+            disabled={loadingCatalogos}
+          >
+            <option value="">Seleccione repartidor</option>
+            {repartidores.map((v) => (
+              <option key={v.idVendedor} value={v.slpName}>
+                {v.slpName
+                  ? `${v.slpName} — ${v.nombre}`
+                  : v.nombre}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="lg:col-span-1">
+        <div className="min-w-0 max-w-full lg:col-span-1">
           <label className={labelClass}>Ruta</label>
 
           <select
-            className={inputClass}
+            className={selectClass}
             value={ruta}
             onChange={(e) => setRuta(e.target.value)}
             disabled={loadingCatalogos}
@@ -370,15 +446,14 @@ export default function ComprobacionRutas() {
             {rutas.map((item) => (
               <option key={item.idRuta} value={item.codigo}>
                 {item.codigo}
-
                 {item.nombre ? ` — ${item.nombre}` : ""}
               </option>
             ))}
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:col-span-2 lg:grid-cols-2 lg:gap-4">
-          <div>
+        <div className="grid min-w-0 max-w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:col-span-2 lg:gap-4">
+          <div className="min-w-0 max-w-full">
             <label className={labelClass}>Fecha desde</label>
 
             <input
@@ -389,7 +464,7 @@ export default function ComprobacionRutas() {
             />
           </div>
 
-          <div>
+          <div className="min-w-0 max-w-full">
             <label className={labelClass}>Fecha hasta</label>
 
             <input
@@ -401,7 +476,7 @@ export default function ComprobacionRutas() {
           </div>
         </div>
 
-        <div className="lg:col-span-1 lg:flex lg:items-end">
+        <div className="min-w-0 max-w-full lg:col-span-1 lg:flex lg:items-end">
           <button
             type="button"
             onClick={() => void cargarDocumentos()}
@@ -432,37 +507,53 @@ export default function ComprobacionRutas() {
 
       {!loading && documentos.length > 0 && (
         <>
-          <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
-            {documentos.length} documento(s) encontrado(s). Doble clic en una
-            fila (escritorio) o toque en móvil para ver el detalle.
-          </p>
-
-          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
-            <span className="font-medium text-gray-700 dark:text-gray-300">
-              Estatus Sistema:
-            </span>
-
-            <span>
-              <span className="font-semibold text-gray-800 dark:text-gray-200">
-                T
-              </span>
-              : Sin Incidencias
-            </span>
-
-            <span>
-              <span className="font-semibold text-gray-800 dark:text-gray-200">
-                P
-              </span>
-              : Pendiente
-            </span>
-
-            <span>
-              <span className="font-semibold text-gray-800 dark:text-gray-200">
-                I
-              </span>
-              : Con Incidencia
-            </span>
+          <div className="mb-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Filtrar estatus sistema
+              </label>
+              <button
+                type="button"
+                onClick={() =>
+                  setFiltroEstatusSistema(new Set(ESTATUS_SISTEMA_TODOS))
+                }
+                className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+              >
+                Marcar todos
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-700 sm:gap-3">
+              {ESTATUS_SISTEMA_OPCIONES.map(({ value, label }) => (
+                <label
+                  key={value}
+                  className="inline-flex max-w-full items-center gap-2 text-sm text-gray-700 dark:text-gray-200"
+                >
+                  <input
+                    type="checkbox"
+                    checked={filtroEstatusSistema.has(value)}
+                    onChange={() => toggleFiltroEstatusSistema(value)}
+                    className="h-4 w-4 shrink-0 rounded border-gray-300"
+                  />
+                  <span className="min-w-0">
+                    <span className="font-semibold">{value}</span>
+                    <span className="hidden text-gray-500 sm:inline dark:text-gray-400">
+                      {" "}
+                      · {label}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
+
+          <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+            {documentosFiltrados.length} documento(s) mostrado(s)
+            {documentosFiltrados.length !== documentos.length
+              ? ` de ${documentos.length}`
+              : ""}
+            . Doble clic en una fila (escritorio) o toque en móvil para ver el
+            detalle.
+          </p>
         </>
       )}
 
@@ -476,10 +567,14 @@ export default function ComprobacionRutas() {
           <p className="px-4 py-8 text-center text-sm text-gray-500">
             No hay documentos para los filtros seleccionados.
           </p>
+        ) : documentosFiltrados.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-gray-500">
+            No hay documentos con los estatus sistema seleccionados.
+          </p>
         ) : (
           <>
             <div className="space-y-3 p-3 md:hidden">
-              {documentos.map((doc, index) => (
+              {documentosFiltrados.map((doc, index) => (
                 <DocumentoDistribucionCard
                   key={`${doc.folio}-${doc.fecha ?? ""}-${index}`}
                   doc={doc}
@@ -527,7 +622,7 @@ export default function ComprobacionRutas() {
                 </thead>
 
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                  {documentos.map((doc, index) => (
+                  {documentosFiltrados.map((doc, index) => (
                     <tr
                       key={`${doc.folio}-${doc.fecha ?? ""}-${index}`}
                       onDoubleClick={() => abrirDetalleOrden(doc)}
@@ -563,6 +658,7 @@ export default function ComprobacionRutas() {
           </>
         )}
       </div>
+      </div>
 
       <ModalDetalleOrdenDistribucion
         abierto={modalDetalleAbierto}
@@ -571,7 +667,7 @@ export default function ComprobacionRutas() {
         incidenciaModalAbierto={modalIncidenciaAbierto}
         detalleRefreshKey={detalleRefreshKey}
         mensajeExito={mensajeIncidencia}
-        idUsuarioCreacion={user?.idPersona ?? null}
+        idUsuarioCreacion={user?.idUsuario ?? null}
         idEmpresa={contextoOperativo?.idEmpresa ?? null}
         idSucursal={contextoOperativo?.idSucursal ?? null}
         onCerrar={cerrarModalDetalle}
@@ -584,7 +680,7 @@ export default function ComprobacionRutas() {
       <ModalIncidenciaDistribucion
         abierto={modalIncidenciaAbierto}
         contexto={contextoIncidencia}
-        idUsuarioCreacion={user?.idPersona ?? null}
+        idUsuarioCreacion={user?.idUsuario ?? null}
         idEmpresa={contextoOperativo?.idEmpresa ?? null}
         idSucursal={contextoOperativo?.idSucursal ?? null}
         onCerrar={cerrarModalIncidencia}

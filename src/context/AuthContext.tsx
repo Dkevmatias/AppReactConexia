@@ -11,6 +11,7 @@ import { clearTokenFallback } from "../utils/tokenFallback";
 interface User {
   role: number;
   idPersona: number;
+  idUsuario: number;
   cardCode: string;
   fullname: string;
   defaultRoute?: string | null;

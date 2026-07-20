@@ -33,7 +33,7 @@ function LayoutContent() {
         } ${isMobileOpen ? "ml-0" : ""}`}
       >
         <AppHeader />
-        <main className="p-4 mx-auto max-w-screen-2xl md:p-6">
+        <main className="mx-auto max-w-screen-2xl overflow-x-hidden p-4 md:p-6">
           <Outlet />
         </main>
       </div>

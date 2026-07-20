@@ -7,6 +7,7 @@ export type EstadoPremio =
 export interface User {
   role: number;
   idPersona: number;
+  idUsuario: number;
   cardCode: string;
   fullname: string;
   /** Ruta inicial del rol (desde backend); opcional */

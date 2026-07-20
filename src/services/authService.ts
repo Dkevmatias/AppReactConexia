@@ -6,6 +6,7 @@ import {
 
 export interface User {
   idPersona: number;
+  idUsuario: number;
   role: number;
   cardCode: string;
   fullname: string;
@@ -34,6 +35,35 @@ export const isSessionAuthenticated = (
   return res.authenticated === true || res.isAuthenticated === true;
 };
 
+function normalizeUser(raw: unknown): User | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const idPersona = pickNumber(o, "idPersona", "IdPersona");
+  const idUsuario = pickNumber(o, "idUsuario", "IdUsuario");
+  const role = pickNumber(o, "role", "Role", "idRol", "IdRol");
+  const cardCode = pickString(o, "cardCode", "CardCode") ?? "";
+  const fullname =
+    pickString(o, "fullname", "Fullname", "nombre", "Nombre") ?? "";
+  const defaultRoute = pickString(
+    o,
+    "defaultRoute",
+    "DefaultRoute",
+    "rutaInicial",
+    "RutaInicial",
+  );
+
+  if (!idPersona && !idUsuario) return undefined;
+
+  return {
+    idPersona,
+    idUsuario,
+    role,
+    cardCode,
+    fullname,
+    defaultRoute,
+  };
+}
+
 // LOGIN
 export const loginService = async (
   email: string,
@@ -57,7 +87,11 @@ export const loginService = async (
     persistTokensFromAuthResponse(res.data);
   }
 
-  return res.data;
+  const user = normalizeUser(res.data?.user);
+  return {
+    ...res.data,
+    user: user ?? res.data.user,
+  };
 };
 
 // CHECK AUTH (lee cookie HttpOnly o Bearer en móvil)
@@ -65,7 +99,9 @@ export const checkAuthService = async (): Promise<CheckAuthResponse> => {
   const res = await api.get<CheckAuthResponse>("/api/Acceso/checkauth", {
     validateStatus: (status) => status === 200 || status === 401,
   });
-  return res.data ?? {};
+  const data = res.data ?? {};
+  const user = normalizeUser(data.user);
+  return user ? { ...data, user } : data;
 };
 
 // LOGOUT
@@ -142,7 +178,13 @@ function normalizeContextoOperativo(raw: unknown): ContextoOperativoPersona {
     idPersona: pickNumber(o, "idPersona", "IdPersona"),
     idEmpresa: pickNumber(o, "idEmpresa", "IdEmpresa"),
     idSucursal: pickNumber(o, "idSucursal", "IdSucursal"),
-    empresa: pickString(o, "empresa", "Empresa", "nombreEmpresa", "NombreEmpresa"),
+    empresa: pickString(
+      o,
+      "empresa",
+      "Empresa",
+      "nombreEmpresa",
+      "NombreEmpresa",
+    ),
     sucursal: pickString(
       o,
       "sucursal",

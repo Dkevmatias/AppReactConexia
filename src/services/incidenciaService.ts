@@ -142,6 +142,12 @@ export interface IncidenciaResumen {
   tipoIncidencia: string;
   observaciones: string;
   estatus: string;
+  idOrdenEntrega: number;
+  idODistribucion: number;
+  idUsuarioCreacion: number;
+  nombreUsuarioCreacion: string | null;
+  fechaCreacion: string | null;
+  fechaCierre: string | null;
 }
 
 function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
@@ -176,7 +182,13 @@ function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
       "TipoIncidencia",
     ) ??
     (tipoAnidado
-      ? pickString(tipoAnidado, "nombre", "Nombre", "descripcion", "Descripcion")
+      ? pickString(
+          tipoAnidado,
+          "nombre",
+          "Nombre",
+          "descripcion",
+          "Descripcion",
+        )
       : null) ??
     (idTipoIncidencia > 0 ? `Tipo ${idTipoIncidencia}` : "—");
 
@@ -184,9 +196,19 @@ function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
     idIncidencia,
     idTipoIncidencia,
     tipoIncidencia,
-    observaciones:
-      pickString(o, "observaciones", "Observaciones") ?? "",
+    observaciones: pickString(o, "observaciones", "Observaciones") ?? "",
     estatus: pickString(o, "estatus", "Estatus") ?? "—",
+    idOrdenEntrega: pickNumber(o, "idOrdenEntrega", "IdOrdenEntrega") ?? 0,
+    idODistribucion: pickNumber(o, "idODistribucion", "IdODistribucion") ?? 0,
+    idUsuarioCreacion:
+      pickNumber(o, "idUsuarioCreacion", "IdUsuarioCreacion") ?? 0,
+    nombreUsuarioCreacion: pickString(
+      o,
+      "nombreUsuarioCreacion",
+      "NombreUsuarioCreacion",
+    ),
+    fechaCreacion: pickString(o, "fechaCreacion", "FechaCreacion"),
+    fechaCierre: pickString(o, "fechaCierre", "FechaCierre"),
   };
 }
 
@@ -230,8 +252,7 @@ function normalizeIncidenciaDetalleItem(
       pickString(o, "itemName", "ItemName", "descripcion", "Descripcion") ?? "",
     cantidad: pickNumber(o, "cantidad", "Cantidad") ?? 0,
     idEstado,
-    observaciones:
-      pickString(o, "observaciones", "Observaciones") ?? "",
+    observaciones: pickString(o, "observaciones", "Observaciones") ?? "",
     vendedor: pickString(o, "vendedor", "Vendedor") ?? "",
     estatus: pickString(o, "estatus", "Estatus") ?? "",
   };
@@ -254,7 +275,12 @@ function normalizeIncidenciaCompleta(raw: unknown): IncidenciaCompleta | null {
   >;
   let detalles: IncidenciaDetalleItem[] = [];
 
-  for (const key of ["detalles", "Detalles", "incidenciaDetalle", "IncidenciaDetalle"]) {
+  for (const key of [
+    "detalles",
+    "Detalles",
+    "incidenciaDetalle",
+    "IncidenciaDetalle",
+  ]) {
     const list = o[key];
     if (Array.isArray(list)) {
       detalles = normalizeIncidenciaDetalleList(list);
@@ -411,7 +437,29 @@ export const incidenciaService = {
       }),
     );
 
-    return resultados.filter((item): item is IncidenciaResumen => item !== null);
+    return resultados.filter(
+      (item): item is IncidenciaCompleta => item !== null,
+    );
+  },
+
+  getBySucursal: async (
+    idSucursal: number,
+    soloActivos = true,
+  ): Promise<IncidenciaCompleta[]> => {
+    if (!idSucursal || idSucursal <= 0) {
+      throw new Error("La sucursal no es válida para consultar incidencias.");
+    }
+    const qs = new URLSearchParams();
+    if (soloActivos) qs.set("soloActivos", "true");
+    const response = await api.get<unknown>(
+      `/api/Incidencias/Sucursal/${Math.trunc(idSucursal)}?${qs.toString()}`,
+    );
+    return normalizeIncidenciaCompletaList(
+      assertOk(
+        response,
+        "No se pudieron cargar las incidencias de la sucursal.",
+      ),
+    );
   },
 
   crearIncidencia: async (
@@ -425,8 +473,14 @@ export const incidenciaService = {
 
     const response = await api.post<unknown>("/api/Incidencias", payload);
 
-    console.log("[Incidencias] POST /api/Incidencias — status:", response.status);
-    console.log("[Incidencias] POST /api/Incidencias — response:", response.data);
+    console.log(
+      "[Incidencias] POST /api/Incidencias — status:",
+      response.status,
+    );
+    console.log(
+      "[Incidencias] POST /api/Incidencias — response:",
+      response.data,
+    );
 
     return assertOk(response, "No se pudo guardar la incidencia.");
   },

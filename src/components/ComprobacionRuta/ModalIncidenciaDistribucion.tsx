@@ -18,7 +18,8 @@ import {
 } from "../../services/itemEntregaService";
 
 const inputClass =
-  "w-full min-h-[40px] rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white touch-manipulation";
+  "box-border w-full max-w-full min-w-0 min-h-[44px] rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-base sm:min-h-[40px] sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white touch-manipulation";
+const selectClass = `${inputClass} appearance-auto truncate`;
 const inputReadonlyClass = `${inputClass} cursor-default bg-gray-100 dark:bg-gray-800`;
 const labelClass =
   "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
@@ -434,23 +435,25 @@ export default function ModalIncidenciaDistribucion({
     );
 
     return (
-      <select
-        className={inputClass}
-        value={linea.articulo}
-        onChange={(e) =>
-          seleccionarArticuloLinea(linea.idLocal, e.target.value)
-        }
-        disabled={loadingItems || opciones.length === 0}
-      >
-        <option value="">
-          {loadingItems ? "Cargando artículos..." : "Seleccione artículo"}
-        </option>
-        {opciones.map((item) => (
-          <option key={item.item} value={item.item}>
-            {item.item}
+      <div className="min-w-0 max-w-full overflow-hidden">
+        <select
+          className={selectClass}
+          value={linea.articulo}
+          onChange={(e) =>
+            seleccionarArticuloLinea(linea.idLocal, e.target.value)
+          }
+          disabled={loadingItems || opciones.length === 0}
+        >
+          <option value="">
+            {loadingItems ? "Cargando artículos..." : "Seleccione artículo"}
           </option>
-        ))}
-      </select>
+          {opciones.map((item) => (
+            <option key={item.item} value={item.item}>
+              {item.item}
+            </option>
+          ))}
+        </select>
+      </div>
     );
   };
 
@@ -466,23 +469,25 @@ export default function ModalIncidenciaDistribucion({
     }
 
     return (
-      <select
-        className={inputClass}
-        value={linea.idEstado}
-        onChange={(e) =>
-          actualizarLinea(linea.idLocal, "idEstado", e.target.value)
-        }
-        disabled={loadingEstados || estadosArticulo.length === 0}
-      >
-        <option value="">
-          {loadingEstados ? "Cargando..." : "Seleccione estado"}
-        </option>
-        {estadosArticulo.map((estado) => (
-          <option key={estado.idEstado} value={valorEstadoItem(estado)}>
-            {estado.nombre}
+      <div className="min-w-0 max-w-full overflow-hidden">
+        <select
+          className={selectClass}
+          value={linea.idEstado}
+          onChange={(e) =>
+            actualizarLinea(linea.idLocal, "idEstado", e.target.value)
+          }
+          disabled={loadingEstados || estadosArticulo.length === 0}
+        >
+          <option value="">
+            {loadingEstados ? "Cargando..." : "Seleccione estado"}
           </option>
-        ))}
-      </select>
+          {estadosArticulo.map((estado) => (
+            <option key={estado.idEstado} value={valorEstadoItem(estado)}>
+              {estado.nombre}
+            </option>
+          ))}
+        </select>
+      </div>
     );
   };
 
@@ -496,9 +501,9 @@ export default function ModalIncidenciaDistribucion({
         if (e.target === e.currentTarget) onCerrar();
       }}
     >
-      <div className="flex max-h-[94vh] w-full flex-col rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[92vh] sm:max-w-5xl sm:rounded-xl dark:border-gray-600 dark:bg-gray-800">
+      <div className="flex max-h-[94vh] w-full max-w-full flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[92vh] sm:max-w-5xl sm:rounded-xl dark:border-gray-600 dark:bg-gray-800">
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-200 px-4 py-4 dark:border-gray-700">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1 overflow-hidden">
             <h2
               id="modal-incidencia-titulo"
               className="text-lg font-semibold text-gray-900 dark:text-white"
@@ -526,7 +531,7 @@ export default function ModalIncidenciaDistribucion({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4">
           {loadingIncidencia ? (
             <div className="flex items-center justify-center gap-2 py-16 text-gray-500">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -545,7 +550,7 @@ export default function ModalIncidenciaDistribucion({
               Encabezado
             </h3>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-1">
+              <div className="min-w-0 max-w-full sm:col-span-1">
                 <label className={labelClass}>Tipo incidencia</label>
                 {modoVer ? (
                   <input
@@ -554,40 +559,42 @@ export default function ModalIncidenciaDistribucion({
                     readOnly
                   />
                 ) : (
-                  <select
-                    className={inputClass}
-                    value={form.idTipoIncidencia}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      const idTipo = Number(value);
-                      setForm((prev) => ({
-                        ...prev,
-                        idTipoIncidencia: value,
-                        lineas:
-                          idTipo === TIPO_INCIDENCIA_SIN_DETALLE ||
-                          !tipoIncidenciaConDetalleArticulos(idTipo)
-                            ? []
-                            : prev.lineas,
-                      }));
-                    }}
-                    disabled={loadingTipos}
-                  >
-                    <option value="">
-                      {loadingTipos ? "Cargando..." : "Seleccione tipo"}
-                    </option>
-                    {tiposIncidencia.map((tipo) => (
-                      <option
-                        key={tipo.idTipoIncidencia}
-                        value={tipo.idTipoIncidencia}
-                      >
-                        {tipo.nombre}
+                  <div className="min-w-0 max-w-full overflow-hidden">
+                    <select
+                      className={selectClass}
+                      value={form.idTipoIncidencia}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const idTipo = Number(value);
+                        setForm((prev) => ({
+                          ...prev,
+                          idTipoIncidencia: value,
+                          lineas:
+                            idTipo === TIPO_INCIDENCIA_SIN_DETALLE ||
+                            !tipoIncidenciaConDetalleArticulos(idTipo)
+                              ? []
+                              : prev.lineas,
+                        }));
+                      }}
+                      disabled={loadingTipos}
+                    >
+                      <option value="">
+                        {loadingTipos ? "Cargando..." : "Seleccione tipo"}
                       </option>
-                    ))}
-                  </select>
+                      {tiposIncidencia.map((tipo) => (
+                        <option
+                          key={tipo.idTipoIncidencia}
+                          value={tipo.idTipoIncidencia}
+                        >
+                          {tipo.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
               </div>
               {modoVer && (
-                <div className="sm:col-span-1">
+                <div className="min-w-0 max-w-full sm:col-span-1">
                   <label className={labelClass}>Estatus</label>
                   <input
                     className={inputReadonlyClass}
@@ -596,7 +603,7 @@ export default function ModalIncidenciaDistribucion({
                   />
                 </div>
               )}
-              <div className="sm:col-span-2">
+              <div className="min-w-0 max-w-full sm:col-span-2">
                 <label className={labelClass}>Observaciones</label>
                 <textarea
                   className={`${modoVer ? inputReadonlyClass : inputClass} min-h-[88px] resize-y`}
@@ -660,7 +667,7 @@ export default function ModalIncidenciaDistribucion({
                   {form.lineas.map((linea, index) => (
                     <article
                       key={linea.idLocal}
-                      className="rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-900/40"
+                      className="min-w-0 max-w-full overflow-hidden rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-600 dark:bg-gray-900/40"
                     >
                       <div className="mb-2 flex items-center justify-between">
                         <span className="text-xs font-medium text-gray-500">
@@ -677,13 +684,13 @@ export default function ModalIncidenciaDistribucion({
                           </button>
                         )}
                       </div>
-                      <div className="grid gap-2">
-                        <div>
+                      <div className="grid min-w-0 gap-2">
+                        <div className="min-w-0 max-w-full">
                           <label className={labelClass}>Artículo</label>
                           {(esTipoConDetalle || modoVer) &&
                             renderCampoArticulo(linea)}
                         </div>
-                        <div>
+                        <div className="min-w-0 max-w-full">
                           <label className={labelClass}>Descripción</label>
                           <input
                             className={
