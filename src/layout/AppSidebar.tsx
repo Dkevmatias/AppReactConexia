@@ -22,7 +22,7 @@ import {
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/useAuth";
 import { BoxIcon } from "lucide-react";
-import { permisoActivo } from "../utils/permisosModulo";
+import { permisoActivo, permisoActivoPorClaveORuta } from "../utils/permisosModulo";
 
 type NavItem = {
   name: string;
@@ -337,7 +337,7 @@ const AppSidebar: React.FC = () => {
         }
 
         if (item.name === "Operaciones" && item.subItems) {
-          const moduloBitacora = menu.find((m) => {
+          const moduloOperaciones = menu.find((m) => {
             const clave = (m.clave ?? "").trim().toLowerCase();
             return (
               clave === "bitacora" ||
@@ -345,11 +345,58 @@ const AppSidebar: React.FC = () => {
               clave === "operaciones"
             );
           });
-          if (!moduloBitacora?.activo) return null;
-          if (!permisoActivo(moduloBitacora.permisos, "bitacora.ver")) {
-            return null;
-          }
-          return item;
+          if (!moduloOperaciones?.activo) return null;
+
+          const operacionesSubs: {
+            claves: string[];
+            ruta: string;
+            entry: NonNullable<NavItem["subItems"]>[number];
+          }[] = [
+            {
+              claves: ["bitacora.ver", "bitacora.operar"],
+              ruta: "/operaciones/BitacoraCobranza",
+              entry: item.subItems[0],
+            },
+            {
+              claves: [
+                "bitacora.ver",
+                "bitacora.lista",
+                "bitacora.listar",
+              ],
+              ruta: "/operaciones/ListaBitacorasCobranza",
+              entry: item.subItems[1],
+            },
+            {
+              claves: [
+                "comprobacion.ver",
+                "comprobacion.operar",
+              ],
+              ruta: "/operaciones/ComprobacionRutas",
+              entry: item.subItems[2],
+            },
+            {
+              claves: [
+                "comprobacion.manager",
+                "comprobacion.incidencias",
+                "manager.ver",
+              ],
+              ruta: "/operaciones/ManagerComprobacionRuta",
+              entry: item.subItems[3],
+            },
+          ];
+
+          const subItems = operacionesSubs
+            .filter(({ claves, ruta }) =>
+              permisoActivoPorClaveORuta(moduloOperaciones.permisos, {
+                claves,
+                ruta,
+              }),
+            )
+            .map(({ entry }) => entry)
+            .filter(Boolean);
+
+          if (subItems.length === 0) return null;
+          return { ...item, subItems };
         }
 
         const menuClaveMap: Record<string, string> = {

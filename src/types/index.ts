@@ -59,6 +59,8 @@ export interface Permiso {
   nombre: string;
   clave: string;
   activo: boolean;
+  /** Ruta opcional asociada al permiso (API de menú por rol). */
+  ruta?: string | null;
 }
 
 export interface Modulo {

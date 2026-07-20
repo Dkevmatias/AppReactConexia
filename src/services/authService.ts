@@ -365,6 +365,7 @@ export interface Modulo {
     nombre: string;
     clave: string;
     activo: boolean;
+    ruta?: string | null;
   }[];
 }
 
