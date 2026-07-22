@@ -31,11 +31,15 @@ export interface IncidenciaCreatePayload {
   detalles?: IncidenciaDetallePayload[];
 }
 
-/** Tipo sin detalle de artículos (estatus D al crear). */
+/** Tipo sin detalle de artículos (no exige líneas de items). */
 export const TIPO_INCIDENCIA_SIN_DETALLE = 1;
 
 /** Tipos que requieren detalle con artículos de la entrega. */
 export const TIPOS_INCIDENCIA_CON_DETALLE = [2, 3, 4, 6] as const;
+
+/** Estatus de incidencia: pendiente al crear; otro proceso la pasa a finalizada. */
+export const ESTATUS_INCIDENCIA_PENDIENTE = "P";
+export const ESTATUS_INCIDENCIA_FINALIZADA = "F";
 
 export function tipoIncidenciaConDetalleArticulos(
   idTipoIncidencia: number,
@@ -45,9 +49,37 @@ export function tipoIncidenciaConDetalleArticulos(
   );
 }
 
-export function resolverEstatusIncidencia(idTipoIncidencia: number): string {
-  if (idTipoIncidencia === TIPO_INCIDENCIA_SIN_DETALLE) return "D";
-  return "P";
+/** Al crear siempre Pendiente (P). Ya no se usa D por tipo. */
+export function resolverEstatusIncidencia(_idTipoIncidencia?: number): string {
+  return ESTATUS_INCIDENCIA_PENDIENTE;
+}
+
+export function normalizarEstatusIncidencia(
+  estatus: string | null | undefined,
+): string {
+  return (estatus ?? "").trim().toUpperCase();
+}
+
+export function esIncidenciaPendiente(
+  estatus: string | null | undefined,
+): boolean {
+  return normalizarEstatusIncidencia(estatus) === ESTATUS_INCIDENCIA_PENDIENTE;
+}
+
+export function esIncidenciaFinalizada(
+  estatus: string | null | undefined,
+): boolean {
+  return normalizarEstatusIncidencia(estatus) === ESTATUS_INCIDENCIA_FINALIZADA;
+}
+
+/** Traduce P/F a etiqueta legible para UI. */
+export function etiquetaEstatusIncidencia(
+  estatus: string | null | undefined,
+): string {
+  const valor = normalizarEstatusIncidencia(estatus);
+  if (valor === ESTATUS_INCIDENCIA_PENDIENTE) return "Pendiente";
+  if (valor === ESTATUS_INCIDENCIA_FINALIZADA) return "Finalizada";
+  return (estatus ?? "").trim() || "—";
 }
 
 function errorDesdeRespuesta(data: unknown, fallback: string): string {
@@ -213,17 +245,27 @@ function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
 }
 
 export interface IncidenciaDetalleItem {
+  idIncidenciaDetalle: number | null;
   itemCode: string;
   itemName: string;
   cantidad: number;
   idEstado: number;
   observaciones: string;
+  /** Texto de cómo se solventó (columna Solución). */
+  solucion: string;
   vendedor: string;
   estatus: string;
 }
 
 export interface IncidenciaCompleta extends IncidenciaResumen {
   detalles: IncidenciaDetalleItem[];
+}
+
+export interface ActualizarSolucionIncidenciaPayload {
+  idIncidencia: number;
+  solucion: string;
+  /** IDs de filas de IncidenciaDetalle a actualizar (si el API los requiere). */
+  idsIncidenciaDetalle?: number[];
 }
 
 function normalizeIncidenciaDetalleItem(
@@ -233,9 +275,19 @@ function normalizeIncidenciaDetalleItem(
     string,
     unknown
   >;
+  const idIncidenciaDetalle =
+    pickNumber(
+      o,
+      "idIncidenciaDetalle",
+      "IdIncidenciaDetalle",
+      "idDetalle",
+      "IdDetalle",
+    ) ?? null;
   const itemCode =
     pickString(o, "itemCode", "ItemCode", "articulo", "Articulo", "item") ?? "";
-  if (!itemCode) return null;
+  if (!itemCode && (idIncidenciaDetalle == null || idIncidenciaDetalle <= 0)) {
+    return null;
+  }
 
   const idEstadoDirecto = pickNumber(o, "idEstado", "IdEstado");
   const legacyEstado = pickString(o, "estado", "Estado");
@@ -247,12 +299,18 @@ function normalizeIncidenciaDetalleItem(
     0;
 
   return {
+    idIncidenciaDetalle:
+      idIncidenciaDetalle != null && idIncidenciaDetalle > 0
+        ? idIncidenciaDetalle
+        : null,
     itemCode,
     itemName:
       pickString(o, "itemName", "ItemName", "descripcion", "Descripcion") ?? "",
     cantidad: pickNumber(o, "cantidad", "Cantidad") ?? 0,
     idEstado,
     observaciones: pickString(o, "observaciones", "Observaciones") ?? "",
+    solucion:
+      pickString(o, "solucion", "Solucion", "solución", "Solución") ?? "",
     vendedor: pickString(o, "vendedor", "Vendedor") ?? "",
     estatus: pickString(o, "estatus", "Estatus") ?? "",
   };
@@ -483,5 +541,46 @@ export const incidenciaService = {
     );
 
     return assertOk(response, "No se pudo guardar la incidencia.");
+  },
+
+  /**
+   * Actualiza la columna Solución en IncidenciaDetalle.
+   * Endpoint tentativo mientras se define el backend:
+   * PUT /api/Incidencias/{idIncidencia}/Solucion
+   * Body: { solucion, idsIncidenciaDetalle? }
+   */
+  actualizarSolucion: async (
+    payload: ActualizarSolucionIncidenciaPayload,
+  ): Promise<unknown> => {
+    const idIncidencia = Math.trunc(payload.idIncidencia);
+    if (!idIncidencia || idIncidencia <= 0) {
+      throw new Error("La incidencia no es válida para actualizar la solución.");
+    }
+    const solucion = payload.solucion.trim();
+    if (!solucion) {
+      throw new Error("Capture el detalle de la solución.");
+    }
+
+    const body = {
+      solucion,
+      idsIncidenciaDetalle: payload.idsIncidenciaDetalle?.filter(
+        (id) => id > 0,
+      ),
+    };
+
+    console.log(
+      `[Incidencias] PUT /api/Incidencias/${idIncidencia}/Solucion — body:`,
+      body,
+    );
+
+    const response = await api.put<unknown>(
+      `/api/Incidencias/${idIncidencia}/Solucion`,
+      body,
+    );
+
+    return assertOk(
+      response,
+      "No se pudo guardar el detalle de la solución.",
+    );
   },
 };

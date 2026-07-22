@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Eye, Loader2, X } from "lucide-react";
 import {
+  etiquetaEstatusIncidencia,
   incidenciaService,
   IncidenciaResumen,
 } from "../../services/incidenciaService";
@@ -147,7 +148,7 @@ export default function ModalVerIncidenciasEntrega({
                     Estatus
                   </dt>
                   <dd className="mt-0.5 font-medium text-gray-900 dark:text-white">
-                    {incidencias[0].estatus}
+                    {etiquetaEstatusIncidencia(incidencias[0].estatus)}
                   </dd>
                 </div>
               </dl>
@@ -202,7 +203,7 @@ export default function ModalVerIncidenciasEntrega({
                           Estatus
                         </dt>
                         <dd className="mt-0.5 font-medium text-gray-900 dark:text-white">
-                          {incidencia.estatus}
+                          {etiquetaEstatusIncidencia(incidencia.estatus)}
                         </dd>
                       </div>
                     </dl>
@@ -259,7 +260,7 @@ export default function ModalVerIncidenciasEntrega({
                         {incidencia.observaciones || "—"}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2">
-                        {incidencia.estatus}
+                        {etiquetaEstatusIncidencia(incidencia.estatus)}
                       </td>
                       {onVerDetalle ? (
                         <td className="px-3 py-2">

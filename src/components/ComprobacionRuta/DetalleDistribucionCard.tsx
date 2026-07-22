@@ -19,6 +19,8 @@ import {
 
 export interface DetalleDistribucionCardProps {
   item: DocODistribucionDetalle;
+  /** Montos cobrados (total / efectivo / transferencia / otros). */
+  mostrarMontos?: boolean;
   crearIncidenciaInactivo?: boolean;
   onCrearIncidencia: (item: DocODistribucionDetalle) => void;
   onVerIncidencia?: (item: DocODistribucionDetalle) => void;
@@ -26,6 +28,7 @@ export interface DetalleDistribucionCardProps {
 
 export default function DetalleDistribucionCard({
   item,
+  mostrarMontos = true,
   crearIncidenciaInactivo = false,
   onCrearIncidencia,
   onVerIncidencia,
@@ -56,9 +59,11 @@ export default function DetalleDistribucionCard({
             {item.cardCode ?? "—"}
           </p>
         </div>
-        <p className="shrink-0 text-sm font-semibold text-gray-900 dark:text-white">
-          {formatCurrency(item.total)}
-        </p>
+        {mostrarMontos ? (
+          <p className="shrink-0 text-sm font-semibold text-gray-900 dark:text-white">
+            {formatCurrency(item.total)}
+          </p>
+        ) : null}
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-300">
         <div>
@@ -81,18 +86,24 @@ export default function DetalleDistribucionCard({
           <dt className="text-gray-500 dark:text-gray-400">Condición</dt>
           <dd className="font-medium">{item.condicion ?? "—"}</dd>
         </div>
-        <div>
-          <dt className="text-gray-500 dark:text-gray-400">Efectivo</dt>
-          <dd className="font-medium">{formatCurrency(item.efectivo)}</dd>
-        </div>
-        <div>
-          <dt className="text-gray-500 dark:text-gray-400">Transferencias</dt>
-          <dd className="font-medium">{formatCurrency(item.transferencia)}</dd>
-        </div>
-        <div>
-          <dt className="text-gray-500 dark:text-gray-400">Otros</dt>
-          <dd className="font-medium">{formatCurrency(item.otros)}</dd>
-        </div>
+        {mostrarMontos ? (
+          <>
+            <div>
+              <dt className="text-gray-500 dark:text-gray-400">Efectivo</dt>
+              <dd className="font-medium">{formatCurrency(item.efectivo)}</dd>
+            </div>
+            <div>
+              <dt className="text-gray-500 dark:text-gray-400">Transferencias</dt>
+              <dd className="font-medium">
+                {formatCurrency(item.transferencia)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-gray-500 dark:text-gray-400">Otros</dt>
+              <dd className="font-medium">{formatCurrency(item.otros)}</dd>
+            </div>
+          </>
+        ) : null}
         <div>
           <dt className="text-gray-500 dark:text-gray-400">Vendedor</dt>
           <dd className="font-medium">{item.slpName ?? "—"}</dd>
@@ -105,7 +116,7 @@ export default function DetalleDistribucionCard({
           disabled={crearIncidenciaInactivo}
           title={
             crearIncidenciaInactivo
-              ? "La orden ya está procesada (Sin Incidencias R-AM)"
+              ? "La orden ya está finalizada (R-F); no se pueden crear incidencias"
               : "Crear incidencia"
           }
           className={`${btnIncidenciaClass} flex-1 disabled:cursor-not-allowed disabled:opacity-50`}

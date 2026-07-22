@@ -20,6 +20,11 @@ export default function SidebarEvento({ puntos }: Props) {
       src: "/images/publicidad/recompensasextrema.jpeg",
       alt: "Aniversario 50 años",
     },
+    {
+      id: 2,
+      src: "/images/publicidad/recompensaextrema2.jpg",
+      alt: "Aniversario 50 años",
+    },
   ];
   const nextImage = (): void => {
     setCurrentImageIndex((prevIndex: number) =>

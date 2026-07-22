@@ -13,6 +13,7 @@ import {
   OBSERVACIONES_SIN_INCIDENCIAS_RUTA,
   procesarODService,
 } from "../../services/procesarODService";
+import { useComprobacionPermisos } from "../../hooks/useComprobacionPermisos";
 import { formatCurrency } from "../../utils/format";
 import {
   btnIncidenciaClass,
@@ -76,6 +77,7 @@ export default function ModalDetalleOrdenDistribucion({
   onMensajeExitoChange,
   onEstatusSistemaChange,
 }: ModalDetalleOrdenDistribucionProps) {
+  const { puedeVerTotales } = useComprobacionPermisos();
   const [documentos, setDocumentos] = useState<DocODistribucionDetalle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,9 +111,16 @@ export default function ModalDetalleOrdenDistribucion({
     [documentos],
   );
 
+  const ordenTieneIncidencias = useMemo(
+    () => documentos.some((doc) => documentoTieneIncidencia(doc)),
+    [documentos],
+  );
+
   const sinIncidenciasInactivo = useMemo(
-    () => bloquearSinIncidenciasPorEstatus(estatusSistema),
-    [estatusSistema],
+    () =>
+      bloquearSinIncidenciasPorEstatus(estatusSistema) ||
+      ordenTieneIncidencias,
+    [estatusSistema, ordenTieneIncidencias],
   );
 
   const rCobranzaInactivo = useMemo(
@@ -341,7 +350,7 @@ export default function ModalDetalleOrdenDistribucion({
   return (
     <>
       <div
-        className="fixed inset-0 z-[200] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+        className="fixed inset-0 z-[200] flex items-stretch justify-center bg-black/50 p-0 sm:items-center sm:p-4"
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-detalle-folio-titulo"
@@ -349,33 +358,39 @@ export default function ModalDetalleOrdenDistribucion({
           if (e.target === e.currentTarget) onCerrar();
         }}
       >
-        <div className="flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:max-h-[90vh] sm:max-w-7xl sm:rounded-xl dark:border-gray-600 dark:bg-gray-800">
-          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-200 px-4 py-4 dark:border-gray-700">
+        {/*
+          Handhelds (Zebra TC21): max-h sin height fija + flex-1/min-h-0 colapsa el listado.
+          En móvil forzamos 100dvh para que el cuerpo pueda scrollear.
+        */}
+        <div className="flex h-[100vh] max-h-[100vh] h-[100dvh] max-h-[100dvh] w-full flex-col rounded-none border border-gray-200 bg-white shadow-xl sm:h-auto sm:max-h-[90vh] sm:max-w-7xl sm:rounded-xl dark:border-gray-600 dark:bg-gray-800">
+          <div className="flex shrink-0 items-start justify-between gap-2 border-b border-gray-200 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-4 dark:border-gray-700">
             <div className="min-w-0">
               <h2
                 id="modal-detalle-folio-titulo"
-                className="text-lg font-semibold text-gray-900 dark:text-white"
+                className="text-base font-semibold text-gray-900 sm:text-lg dark:text-white"
               >
                 Detalle orden {folio ?? "—"}
               </h2>
               {!loading && documentos.length > 0 && (
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  {documentos.length} documento(s) · Total{" "}
-                  {formatCurrency(total)}
+                <p className="mt-0.5 text-xs text-gray-500 sm:mt-1 sm:text-sm dark:text-gray-400">
+                  {documentos.length} documento(s)
+                  {puedeVerTotales ? (
+                    <> · Total {formatCurrency(total)}</>
+                  ) : null}
                 </p>
               )}
             </div>
             <button
               type="button"
               onClick={onCerrar}
-              className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 touch-manipulation"
+              className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 touch-manipulation sm:min-h-[44px] sm:min-w-[44px]"
               aria-label="Cerrar detalle"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-4">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-3 py-2 sm:overflow-hidden sm:px-4 sm:py-4">
             {mensajeExito && (
               <div className="mb-4 shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
                 {mensajeExito}
@@ -396,69 +411,72 @@ export default function ModalDetalleOrdenDistribucion({
               </p>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="mb-4 flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-600 dark:text-gray-400">
-                  <span className="inline-flex items-center gap-2">
+                <div className="mb-2 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] leading-tight text-gray-600 sm:mb-4 sm:gap-x-4 sm:gap-y-2 sm:text-xs dark:text-gray-400">
+                  <span className="inline-flex items-center gap-1.5">
                     <span
-                      className="h-3 w-8 shrink-0 rounded border border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/40"
+                      className="h-2.5 w-5 shrink-0 rounded border border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950/40 sm:h-3 sm:w-8"
                       aria-hidden
                     />
-                    Verde = Efectivo
+                    Efectivo
                   </span>
-                  <span className="inline-flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5">
                     <span
-                      className="h-3 w-8 shrink-0 rounded border border-sky-400 bg-sky-50 dark:border-sky-700 dark:bg-sky-950/40"
+                      className="h-2.5 w-5 shrink-0 rounded border border-sky-400 bg-sky-50 dark:border-sky-700 dark:bg-sky-950/40 sm:h-3 sm:w-8"
                       aria-hidden
                     />
-                    Azul = Transferencia
+                    Transferencia
                   </span>
-                  <span className="inline-flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5">
                     <span
-                      className="h-3 w-8 shrink-0 rounded border border-amber-400 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40"
+                      className="h-2.5 w-5 shrink-0 rounded border border-amber-400 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40 sm:h-3 sm:w-8"
                       aria-hidden
                     />
-                    Amarillo = Otros
+                    Otros
                   </span>
-                  <span className="inline-flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
                     <span
-                      className="h-3 w-8 shrink-0 rounded border border-emerald-400 bg-emerald-50/60 dark:border-emerald-700 dark:bg-emerald-950/30"
+                      className="h-2.5 w-5 shrink-0 rounded border border-emerald-400 bg-emerald-50/60 dark:border-emerald-700 dark:bg-emerald-950/30 sm:h-3 sm:w-8"
                       aria-hidden
                     />
-                    Traspaso (TipoOD = T) si no hay pago
+                    Traspaso (T)
                   </span>
                 </div>
 
-                <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-800 dark:bg-emerald-950/40">
-                    <p className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-                      Total Efectivo:
-                    </p>
-                    <p className="mt-1 text-lg font-bold text-emerald-800 dark:text-emerald-200">
-                      {formatCurrency(totalEfectivo)}
-                    </p>
+                {puedeVerTotales ? (
+                  <div className="mb-2 grid shrink-0 grid-cols-3 gap-1.5 sm:mb-4 sm:gap-3">
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 dark:border-emerald-800 dark:bg-emerald-950/40 sm:rounded-xl sm:px-4 sm:py-3">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300 sm:text-xs">
+                        Efectivo
+                      </p>
+                      <p className="mt-0.5 text-sm font-bold text-emerald-800 dark:text-emerald-200 sm:mt-1 sm:text-lg">
+                        {formatCurrency(totalEfectivo)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 dark:border-sky-800 dark:bg-sky-950/40 sm:rounded-xl sm:px-4 sm:py-3">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300 sm:text-xs">
+                        Transfer.
+                      </p>
+                      <p className="mt-0.5 text-sm font-bold text-sky-800 dark:text-sky-200 sm:mt-1 sm:text-lg">
+                        {formatCurrency(totalTransferencia)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 dark:border-amber-800 dark:bg-amber-950/40 sm:rounded-xl sm:px-4 sm:py-3">
+                      <p className="text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300 sm:text-xs">
+                        Otros
+                      </p>
+                      <p className="mt-0.5 text-sm font-bold text-amber-800 dark:text-amber-200 sm:mt-1 sm:text-lg">
+                        {formatCurrency(totalOtros)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-800 dark:bg-sky-950/40">
-                    <p className="text-xs font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300">
-                      Total Transferencia:
-                    </p>
-                    <p className="mt-1 text-lg font-bold text-sky-800 dark:text-sky-200">
-                      {formatCurrency(totalTransferencia)}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-950/40">
-                    <p className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                      Total Otros:
-                    </p>
-                    <p className="mt-1 text-lg font-bold text-amber-800 dark:text-amber-200">
-                      {formatCurrency(totalOtros)}
-                    </p>
-                  </div>
-                </div>
+                ) : null}
 
-                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto md:hidden">
+                <div className="space-y-2 pb-2 sm:hidden">
                   {documentosOrdenados.map((item, index) => (
                     <DetalleDistribucionCard
                       key={`${item.entrega}-${item.documento}-${index}`}
                       item={item}
+                      mostrarMontos={puedeVerTotales}
                       crearIncidenciaInactivo={crearIncidenciaInactivo}
                       onCrearIncidencia={onCrearIncidencia}
                       onVerIncidencia={abrirVerIncidencias}
@@ -466,7 +484,7 @@ export default function ModalDetalleOrdenDistribucion({
                   ))}
                 </div>
 
-                <div className="hidden min-h-0 flex-1 overflow-auto md:block">
+                <div className="hidden min-h-0 flex-1 overflow-auto sm:block">
                   <table className="min-w-full border-separate border-spacing-0 text-sm">
                     <thead>
                       <tr>
@@ -482,18 +500,22 @@ export default function ModalDetalleOrdenDistribucion({
                         <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-left font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                           Fecha
                         </th>
-                        <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                          Total
-                        </th>
-                        <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                          Efectivo
-                        </th>
-                        <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                          Transferencias
-                        </th>
-                        <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                          Otros
-                        </th>
+                        {puedeVerTotales ? (
+                          <>
+                            <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                              Total
+                            </th>
+                            <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                              Efectivo
+                            </th>
+                            <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                              Transferencias
+                            </th>
+                            <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-right font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                              Otros
+                            </th>
+                          </>
+                        ) : null}
                         <th className="sticky top-0 z-20 border-b border-gray-200 bg-gray-50 px-3 py-2 text-left font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                           Condición
                         </th>
@@ -551,18 +573,22 @@ export default function ModalDetalleOrdenDistribucion({
                             <td className="whitespace-nowrap px-3 py-2">
                               {formatearFecha(item.fechaDoc)}
                             </td>
-                            <td className="whitespace-nowrap px-3 py-2 text-right font-medium">
-                              {formatCurrency(item.total)}
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-2 text-right">
-                              {formatCurrency(item.efectivo)}
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-2 text-right">
-                              {formatCurrency(item.transferencia)}
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-2 text-right">
-                              {formatCurrency(item.otros)}
-                            </td>
+                            {puedeVerTotales ? (
+                              <>
+                                <td className="whitespace-nowrap px-3 py-2 text-right font-medium">
+                                  {formatCurrency(item.total)}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2 text-right">
+                                  {formatCurrency(item.efectivo)}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2 text-right">
+                                  {formatCurrency(item.transferencia)}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2 text-right">
+                                  {formatCurrency(item.otros)}
+                                </td>
+                              </>
+                            ) : null}
                             <td className="px-3 py-2">
                               {item.condicion ?? "—"}
                             </td>
@@ -581,7 +607,7 @@ export default function ModalDetalleOrdenDistribucion({
                                 className={`${btnIncidenciaClass} disabled:cursor-not-allowed disabled:opacity-50`}
                                 title={
                                   crearIncidenciaInactivo
-                                    ? "La orden ya está procesada (Sin Incidencias R-AM)"
+                                    ? "La orden ya está finalizada (R-F); no se pueden crear incidencias"
                                     : "Crear incidencia"
                                 }
                               >
@@ -608,11 +634,11 @@ export default function ModalDetalleOrdenDistribucion({
             )}
           </div>
 
-          <div className="flex shrink-0 flex-col gap-3 border-t border-gray-200 px-4 py-3 dark:border-gray-700 sm:flex-row sm:flex-wrap">
+          <div className="grid shrink-0 grid-cols-2 gap-2 border-t border-gray-200 px-3 py-2 dark:border-gray-700 sm:flex sm:flex-row sm:flex-wrap sm:gap-3 sm:px-4 sm:py-3">
             <button
               type="button"
               onClick={onCerrar}
-              className="inline-flex min-h-[44px] w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 touch-manipulation sm:w-auto"
+              className="inline-flex min-h-[40px] w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
             >
               Cerrar
             </button>
@@ -622,11 +648,13 @@ export default function ModalDetalleOrdenDistribucion({
               onClick={() => void marcarSinIncidencias()}
               disabled={procesandoEstatus || loading || sinIncidenciasInactivo}
               title={
-                sinIncidenciasInactivo
-                  ? "La orden ya está procesada (Sin Incidencias R-AM o con incidencia)"
-                  : "Registrar orden sin incidencias en ruta"
+                ordenTieneIncidencias
+                  ? "No disponible: la orden ya tiene incidencias registradas"
+                  : sinIncidenciasInactivo
+                    ? "La orden ya está procesada (Sin Incidencias R-AM o con incidencia)"
+                    : "Registrar orden sin incidencias en ruta"
               }
-              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-700 dark:hover:bg-emerald-600 touch-manipulation sm:w-auto"
+              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-700 dark:hover:bg-emerald-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
             >
               {procesandoSinIncidencias ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -643,7 +671,7 @@ export default function ModalDetalleOrdenDistribucion({
                   ? "Disponible cuando la orden esté en R-AM (revisada por almacén)"
                   : "Actualizar estatus a R-COD (revisada por cobranza)"
               }
-              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50 dark:bg-sky-700 dark:hover:bg-sky-600 touch-manipulation sm:w-auto"
+              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50 dark:bg-sky-700 dark:hover:bg-sky-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
             >
               {procesandoRCobranza ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -660,7 +688,7 @@ export default function ModalDetalleOrdenDistribucion({
                   ? "Disponible cuando la orden esté en R-COD (revisada por cobranza)"
                   : "Finalizar orden (actualizar estatus a R-F)"
               }
-              className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 dark:bg-violet-700 dark:hover:bg-violet-600 touch-manipulation sm:w-auto"
+              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 dark:bg-violet-700 dark:hover:bg-violet-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
             >
               {procesandoFinalizado ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

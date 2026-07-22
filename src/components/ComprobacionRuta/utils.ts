@@ -115,17 +115,12 @@ export function ordenarDocumentosPorCondicion(
   });
 }
 
-/** T / R-AM / R-COD / R-F = Sin Incidencias — no se pueden registrar incidencias. */
+/** Solo R-F (finalizado) bloquea crear incidencias; en PDT / R-AM / R-COD / I sigue permitido. */
 export function bloquearCrearIncidenciaPorEstatus(
   estatusS: string | null | undefined,
 ): boolean {
   const estatus = (estatusS ?? "").trim().toUpperCase();
-  return (
-    estatus === "T" ||
-    estatus === ESTATUS_PROCESADO ||
-    estatus === ESTATUS_COBRANZA ||
-    estatus === ESTATUS_FINALIZADO
-  );
+  return estatus === ESTATUS_FINALIZADO;
 }
 
 /** T / R-AM / R-COD / R-F / I — no aplica marcar Sin Incidencias de nuevo. */

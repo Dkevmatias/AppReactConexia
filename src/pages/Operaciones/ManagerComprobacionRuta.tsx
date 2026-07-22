@@ -12,6 +12,7 @@ import {
   getContextoOperativoPersona,
 } from "../../services/authService";
 import {
+  etiquetaEstatusIncidencia,
   IncidenciaCompleta,
   incidenciaService,
 } from "../../services/incidenciaService";
@@ -70,7 +71,7 @@ function aFilas(incidencias: IncidenciaCompleta[]): FilaIncidenciaManager[] {
       fechaCreacion: formatearFechaIncidencia(incidencia.fechaCreacion),
       fechaCierre: formatearFechaIncidencia(incidencia.fechaCierre),
       nombreUsuarioCreacion: incidencia.nombreUsuarioCreacion?.trim() || "—",
-      estatus: incidencia.estatus || "—",
+      estatus: etiquetaEstatusIncidencia(incidencia.estatus),
     };
 
     if (incidencia.detalles.length === 0) {
@@ -352,13 +353,19 @@ export default function ManagerComprobacionRuta() {
 
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
         <span className="font-medium text-gray-700 dark:text-gray-300">
-          Seguimiento:
+          Estatus incidencia:
         </span>
         <span>
           <span className="font-semibold text-gray-800 dark:text-gray-200">
             P
           </span>
-          : Pendiente de Revisión
+          : Pendiente
+        </span>
+        <span>
+          <span className="font-semibold text-gray-800 dark:text-gray-200">
+            F
+          </span>
+          : Finalizada
         </span>
         <span className="text-gray-500 dark:text-gray-400">
           · Doble clic (escritorio) o toque (móvil) para ver la incidencia
@@ -562,6 +569,9 @@ export default function ManagerComprobacionRuta() {
         idEmpresa={contextoOperativo?.idEmpresa ?? null}
         idSucursal={contextoOperativo?.idSucursal ?? null}
         onCerrar={cerrarModalIncidencia}
+        onGuardado={() => {
+          void cargarIncidencias();
+        }}
       />
     </>
   );
