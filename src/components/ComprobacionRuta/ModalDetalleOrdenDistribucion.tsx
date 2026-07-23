@@ -15,6 +15,7 @@ import {
 } from "../../services/procesarODService";
 import { useComprobacionPermisos } from "../../hooks/useComprobacionPermisos";
 import { formatCurrency } from "../../utils/format";
+import { abrirPdfCorteRuta } from "./generarPdfCorteRuta";
 import {
   btnIncidenciaClass,
   clasesFilaPagoEfectivo,
@@ -44,6 +45,10 @@ export interface ModalDetalleOrdenDistribucionProps {
   abierto: boolean;
   folio: number | null;
   estatusSistema: string | null;
+  /** Ruta del filtro / listado de comprobación. */
+  ruta?: string | null;
+  /** Repartidor del filtro / listado (va como Entrega en el PDF). */
+  repartidor?: string | null;
   incidenciaModalAbierto: boolean;
   /** Incrementa al guardar una incidencia nueva para refrescar el listado de documentos. */
   detalleRefreshKey?: number;
@@ -65,6 +70,8 @@ export default function ModalDetalleOrdenDistribucion({
   abierto,
   folio,
   estatusSistema,
+  ruta = null,
+  repartidor = null,
   incidenciaModalAbierto,
   detalleRefreshKey = 0,
   mensajeExito,
@@ -85,6 +92,9 @@ export default function ModalDetalleOrdenDistribucion({
     useState(false);
   const [procesandoRCobranza, setProcesandoRCobranza] = useState(false);
   const [procesandoFinalizado, setProcesandoFinalizado] = useState(false);
+  const [modalCorteAbierto, setModalCorteAbierto] = useState(false);
+  const [recibeCorte, setRecibeCorte] = useState("");
+  const [observacionesCorte, setObservacionesCorte] = useState("");
   const [verIncidenciasCtx, setVerIncidenciasCtx] = useState<{
     entrega: number;
     idsIncidencia: number[];
@@ -101,8 +111,7 @@ export default function ModalDetalleOrdenDistribucion({
   );
 
   const totalTransferencia = useMemo(
-    () =>
-      documentos.reduce((sum, item) => sum + (item.transferencia || 0), 0),
+    () => documentos.reduce((sum, item) => sum + (item.transferencia || 0), 0),
     [documentos],
   );
 
@@ -118,8 +127,7 @@ export default function ModalDetalleOrdenDistribucion({
 
   const sinIncidenciasInactivo = useMemo(
     () =>
-      bloquearSinIncidenciasPorEstatus(estatusSistema) ||
-      ordenTieneIncidencias,
+      bloquearSinIncidenciasPorEstatus(estatusSistema) || ordenTieneIncidencias,
     [estatusSistema, ordenTieneIncidencias],
   );
 
@@ -132,6 +140,11 @@ export default function ModalDetalleOrdenDistribucion({
     () => bloquearFinalizadoPorEstatus(estatusSistema),
     [estatusSistema],
   );
+
+  const generarCorteInactivo = useMemo(() => {
+    const estatus = (estatusSistema ?? "").trim().toUpperCase();
+    return estatus !== ESTATUS_FINALIZADO;
+  }, [estatusSistema]);
 
   const crearIncidenciaInactivo = useMemo(
     () => bloquearCrearIncidenciaPorEstatus(estatusSistema),
@@ -321,6 +334,51 @@ export default function ModalDetalleOrdenDistribucion({
     } finally {
       setProcesandoFinalizado(false);
     }
+  };
+
+  const abrirModalCorte = () => {
+    if (generarCorteInactivo || loading || documentos.length === 0) {
+      setError(
+        documentos.length === 0
+          ? "No hay documentos para generar el corte."
+          : "El corte solo está disponible cuando la orden está en R-F.",
+      );
+      return;
+    }
+    setError(null);
+    setModalCorteAbierto(true);
+  };
+
+  const cerrarModalCorte = () => {
+    setModalCorteAbierto(false);
+  };
+
+  const confirmarGenerarCorte = () => {
+    if (!folio || folio <= 0) {
+      setError("No hay una orden de distribución seleccionada.");
+      return;
+    }
+    const fechaCorte = new Date().toLocaleDateString("es-MX", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+    const ok = abrirPdfCorteRuta({
+      folio,
+      fechaCorte,
+      ruta: (ruta ?? "").trim(),
+      recibe: recibeCorte.trim(),
+      entrega: (repartidor ?? "").trim(),
+      observaciones: observacionesCorte.trim(),
+      documentos,
+    });
+    if (!ok) {
+      setError(
+        "No se pudo abrir la ventana del PDF. Permita ventanas emergentes para esta página.",
+      );
+      return;
+    }
+    setModalCorteAbierto(false);
   };
 
   if (!abierto) return null;
@@ -695,9 +753,145 @@ export default function ModalDetalleOrdenDistribucion({
               ) : null}
               Finalizado
             </button>
+
+            <button
+              type="button"
+              onClick={abrirModalCorte}
+              disabled={
+                procesandoEstatus ||
+                loading ||
+                generarCorteInactivo ||
+                documentos.length === 0
+              }
+              title={
+                generarCorteInactivo
+                  ? "Disponible cuando la orden esté finalizada (R-F)"
+                  : "Generar PDF de corte de la orden"
+              }
+              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-700 dark:hover:bg-indigo-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
+            >
+              Generar Corte
+            </button>
           </div>
         </div>
       </div>
+
+      {modalCorteAbierto ? (
+        <div
+          className="fixed inset-0 z-[220] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-corte-titulo"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) cerrarModalCorte();
+          }}
+        >
+          <div className="w-full max-w-lg rounded-t-2xl border border-gray-200 bg-white p-4 shadow-xl sm:rounded-xl dark:border-gray-600 dark:bg-gray-800">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3
+                  id="modal-corte-titulo"
+                  className="text-base font-semibold text-gray-900 dark:text-white"
+                >
+                  Generar corte — Folio {folio ?? "—"}
+                </h3>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Complete los datos manuales y genere el PDF de recepción de
+                  cobranza.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={cerrarModalCorte}
+                className="inline-flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+                aria-label="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 text-xs text-gray-600 dark:text-gray-300">
+                <div>
+                  <span className="font-medium text-gray-700 dark:text-gray-200">
+                    Fecha:
+                  </span>{" "}
+                  {new Date().toLocaleDateString("es-MX")}
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700 dark:text-gray-200">
+                    Ruta:
+                  </span>{" "}
+                  {(ruta ?? "").trim() || "—"}
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700 dark:text-gray-200">
+                    O. Distribución:
+                  </span>{" "}
+                  {folio ?? "—"}
+                </div>
+                <div className="col-span-2">
+                  <span className="font-medium text-gray-700 dark:text-gray-200">
+                    Entrega:
+                  </span>{" "}
+                  {(repartidor ?? "").trim() || "—"}
+                </div>
+              </div>
+
+              <div>
+                <label
+                  className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  htmlFor="corte-recibe"
+                >
+                  Recibe
+                </label>
+                <input
+                  id="corte-recibe"
+                  className="w-full min-h-[44px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  value={recibeCorte}
+                  onChange={(e) => setRecibeCorte(e.target.value)}
+                  placeholder="Nombre de quien recibe"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label
+                  className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  htmlFor="corte-observaciones"
+                >
+                  Observaciones
+                </label>
+                <textarea
+                  id="corte-observaciones"
+                  className="w-full min-h-[88px] resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  value={observacionesCorte}
+                  onChange={(e) => setObservacionesCorte(e.target.value)}
+                  placeholder="Comentarios del corte (opcional)"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={cerrarModalCorte}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarGenerarCorte}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                Generar PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <ModalVerIncidenciasEntrega
         abierto={verIncidenciasCtx !== null}

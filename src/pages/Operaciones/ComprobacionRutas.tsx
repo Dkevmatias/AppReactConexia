@@ -148,6 +148,9 @@ export default function ComprobacionRutas() {
     string | null
   >(null);
 
+  /** Ruta de la fila del listado (columna Ruta) para el PDF de corte. */
+  const [rutaSeleccionada, setRutaSeleccionada] = useState<string | null>(null);
+
   const [modalIncidenciaAbierto, setModalIncidenciaAbierto] = useState(false);
 
   const [contextoIncidencia, setContextoIncidencia] =
@@ -198,6 +201,8 @@ export default function ComprobacionRutas() {
     setFolioSeleccionado(null);
 
     setEstatusSSeleccionado(null);
+
+    setRutaSeleccionada(null);
 
     setModalIncidenciaAbierto(false);
 
@@ -254,6 +259,8 @@ export default function ComprobacionRutas() {
     setFolioSeleccionado(doc.folio);
 
     setEstatusSSeleccionado(doc.estatusS);
+
+    setRutaSeleccionada((doc.ruta ?? "").trim() || null);
 
     setModalDetalleAbierto(true);
 
@@ -382,6 +389,15 @@ export default function ComprobacionRutas() {
       ),
     [documentos, filtroEstatusSistema],
   );
+
+  /** Nombre legible del repartidor (el filtro guarda slpName / código). */
+  const nombreRepartidor = useMemo(() => {
+    const codigo = repartidor.trim();
+    if (!codigo) return "";
+    const encontrado = repartidores.find((v) => v.slpName === codigo);
+    const nombre = encontrado?.nombre?.trim() ?? "";
+    return nombre || codigo;
+  }, [repartidor, repartidores]);
 
   const toggleFiltroEstatusSistema = (value: EstatusSistemaFiltro) => {
     setFiltroEstatusSistema((prev) => {
@@ -664,6 +680,8 @@ export default function ComprobacionRutas() {
         abierto={modalDetalleAbierto}
         folio={folioSeleccionado}
         estatusSistema={estatusSSeleccionado}
+        ruta={rutaSeleccionada}
+        repartidor={nombreRepartidor}
         incidenciaModalAbierto={modalIncidenciaAbierto}
         detalleRefreshKey={detalleRefreshKey}
         mensajeExito={mensajeIncidencia}
