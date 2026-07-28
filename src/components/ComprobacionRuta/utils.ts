@@ -56,6 +56,24 @@ export function esCondicionContado(
   return normalizarCondicion(condicion).startsWith("contado");
 }
 
+/** Condición Contado-COD (cobro contra entrega). */
+export function esCondicionCOD(condicion: string | null | undefined): boolean {
+  return normalizarCondicion(condicion).includes("cod");
+}
+
+/** COD sin monto en efectivo, transferencia ni otros. */
+export function esCodSinPago(
+  item: Pick<
+    DocODistribucionDetalle,
+    "condicion" | "efectivo" | "transferencia" | "otros"
+  >,
+): boolean {
+  return (
+    esCondicionCOD(item.condicion) &&
+    resolverTipoPagoPrioridad(item) === "ninguno"
+  );
+}
+
 export function esCondicion20Dias(
   condicion: string | null | undefined,
 ): boolean {

@@ -3,6 +3,7 @@ import { DocODistribucionDetalle } from "../../services/oDistribucionService";
 import { formatCurrency } from "../../utils/format";
 import {
   btnIncidenciaClass,
+  clasesTarjetaCodSinPago,
   clasesTarjetaDetalleTraspasoTipoOD,
   clasesTarjetaPagoEfectivo,
   clasesTarjetaPagoOtros,
@@ -11,6 +12,7 @@ import {
 import { BotonVerIncidencia } from "./ModalVerIncidenciasEntrega";
 import {
   documentoTieneIncidencia,
+  esCodSinPago,
   esTipoODTraspaso,
   formatearDocRelacionado,
   formatearFecha,
@@ -44,9 +46,11 @@ export default function DetalleDistribucionCard({
         ? clasesTarjetaPagoTransferencia
         : tipoPago === "otros"
           ? clasesTarjetaPagoOtros
-          : esTraspaso
-            ? clasesTarjetaDetalleTraspasoTipoOD
-            : "border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-900/40";
+          : esCodSinPago(item)
+            ? clasesTarjetaCodSinPago
+            : esTraspaso
+              ? clasesTarjetaDetalleTraspasoTipoOD
+              : "border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-900/40";
 
   return (
     <article className={`rounded-lg border p-3 ${claseTarjeta}`}>

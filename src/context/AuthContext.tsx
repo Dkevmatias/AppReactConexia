@@ -4,6 +4,7 @@ import {
   isSessionAuthenticated,
   logout as logoutService,
   getMenuByRol,
+  mergeSessionUser,
   Modulo,
 } from "../services/authService";
 import { clearTokenFallback } from "../utils/tokenFallback";
@@ -38,19 +39,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [menu, setMenu] = useState<Modulo[]>([]);
   const [menuLoading, setMenuLoading] = useState(false);
 
-  // SIEMPRE validar cookie al cargar app
   useEffect(() => {
-    checkAuth();
+    void checkAuth();
   }, []);
 
   const checkAuth = async () => {
     try {
       const res = await checkAuthService();
-      if (isSessionAuthenticated(res)) {
-        setUser(res.user!);
+      if (isSessionAuthenticated(res) && res.user) {
+        // Evita que checkauth pise idUsuario si el login ya lo tenía y checkauth lo omite.
+        setUser((prev) => mergeSessionUser(res.user!, prev));
         setMenuLoading(true);
-        const menuData = await getMenuByRol(res.user!.role);
-        if (menuData && menuData.modulos) {
+        const menuData = await getMenuByRol(res.user.role);
+        if (menuData?.modulos) {
           setMenu(menuData.modulos);
         } else {
           setMenu([]);
@@ -59,8 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setUser(null);
         setMenu([]);
       }
-    } catch (error) {
-      // 401 es esperado cuando no hay sesión
+    } catch {
       setUser(null);
       setMenu([]);
     } finally {
@@ -69,12 +69,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Cookie la puso el backend; menuLoading evita un frame con todos los ítems antes del filtro
-  const login = async (user: User) => {
+  const login = async (nextUser: User) => {
     setMenuLoading(true);
-    setUser(user);
+    setUser(mergeSessionUser(nextUser, null));
     try {
-      const menuData = await getMenuByRol(user.role);
+      const menuData = await getMenuByRol(nextUser.role);
       if (menuData?.modulos) {
         setMenu(menuData.modulos);
       } else {
@@ -82,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     } finally {
       setMenuLoading(false);
+      setLoading(false);
     }
   };
 

@@ -77,6 +77,7 @@ export default function Evento() {
 
         setVentaTotal(puntosAcumulados.puntosDisponibles);
         setSaldoVencido(saldo?.vencido);
+        console.log("saldovencido", saldo?.vencido);
         setMesesCompras(mesesCompras);
       } catch (error) {
         if (import.meta.env.DEV) {

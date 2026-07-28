@@ -39,8 +39,6 @@ type FilaIncidenciaManager = {
   fechaCreacion: string;
   fechaCierre: string;
   nombreUsuarioCreacion: string;
-  itemCode: string;
-  itemName: string;
   estatus: string;
 };
 
@@ -59,42 +57,19 @@ function formatearFechaIncidencia(
   });
 }
 
+/** Una fila por incidencia (sin expandir detalles/ítems). */
 function aFilas(incidencias: IncidenciaCompleta[]): FilaIncidenciaManager[] {
-  const filas: FilaIncidenciaManager[] = [];
-
-  for (const incidencia of incidencias) {
-    const base = {
-      idIncidencia: incidencia.idIncidencia,
-      idODistribucion: incidencia.idODistribucion,
-      idOrdenEntrega: incidencia.idOrdenEntrega,
-      nombreTipoIncidencia: incidencia.tipoIncidencia || "—",
-      fechaCreacion: formatearFechaIncidencia(incidencia.fechaCreacion),
-      fechaCierre: formatearFechaIncidencia(incidencia.fechaCierre),
-      nombreUsuarioCreacion: incidencia.nombreUsuarioCreacion?.trim() || "—",
-      estatus: etiquetaEstatusIncidencia(incidencia.estatus),
-    };
-
-    if (incidencia.detalles.length === 0) {
-      filas.push({
-        ...base,
-        key: `${incidencia.idIncidencia}-sin-detalle`,
-        itemCode: "—",
-        itemName: "—",
-      });
-      continue;
-    }
-
-    for (const [index, detalle] of incidencia.detalles.entries()) {
-      filas.push({
-        ...base,
-        key: `${incidencia.idIncidencia}-${detalle.itemCode}-${index}`,
-        itemCode: detalle.itemCode || "—",
-        itemName: detalle.itemName || "—",
-      });
-    }
-  }
-
-  return filas;
+  return incidencias.map((incidencia) => ({
+    key: String(incidencia.idIncidencia),
+    idIncidencia: incidencia.idIncidencia,
+    idODistribucion: incidencia.idODistribucion,
+    idOrdenEntrega: incidencia.idOrdenEntrega,
+    nombreTipoIncidencia: incidencia.tipoIncidencia || "—",
+    fechaCreacion: formatearFechaIncidencia(incidencia.fechaCreacion),
+    fechaCierre: formatearFechaIncidencia(incidencia.fechaCierre),
+    nombreUsuarioCreacion: incidencia.nombreUsuarioCreacion?.trim() || "—",
+    estatus: etiquetaEstatusIncidencia(incidencia.estatus),
+  }));
 }
 
 function documentoStubDesdeIncidencia(
@@ -253,6 +228,8 @@ export default function ManagerComprobacionRuta() {
         documento: documentoStubDesdeIncidencia(incidencia),
         modo: "ver",
         idIncidencia: incidencia.idIncidencia,
+        idIncidenciaDetalle: null,
+        solucionInicial: incidencia.solucion?.trim() || null,
       });
       setModalIncidenciaAbierto(true);
     },
@@ -367,6 +344,12 @@ export default function ManagerComprobacionRuta() {
           </span>
           : Finalizada
         </span>
+        <span>
+          <span className="font-semibold text-gray-800 dark:text-gray-200">
+            T
+          </span>
+          : Terminado
+        </span>
         <span className="text-gray-500 dark:text-gray-400">
           · Doble clic (escritorio) o toque (móvil) para ver la incidencia
         </span>
@@ -454,26 +437,10 @@ export default function ManagerComprobacionRuta() {
                     </div>
                     <div>
                       <dt className="text-gray-500 dark:text-gray-400">
-                        Item code
-                      </dt>
-                      <dd className="font-medium text-gray-900 dark:text-white">
-                        {fila.itemCode}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-gray-500 dark:text-gray-400">
                         Estatus
                       </dt>
                       <dd className="font-medium text-gray-900 dark:text-white">
                         {fila.estatus}
-                      </dd>
-                    </div>
-                    <div className="col-span-2">
-                      <dt className="text-gray-500 dark:text-gray-400">
-                        Artículo
-                      </dt>
-                      <dd className="font-medium text-gray-900 dark:text-white">
-                        {fila.itemName}
                       </dd>
                     </div>
                   </dl>
@@ -499,12 +466,6 @@ export default function ManagerComprobacionRuta() {
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">
                       Usuario creación
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">
-                      Item code
-                    </th>
-                    <th className="min-w-[220px] px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">
-                      Artículo
                     </th>
                     <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">
                       Fecha cierre
@@ -537,10 +498,6 @@ export default function ManagerComprobacionRuta() {
                       <td className="px-4 py-2">
                         {fila.nombreUsuarioCreacion}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-2 font-medium">
-                        {fila.itemCode}
-                      </td>
-                      <td className="px-4 py-2">{fila.itemName}</td>
                       <td className="whitespace-nowrap px-4 py-2">
                         {fila.fechaCierre}
                       </td>

@@ -15,9 +15,11 @@ import {
 } from "../../services/procesarODService";
 import { useComprobacionPermisos } from "../../hooks/useComprobacionPermisos";
 import { formatCurrency } from "../../utils/format";
+import { crearIncidenciasDevolucionAutomaticas } from "./crearIncidenciasDevolucionAutomaticas";
 import { abrirPdfCorteRuta } from "./generarPdfCorteRuta";
 import {
   btnIncidenciaClass,
+  clasesFilaCodSinPago,
   clasesFilaPagoEfectivo,
   clasesFilaPagoOtros,
   clasesFilaPagoTransferencia,
@@ -33,6 +35,7 @@ import {
   bloquearRCobranzaPorEstatus,
   bloquearSinIncidenciasPorEstatus,
   documentoTieneIncidencia,
+  esCodSinPago,
   esTipoODTraspaso,
   formatearDocRelacionado,
   formatearFecha,
@@ -159,25 +162,64 @@ export default function ModalDetalleOrdenDistribucion({
     [documentos],
   );
 
-  const cargarDetalle = useCallback(async (idFolio: number) => {
-    setLoading(true);
-    setError(null);
-    setDocumentos([]);
-    try {
-      const detalle = await oDistribucionService.getDetalleByFolio(idFolio);
-      setDocumentos(detalle);
-    } catch (err) {
-      console.error(err);
+  const cargarDetalle = useCallback(
+    async (idFolio: number) => {
+      setLoading(true);
+      setError(null);
       setDocumentos([]);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "No se pudo cargar el detalle de la orden.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      try {
+        let detalle = await oDistribucionService.getDetalleByFolio(idFolio);
+        setDocumentos(detalle);
+
+        if (
+          idEmpresa &&
+          idEmpresa > 0 &&
+          idSucursal &&
+          idSucursal > 0 &&
+          idUsuarioCreacion &&
+          idUsuarioCreacion > 0
+        ) {
+          try {
+            const creadas = await crearIncidenciasDevolucionAutomaticas(
+              detalle,
+              {
+                idEmpresa,
+                idSucursal,
+                idUsuarioCreacionFallback: idUsuarioCreacion,
+              },
+            );
+            if (creadas > 0) {
+              detalle = await oDistribucionService.getDetalleByFolio(idFolio);
+              setDocumentos(detalle);
+              onMensajeExitoChange(
+                creadas === 1
+                  ? "Se generó 1 incidencia automática por devolución."
+                  : `Se generaron ${creadas} incidencias automáticas por devolución.`,
+              );
+            }
+          } catch (autoErr) {
+            console.error(autoErr);
+            setError(
+              autoErr instanceof Error
+                ? autoErr.message
+                : "No se pudo generar la incidencia automática por devolución.",
+            );
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        setDocumentos([]);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo cargar el detalle de la orden.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [idEmpresa, idSucursal, idUsuarioCreacion, onMensajeExitoChange],
+  );
 
   useEffect(() => {
     if (!abierto || !folio || folio <= 0) {
@@ -606,9 +648,11 @@ export default function ModalDetalleOrdenDistribucion({
                               ? clasesFilaPagoTransferencia
                               : tipoPago === "otros"
                                 ? clasesFilaPagoOtros
-                                : esTraspaso
-                                  ? clasesFilaTraspasoTipoOD
-                                  : "hover:bg-gray-50 dark:hover:bg-gray-900/30";
+                                : esCodSinPago(item)
+                                  ? clasesFilaCodSinPago
+                                  : esTraspaso
+                                    ? clasesFilaTraspasoTipoOD
+                                    : "hover:bg-gray-50 dark:hover:bg-gray-900/30";
                         return (
                           <tr
                             key={`${item.entrega}-${item.documento}-${index}`}

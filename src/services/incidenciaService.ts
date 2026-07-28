@@ -37,9 +37,19 @@ export const TIPO_INCIDENCIA_SIN_DETALLE = 1;
 /** Tipos que requieren detalle con artículos de la entrega. */
 export const TIPOS_INCIDENCIA_CON_DETALLE = [2, 3, 4, 6] as const;
 
-/** Estatus de incidencia: pendiente al crear; otro proceso la pasa a finalizada. */
+/** Incidencia automática por devolución (DV-). */
+export const TIPO_INCIDENCIA_DEVOLUCION = 7;
+
+/** Estado de artículo por defecto en detalle de devolución automática. */
+export const ESTADO_ITEM_DEVOLUCION_DEFAULT = 5;
+
+export const OBSERVACIONES_INCIDENCIA_AUTOMATICA =
+  "INCIDENCIA GENERADA AUTOMATICAMENTE";
+
+/** Estatus de incidencia: pendiente al crear; otro proceso la pasa a finalizada/terminada. */
 export const ESTATUS_INCIDENCIA_PENDIENTE = "P";
 export const ESTATUS_INCIDENCIA_FINALIZADA = "F";
+export const ESTATUS_INCIDENCIA_TERMINADO = "T";
 
 export function tipoIncidenciaConDetalleArticulos(
   idTipoIncidencia: number,
@@ -69,16 +79,21 @@ export function esIncidenciaPendiente(
 export function esIncidenciaFinalizada(
   estatus: string | null | undefined,
 ): boolean {
-  return normalizarEstatusIncidencia(estatus) === ESTATUS_INCIDENCIA_FINALIZADA;
+  const valor = normalizarEstatusIncidencia(estatus);
+  return (
+    valor === ESTATUS_INCIDENCIA_FINALIZADA ||
+    valor === ESTATUS_INCIDENCIA_TERMINADO
+  );
 }
 
-/** Traduce P/F a etiqueta legible para UI. */
+/** Traduce P/F/T a etiqueta legible para UI. */
 export function etiquetaEstatusIncidencia(
   estatus: string | null | undefined,
 ): string {
   const valor = normalizarEstatusIncidencia(estatus);
   if (valor === ESTATUS_INCIDENCIA_PENDIENTE) return "Pendiente";
   if (valor === ESTATUS_INCIDENCIA_FINALIZADA) return "Finalizada";
+  if (valor === ESTATUS_INCIDENCIA_TERMINADO) return "Terminado";
   return (estatus ?? "").trim() || "—";
 }
 
@@ -173,6 +188,8 @@ export interface IncidenciaResumen {
   idTipoIncidencia: number;
   tipoIncidencia: string;
   observaciones: string;
+  /** Solución a nivel incidencia (no por detalle/ítem). */
+  solucion: string;
   estatus: string;
   idOrdenEntrega: number;
   idODistribucion: number;
@@ -188,7 +205,12 @@ function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
     unknown
   >;
   const idIncidencia =
-    pickNumber(o, "idIncidencia", "IdIncidencia", "id", "Id") ?? 0;
+    pickNumber(o, "idIncidencia", "IdIncidencia") ??
+    // Solo usar `id` genérico si no parece un detalle plano.
+    (pickNumber(o, "idIncidenciaDetalle", "IdIncidenciaDetalle") == null
+      ? pickNumber(o, "id", "Id")
+      : null) ??
+    0;
   if (idIncidencia <= 0) return null;
 
   const tipoAnidado =
@@ -229,6 +251,8 @@ function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
     idTipoIncidencia,
     tipoIncidencia,
     observaciones: pickString(o, "observaciones", "Observaciones") ?? "",
+    solucion:
+      pickString(o, "solucion", "Solucion", "solución", "Solución") ?? "",
     estatus: pickString(o, "estatus", "Estatus") ?? "—",
     idOrdenEntrega: pickNumber(o, "idOrdenEntrega", "IdOrdenEntrega") ?? 0,
     idODistribucion: pickNumber(o, "idODistribucion", "IdODistribucion") ?? 0,
@@ -250,9 +274,8 @@ export interface IncidenciaDetalleItem {
   itemName: string;
   cantidad: number;
   idEstado: number;
+  idTipoDoc: number;
   observaciones: string;
-  /** Texto de cómo se solventó (columna Solución). */
-  solucion: string;
   vendedor: string;
   estatus: string;
 }
@@ -264,8 +287,23 @@ export interface IncidenciaCompleta extends IncidenciaResumen {
 export interface ActualizarSolucionIncidenciaPayload {
   idIncidencia: number;
   solucion: string;
-  /** IDs de filas de IncidenciaDetalle a actualizar (si el API los requiere). */
-  idsIncidenciaDetalle?: number[];
+}
+
+/** Ítem para PUT /api/Incidencias/detalles/lote */
+export interface ActualizarIncidenciaDetalleLoteItem {
+  idIncidenciaDetalle: number;
+  idIncidencia: number;
+  idOrdenEntrega: number;
+  idTipoDoc: number;
+  itemCode: string;
+  itemName: string;
+  cantidad: number;
+  idEstado: number;
+  vendedor: string;
+  observaciones: string;
+  idUsuarioEdicion: number;
+  estatus: string;
+  activo: boolean;
 }
 
 function normalizeIncidenciaDetalleItem(
@@ -282,6 +320,11 @@ function normalizeIncidenciaDetalleItem(
       "IdIncidenciaDetalle",
       "idDetalle",
       "IdDetalle",
+      "idIncidenciaItem",
+      "IdIncidenciaItem",
+      // En detalles anidados, `id` suele ser el PK del detalle.
+      "id",
+      "Id",
     ) ?? null;
   const itemCode =
     pickString(o, "itemCode", "ItemCode", "articulo", "Articulo", "item") ?? "";
@@ -308,9 +351,8 @@ function normalizeIncidenciaDetalleItem(
       pickString(o, "itemName", "ItemName", "descripcion", "Descripcion") ?? "",
     cantidad: pickNumber(o, "cantidad", "Cantidad") ?? 0,
     idEstado,
+    idTipoDoc: pickNumber(o, "idTipoDoc", "IdTipoDoc") ?? 0,
     observaciones: pickString(o, "observaciones", "Observaciones") ?? "",
-    solucion:
-      pickString(o, "solucion", "Solucion", "solución", "Solución") ?? "",
     vendedor: pickString(o, "vendedor", "Vendedor") ?? "",
     estatus: pickString(o, "estatus", "Estatus") ?? "",
   };
@@ -470,9 +512,29 @@ export const incidenciaService = {
     const response = await api.get<unknown>(
       `/api/Incidencias/${Math.trunc(idIncidencia)}`,
     );
-    const list = normalizeIncidenciaCompletaList(
-      assertOk(response, "No se pudo cargar la incidencia."),
-    );
+    const raw = assertOk(response, "No se pudo cargar la incidencia.");
+
+    // El API puede devolver el objeto directo, un array, o envuelto en data/incidencia.
+    let candidate: unknown = raw;
+    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+      const o = raw as Record<string, unknown>;
+      for (const key of [
+        "incidencia",
+        "Incidencia",
+        "data",
+        "Data",
+        "result",
+        "Result",
+      ]) {
+        const nested = o[key];
+        if (nested && typeof nested === "object") {
+          candidate = nested;
+          break;
+        }
+      }
+    }
+
+    const list = normalizeIncidenciaCompletaList(candidate);
     const item = list[0];
     if (!item) {
       throw new Error("No se encontró la incidencia solicitada.");
@@ -544,29 +606,25 @@ export const incidenciaService = {
   },
 
   /**
-   * Actualiza la columna Solución en IncidenciaDetalle.
-   * Endpoint tentativo mientras se define el backend:
+   * Actualiza la solución a nivel incidencia (no por detalle/ítem).
    * PUT /api/Incidencias/{idIncidencia}/Solucion
-   * Body: { solucion, idsIncidenciaDetalle? }
+   * Body: { solucion }
    */
   actualizarSolucion: async (
     payload: ActualizarSolucionIncidenciaPayload,
   ): Promise<unknown> => {
     const idIncidencia = Math.trunc(payload.idIncidencia);
     if (!idIncidencia || idIncidencia <= 0) {
-      throw new Error("La incidencia no es válida para actualizar la solución.");
+      throw new Error(
+        "La incidencia no es válida para actualizar la solución.",
+      );
     }
     const solucion = payload.solucion.trim();
     if (!solucion) {
       throw new Error("Capture el detalle de la solución.");
     }
 
-    const body = {
-      solucion,
-      idsIncidenciaDetalle: payload.idsIncidenciaDetalle?.filter(
-        (id) => id > 0,
-      ),
-    };
+    const body = { solucion };
 
     console.log(
       `[Incidencias] PUT /api/Incidencias/${idIncidencia}/Solucion — body:`,
@@ -578,9 +636,74 @@ export const incidenciaService = {
       body,
     );
 
+    return assertOk(response, "No se pudo guardar la solución de la incidencia.");
+  },
+
+  /**
+   * Actualiza uno o varios detalles de incidencia en lote.
+   * PUT /api/Incidencias/detalles/lote
+   * Body: ActualizarIncidenciaDetalleLoteItem[]
+   */
+  actualizarDetallesLote: async (
+    items: ActualizarIncidenciaDetalleLoteItem[],
+  ): Promise<unknown> => {
+    if (!items.length) {
+      throw new Error("No hay detalles para actualizar.");
+    }
+
+    const body = items.map((item) => {
+      const idIncidenciaDetalle = Math.trunc(item.idIncidenciaDetalle);
+      const idIncidencia = Math.trunc(item.idIncidencia);
+      const idUsuarioEdicion = Math.trunc(item.idUsuarioEdicion);
+      const idEstado = Math.trunc(item.idEstado);
+
+      if (!idIncidenciaDetalle || idIncidenciaDetalle <= 0) {
+        throw new Error(
+          "Cada detalle debe tener un idIncidenciaDetalle válido.",
+        );
+      }
+      if (!idIncidencia || idIncidencia <= 0) {
+        throw new Error("La incidencia no es válida para actualizar el detalle.");
+      }
+      if (!idUsuarioEdicion || idUsuarioEdicion <= 0) {
+        throw new Error("No se pudo resolver el usuario de edición.");
+      }
+      if (!idEstado || idEstado <= 0) {
+        throw new Error(
+          `Seleccione un estado válido para el artículo ${item.itemCode || ""}.`,
+        );
+      }
+
+      return {
+        idIncidencia,
+        idOrdenEntrega: Math.trunc(item.idOrdenEntrega) || 0,
+        idTipoDoc: Math.trunc(item.idTipoDoc) || 0,
+        itemCode: item.itemCode.trim(),
+        itemName: item.itemName.trim(),
+        cantidad: Number(item.cantidad) || 0,
+        idEstado,
+        vendedor: item.vendedor.trim(),
+        observaciones: item.observaciones.trim(),
+        idUsuarioEdicion,
+        estatus: (item.estatus || "").trim() || "P",
+        activo: item.activo !== false,
+        idIncidenciaDetalle,
+      };
+    });
+
+    console.log(
+      "[Incidencias] PUT /api/Incidencias/detalles/lote — body:",
+      body,
+    );
+
+    const response = await api.put<unknown>(
+      "/api/Incidencias/detalles/lote",
+      body,
+    );
+
     return assertOk(
       response,
-      "No se pudo guardar el detalle de la solución.",
+      "No se pudieron actualizar los detalles de la incidencia.",
     );
   },
 };

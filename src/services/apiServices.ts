@@ -1,5 +1,6 @@
 import axios, {
   AxiosInstance,
+  AxiosResponse,
   InternalAxiosRequestConfig,
 } from "axios";
 import {
@@ -15,7 +16,7 @@ const REFRESH_PATH = "/api/Acceso/refresh";
 
 let isRefreshing = false;
 let failedQueue: Array<{
-  resolve: (value: unknown) => void;
+  resolve: () => void;
   reject: (reason?: unknown) => void;
 }> = [];
 
@@ -57,7 +58,7 @@ api.interceptors.request.use((config) => {
 
 const processQueue = (error: unknown = null) => {
   failedQueue.forEach((prom) => {
-    error ? prom.reject(error) : prom.resolve(null);
+    error ? prom.reject(error) : prom.resolve();
   });
   failedQueue = [];
 };
@@ -73,15 +74,15 @@ async function callRefreshEndpoint(): Promise<boolean> {
 
   const body = fallbackRefresh ? { refreshToken: fallbackRefresh } : {};
 
-  const res = await api.post<{ isSuccess?: boolean; accessToken?: string; refreshToken?: string }>(
-    REFRESH_PATH,
-    body,
-    {
-      withCredentials: true,
-      headers,
-      validateStatus: (status) => status < 500,
-    },
-  );
+  const res = await api.post<{
+    isSuccess?: boolean;
+    accessToken?: string;
+    refreshToken?: string;
+  }>(REFRESH_PATH, body, {
+    withCredentials: true,
+    headers,
+    validateStatus: (status) => status < 500,
+  });
 
   if (res.status !== 200 || !res.data?.isSuccess) return false;
 
@@ -91,15 +92,19 @@ async function callRefreshEndpoint(): Promise<boolean> {
 
 async function handleUnauthorized(
   originalRequest: RetryableConfig,
-): Promise<unknown> {
+): Promise<AxiosResponse> {
   if (isAuthBypassUrl(originalRequest.url) || originalRequest._retry) {
     return api(originalRequest);
   }
 
   if (isRefreshing) {
-    return new Promise((resolve, reject) => {
-      failedQueue.push({ resolve, reject });
-    }).then(() => api(originalRequest));
+    await new Promise<void>((resolve, reject) => {
+      failedQueue.push({
+        resolve: () => resolve(),
+        reject,
+      });
+    });
+    return api(originalRequest);
   }
 
   originalRequest._retry = true;
@@ -126,7 +131,7 @@ async function handleUnauthorized(
 }
 
 api.interceptors.response.use(
-  async (response) => {
+  (response): AxiosResponse | Promise<AxiosResponse> => {
     if (response.status !== 401) return response;
 
     const originalRequest = response.config as RetryableConfig;

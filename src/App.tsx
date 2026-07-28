@@ -36,7 +36,8 @@ import ListaPrecios from "./pages/Ventas/ListaPrecios";
 import BitacoraCobranza from "./pages/Operaciones/BitacoraCobranza";
 import ListaBitacorasCobranza from "./pages/Operaciones/ListaBitacorasCobranza";
 import ComprobacionRutas from "./pages/Operaciones/ComprobacionRutas";
-import ManagerComprobacionRuta from "./pages/Operaciones/ManagerComprobacionRuta";
+import ManagerComprobacionRuta from "./pages/Operaciones/ListadoIncidencias";
+import Cotizador from "./pages/Ventas/Cotizador";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -98,7 +99,10 @@ export default function App() {
           <Route path="/video" element={<Video />} />
 
           {/* Cambio de contraseña (sin login requerido) */}
-          <Route path="/clientes/CambiarContrasena" element={<CambiarContrasena />} />
+          <Route
+            path="/clientes/CambiarContrasena"
+            element={<CambiarContrasena />}
+          />
 
           {/* Protected */}
           <Route
@@ -119,6 +123,7 @@ export default function App() {
             <Route path="/clientes/Profile" element={<Profile />} />
             <Route path="/ventas/Articulos" element={<Articulos />} />
             <Route path="/ventas/ListaPrecios" element={<ListaPrecios />} />
+            <Route path="/ventas/Cotizador" element={<Cotizador />} />
             <Route
               path="/configPage/Respuesta"
               element={<RespuestaClientes />}
@@ -128,26 +133,14 @@ export default function App() {
               element={<EntregasPremios />}
             />
             <Route path="/CRM/Prospectos" element={<Prospectos />} />
-            <Route
-              path="/CRM/Configuración"
-              element={<CrmConfiguracion />}
-            />
-            <Route
-              path="/CRM/CatalogoEtapas"
-              element={<CatalogoEtapas />}
-            />
-            <Route
-              path="/CRM/CatalogoFuentes"
-              element={<CatalogoFuentes />}
-            />
+            <Route path="/CRM/Configuración" element={<CrmConfiguracion />} />
+            <Route path="/CRM/CatalogoEtapas" element={<CatalogoEtapas />} />
+            <Route path="/CRM/CatalogoFuentes" element={<CatalogoFuentes />} />
             <Route
               path="/CRM/CatalogoSeguimientos"
               element={<CatalogoSeguimientos />}
             />
-            <Route
-              path="/CRM/CatalogoEstatus"
-              element={<CatalogoEstatus />}
-            />
+            <Route path="/CRM/CatalogoEstatus" element={<CatalogoEstatus />} />
             <Route
               path="/CRM/CatalogoTipoEstatus"
               element={<CatalogoTipoEstatus />}

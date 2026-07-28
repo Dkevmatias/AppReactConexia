@@ -9,6 +9,7 @@ import {
   IncidenciaCompleta,
   incidenciaService,
   resolverEstatusIncidencia,
+  TIPO_INCIDENCIA_DEVOLUCION,
   TIPO_INCIDENCIA_SIN_DETALLE,
   tipoIncidenciaConDetalleArticulos,
   TipoIncidencia,
@@ -32,6 +33,7 @@ function formDesdeIncidencia(incidencia: IncidenciaCompleta) {
     observacionesEncabezado: incidencia.observaciones,
     lineas: incidencia.detalles.map((detalle, index) => ({
       idLocal: `ver-${incidencia.idIncidencia}-${index}`,
+      idIncidenciaDetalle: detalle.idIncidenciaDetalle,
       articulo: detalle.itemCode,
       descripcion: detalle.itemName,
       cantidad: String(detalle.cantidad > 0 ? detalle.cantidad : 1),
@@ -42,11 +44,7 @@ function formDesdeIncidencia(incidencia: IncidenciaCompleta) {
 }
 
 function solucionDesdeIncidencia(incidencia: IncidenciaCompleta): string {
-  const textos = incidencia.detalles
-    .map((detalle) => (detalle.solucion ?? "").trim())
-    .filter(Boolean);
-  if (textos.length === 0) return "";
-  return [...new Set(textos)][0] ?? "";
+  return (incidencia.solucion ?? "").trim();
 }
 
 export type ModoModalIncidencia = "crear" | "ver";
@@ -56,10 +54,15 @@ export type ContextoIncidenciaDistribucion = {
   documento: DocODistribucionDetalle;
   modo?: ModoModalIncidencia;
   idIncidencia?: number;
+  /** Detalle concreto al abrir desde el listado (fila de artículo). */
+  idIncidenciaDetalle?: number | null;
+  /** Solución ya conocida del listado (respaldo si el GET aún no la trae). */
+  solucionInicial?: string | null;
 };
 
 type LineaDetalleIncidencia = {
   idLocal: string;
+  idIncidenciaDetalle?: number | null;
   articulo: string;
   descripcion: string;
   cantidad: string;
@@ -70,6 +73,7 @@ type LineaDetalleIncidencia = {
 function nuevaLineaDetalle(idEstadoDefault = ""): LineaDetalleIncidencia {
   return {
     idLocal: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    idIncidenciaDetalle: null,
     articulo: "",
     descripcion: "",
     cantidad: "1",
@@ -143,12 +147,20 @@ export default function ModalIncidenciaDistribucion({
   );
   const [solucionTexto, setSolucionTexto] = useState("");
   const [guardandoSolucion, setGuardandoSolucion] = useState(false);
+  const [guardandoActualizacion, setGuardandoActualizacion] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(formularioVacio());
 
   const modoVer = contexto?.modo === "ver";
   const solucionSoloLectura =
     modoVer && esIncidenciaFinalizada(incidenciaVer?.estatus);
+  const esDevolucionAutomatica =
+    (incidenciaVer?.idTipoIncidencia ?? Number(form.idTipoIncidencia)) ===
+    TIPO_INCIDENCIA_DEVOLUCION;
+  const puedeActualizarDevolucion =
+    modoVer &&
+    esDevolucionAutomatica &&
+    !esIncidenciaFinalizada(incidenciaVer?.estatus);
 
   const cargarTipos = useCallback(async () => {
     setLoadingTipos(true);
@@ -211,26 +223,84 @@ export default function ModalIncidenciaDistribucion({
     }
   }, []);
 
-  const cargarIncidenciaParaVer = useCallback(async (idIncidencia: number) => {
-    setLoadingIncidencia(true);
-    setError(null);
-    setIncidenciaVer(null);
-    setSolucionTexto("");
-    setForm(formularioVacio());
-    try {
-      const incidencia = await incidenciaService.getById(idIncidencia);
-      setIncidenciaVer(incidencia);
-      setForm(formDesdeIncidencia(incidencia));
-      setSolucionTexto(solucionDesdeIncidencia(incidencia));
-    } catch (err) {
-      console.error(err);
-      setError(
-        err instanceof Error ? err.message : "No se pudo cargar la incidencia.",
-      );
-    } finally {
-      setLoadingIncidencia(false);
-    }
-  }, []);
+  const cargarIncidenciaParaVer = useCallback(
+    async (
+      idIncidencia: number,
+      idIncidenciaDetalle?: number | null,
+      solucionInicial?: string | null,
+    ) => {
+      setLoadingIncidencia(true);
+      setError(null);
+      setIncidenciaVer(null);
+      setSolucionTexto("");
+      setForm(formularioVacio());
+      try {
+        // Aquí se consulta la incidencia seleccionada del listado:
+        // GET /api/Incidencias/{idIncidencia}
+        const incidencia = await incidenciaService.getById(idIncidencia);
+        const formData = formDesdeIncidencia(incidencia);
+        const idDetalleFoco =
+          idIncidenciaDetalle != null && idIncidenciaDetalle > 0
+            ? idIncidenciaDetalle
+            : null;
+
+        // Si el API no trajo idIncidenciaDetalle en las líneas, conserva el del listado.
+        if (idDetalleFoco) {
+          const yaTieneDetalle = formData.lineas.some(
+            (linea) => linea.idIncidenciaDetalle === idDetalleFoco,
+          );
+          if (!yaTieneDetalle) {
+            const porItem =
+              formData.lineas.length === 1
+                ? 0
+                : formData.lineas.findIndex(
+                    (linea) =>
+                      !linea.idIncidenciaDetalle ||
+                      linea.idIncidenciaDetalle <= 0,
+                  );
+            const indexDestino = porItem >= 0 ? porItem : 0;
+            formData.lineas = formData.lineas.map((linea, index) =>
+              index === indexDestino
+                ? { ...linea, idIncidenciaDetalle: idDetalleFoco }
+                : linea,
+            );
+          }
+        }
+
+        const solucion =
+          solucionDesdeIncidencia(incidencia) ||
+          (solucionInicial ?? "").trim();
+
+        setIncidenciaVer({
+          ...incidencia,
+          solucion,
+          detalles: incidencia.detalles.map((detalle, index) => {
+            const linea = formData.lineas[index];
+            if (!linea?.idIncidenciaDetalle) return detalle;
+            if (detalle.idIncidenciaDetalle && detalle.idIncidenciaDetalle > 0) {
+              return detalle;
+            }
+            return {
+              ...detalle,
+              idIncidenciaDetalle: linea.idIncidenciaDetalle,
+            };
+          }),
+        });
+        setForm(formData);
+        setSolucionTexto(solucion);
+      } catch (err) {
+        console.error(err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo cargar la incidencia.",
+        );
+      } finally {
+        setLoadingIncidencia(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!abierto || !contexto) return;
@@ -239,7 +309,11 @@ export default function ModalIncidenciaDistribucion({
 
     if (contexto.modo === "ver" && contexto.idIncidencia) {
       setItemsEntrega([]);
-      void cargarIncidenciaParaVer(contexto.idIncidencia);
+      void cargarIncidenciaParaVer(
+        contexto.idIncidencia,
+        contexto.idIncidenciaDetalle,
+        contexto.solucionInicial,
+      );
       return;
     }
 
@@ -259,6 +333,8 @@ export default function ModalIncidenciaDistribucion({
     contexto?.documento.entrega,
     contexto?.modo,
     contexto?.idIncidencia,
+    contexto?.idIncidenciaDetalle,
+    contexto?.solucionInicial,
     cargarTipos,
     cargarEstadosArticulo,
     cargarItemsEntrega,
@@ -436,25 +512,16 @@ export default function ModalIncidenciaDistribucion({
     setGuardandoSolucion(true);
     setError(null);
     try {
-      const idsIncidenciaDetalle = incidenciaVer.detalles
-        .map((detalle) => detalle.idIncidenciaDetalle)
-        .filter((id): id is number => id != null && id > 0);
-
       await incidenciaService.actualizarSolucion({
         idIncidencia: incidenciaVer.idIncidencia,
         solucion: texto,
-        idsIncidenciaDetalle:
-          idsIncidenciaDetalle.length > 0 ? idsIncidenciaDetalle : undefined,
       });
 
       setIncidenciaVer((prev) =>
         prev
           ? {
               ...prev,
-              detalles: prev.detalles.map((detalle) => ({
-                ...detalle,
-                solucion: texto,
-              })),
+              solucion: texto,
             }
           : prev,
       );
@@ -466,10 +533,114 @@ export default function ModalIncidenciaDistribucion({
       setError(
         err instanceof Error
           ? err.message
-          : "No se pudo guardar el detalle de la solución.",
+          : "No se pudo guardar la solución de la incidencia.",
       );
     } finally {
       setGuardandoSolucion(false);
+    }
+  };
+
+  const handleActualizarDevolucion = async () => {
+    if (!puedeActualizarDevolucion || !incidenciaVer) return;
+
+    if (!idUsuarioCreacion || idUsuarioCreacion <= 0) {
+      setError("No se pudo resolver el usuario de edición.");
+      return;
+    }
+
+    if (form.lineas.length === 0) {
+      setError("La incidencia no tiene detalle de artículos para actualizar.");
+      return;
+    }
+
+    for (const [index, linea] of form.lineas.entries()) {
+      const idDetalle = linea.idIncidenciaDetalle;
+      if (idDetalle == null || idDetalle <= 0) {
+        setError(
+          `No se encontró idIncidenciaDetalle en la fila ${index + 1} (${linea.articulo || "artículo"}).`,
+        );
+        return;
+      }
+      const idEstado = Number(linea.idEstado);
+      if (!Number.isFinite(idEstado) || idEstado <= 0) {
+        setError(
+          `Seleccione el estado del artículo en la fila ${index + 1}.`,
+        );
+        return;
+      }
+    }
+
+    setGuardandoActualizacion(true);
+    setError(null);
+    try {
+      const vendedorFallback = (contexto?.documento.slpName ?? "").trim();
+      const estatusFallback =
+        (incidenciaVer.estatus ?? "").trim() || "P";
+
+      const lote = form.lineas.map((linea) => {
+        const idDetalle = linea.idIncidenciaDetalle!;
+        const detalleOrig =
+          incidenciaVer.detalles.find(
+            (detalle) => detalle.idIncidenciaDetalle === idDetalle,
+          ) ?? null;
+
+        return {
+          idIncidenciaDetalle: idDetalle,
+          idIncidencia: incidenciaVer.idIncidencia,
+          idOrdenEntrega: incidenciaVer.idOrdenEntrega,
+          idTipoDoc: detalleOrig?.idTipoDoc ?? 0,
+          itemCode: linea.articulo.trim(),
+          itemName: linea.descripcion.trim(),
+          cantidad: Number(linea.cantidad) || detalleOrig?.cantidad || 0,
+          idEstado: Number(linea.idEstado),
+          vendedor:
+            (detalleOrig?.vendedor ?? "").trim() || vendedorFallback,
+          observaciones:
+            linea.observaciones.trim() ||
+            form.observacionesEncabezado.trim(),
+          idUsuarioEdicion: idUsuarioCreacion,
+          estatus:
+            (detalleOrig?.estatus ?? "").trim() || estatusFallback,
+          activo: true,
+        };
+      });
+
+      await incidenciaService.actualizarDetallesLote(lote);
+
+      setIncidenciaVer((prev) =>
+        prev
+          ? {
+              ...prev,
+              observaciones: form.observacionesEncabezado.trim(),
+              detalles: prev.detalles.map((detalle) => {
+                const linea = form.lineas.find(
+                  (item) =>
+                    item.idIncidenciaDetalle === detalle.idIncidenciaDetalle,
+                );
+                if (!linea) return detalle;
+                return {
+                  ...detalle,
+                  idEstado: Number(linea.idEstado) || detalle.idEstado,
+                  observaciones: linea.observaciones.trim(),
+                  itemName: linea.descripcion.trim() || detalle.itemName,
+                  cantidad: Number(linea.cantidad) || detalle.cantidad,
+                };
+              }),
+            }
+          : prev,
+      );
+      onGuardado?.(
+        `Se actualizaron ${lote.length} detalle(s) de la incidencia ${incidenciaVer.idIncidencia}.`,
+      );
+    } catch (err) {
+      console.error(err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "No se pudo actualizar la incidencia.",
+      );
+    } finally {
+      setGuardandoActualizacion(false);
     }
   };
 
@@ -522,7 +693,7 @@ export default function ModalIncidenciaDistribucion({
   };
 
   const renderCampoEstado = (linea: LineaDetalleIncidencia) => {
-    if (modoVer) {
+    if (modoVer && !puedeActualizarDevolucion) {
       return (
         <input
           className={inputReadonlyClass}
@@ -577,7 +748,12 @@ export default function ModalIncidenciaDistribucion({
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Orden {folioOrden} · Entrega {documento.entrega}
               {modoVer && contexto.idIncidencia
-                ? ` · Folio ${contexto.idIncidencia}`
+                ? ` · Incidencia ${contexto.idIncidencia}`
+                : ""}
+              {modoVer &&
+              contexto.idIncidenciaDetalle != null &&
+              contexto.idIncidenciaDetalle > 0
+                ? ` · Detalle ${contexto.idIncidenciaDetalle}`
                 : ""}
             </p>
             <p className="truncate text-sm text-gray-700 dark:text-gray-300">
@@ -672,18 +848,28 @@ export default function ModalIncidenciaDistribucion({
                   <div className="min-w-0 max-w-full sm:col-span-2">
                     <label className={labelClass}>Observaciones</label>
                     <textarea
-                      className={`${modoVer ? inputReadonlyClass : inputClass} min-h-[88px] resize-y`}
+                      className={`${modoVer && !puedeActualizarDevolucion ? inputReadonlyClass : inputClass} min-h-[88px] resize-y`}
                       value={form.observacionesEncabezado}
-                      readOnly={modoVer}
+                      readOnly={modoVer && !puedeActualizarDevolucion}
                       onChange={(e) =>
                         setForm((prev) => ({
                           ...prev,
                           observacionesEncabezado: e.target.value,
                         }))
                       }
-                      placeholder="Observaciones generales de la incidencia"
+                      placeholder={
+                        puedeActualizarDevolucion
+                          ? "Agregue observaciones adicionales si aplica"
+                          : "Observaciones generales de la incidencia"
+                      }
                       rows={3}
                     />
+                    {puedeActualizarDevolucion ? (
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Puede editar o agregar observaciones adicionales antes
+                        de actualizar.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </section>
@@ -705,6 +891,12 @@ export default function ModalIncidenciaDistribucion({
                     </button>
                   )}
                 </div>
+                {puedeActualizarDevolucion && form.lineas.length > 0 ? (
+                  <p className="mb-3 text-xs text-blue-700 dark:text-blue-300">
+                    Puede editar el estado y observaciones de uno o varios
+                    artículos y luego pulsar Actualizar para guardar todos.
+                  </p>
+                ) : null}
 
                 {esTipoConDetalle && !modoVer && loadingItems && (
                   <p className="mb-3 flex items-center gap-2 text-sm text-gray-500">
@@ -810,10 +1002,14 @@ export default function ModalIncidenciaDistribucion({
                               </label>
                               <input
                                 className={
-                                  modoVer ? inputReadonlyClass : inputClass
+                                  modoVer && !puedeActualizarDevolucion
+                                    ? inputReadonlyClass
+                                    : inputClass
                                 }
                                 value={linea.observaciones}
-                                readOnly={modoVer}
+                                readOnly={
+                                  modoVer && !puedeActualizarDevolucion
+                                }
                                 onChange={(e) =>
                                   actualizarLinea(
                                     linea.idLocal,
@@ -900,10 +1096,14 @@ export default function ModalIncidenciaDistribucion({
                               <td className="px-2 py-2">
                                 <input
                                   className={
-                                    modoVer ? inputReadonlyClass : inputClass
+                                    modoVer && !puedeActualizarDevolucion
+                                      ? inputReadonlyClass
+                                      : inputClass
                                   }
                                   value={linea.observaciones}
-                                  readOnly={modoVer}
+                                  readOnly={
+                                    modoVer && !puedeActualizarDevolucion
+                                  }
                                   onChange={(e) =>
                                     actualizarLinea(
                                       linea.idLocal,
@@ -937,13 +1137,13 @@ export default function ModalIncidenciaDistribucion({
               {modoVer ? (
                 <section className="mt-4 rounded-xl border border-gray-200 bg-gray-50/80 p-4 dark:border-gray-700 dark:bg-gray-900/30">
                   <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
-                    Detalle de la solución
+                    Solución de la incidencia
                   </h3>
-                  <label className={labelClass} htmlFor="detalle-solucion">
+                  <label className={labelClass} htmlFor="solucion-incidencia">
                     ¿Cómo se solventó?
                   </label>
                   <textarea
-                    id="detalle-solucion"
+                    id="solucion-incidencia"
                     className={`${solucionSoloLectura ? inputReadonlyClass : inputClass} min-h-[120px] resize-y`}
                     value={solucionTexto}
                     readOnly={solucionSoloLectura}
@@ -958,8 +1158,8 @@ export default function ModalIncidenciaDistribucion({
                     </p>
                   ) : (
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      Se actualizará la columna Solución del detalle de la
-                      incidencia.
+                      La solución queda a nivel incidencia (no por cada
+                      artículo del detalle).
                     </p>
                   )}
                 </section>
@@ -974,16 +1174,38 @@ export default function ModalIncidenciaDistribucion({
               <button
                 type="button"
                 onClick={onCerrar}
-                disabled={guardandoSolucion}
+                disabled={guardandoSolucion || guardandoActualizacion}
                 className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 touch-manipulation"
               >
                 Cerrar
               </button>
+              {puedeActualizarDevolucion ? (
+                <button
+                  type="button"
+                  onClick={() => void handleActualizarDevolucion()}
+                  disabled={
+                    guardandoActualizacion ||
+                    guardandoSolucion ||
+                    loadingIncidencia ||
+                    form.lineas.length === 0
+                  }
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 touch-manipulation"
+                >
+                  {guardandoActualizacion ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  Actualizar
+                </button>
+              ) : null}
               {!solucionSoloLectura ? (
                 <button
                   type="button"
                   onClick={() => void handleGuardarSolucion()}
-                  disabled={guardandoSolucion || loadingIncidencia}
+                  disabled={
+                    guardandoSolucion ||
+                    guardandoActualizacion ||
+                    loadingIncidencia
+                  }
                   className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50 touch-manipulation"
                 >
                   {guardandoSolucion ? (

@@ -16,6 +16,9 @@ export const clasesFilaPagoTransferencia =
 export const clasesFilaPagoOtros =
   "bg-amber-50/90 hover:bg-amber-100/80 dark:bg-amber-950/40 dark:hover:bg-amber-950/55";
 
+export const clasesFilaCodSinPago =
+  "bg-red-50/90 hover:bg-red-100/80 dark:bg-red-950/40 dark:hover:bg-red-950/55";
+
 export const clasesTarjetaPagoEfectivo =
   "border-emerald-400 bg-emerald-50/90 dark:border-emerald-700 dark:bg-emerald-950/40";
 
@@ -24,3 +27,6 @@ export const clasesTarjetaPagoTransferencia =
 
 export const clasesTarjetaPagoOtros =
   "border-amber-400 bg-amber-50/90 dark:border-amber-700 dark:bg-amber-950/40";
+
+export const clasesTarjetaCodSinPago =
+  "border-red-400 bg-red-50/90 dark:border-red-700 dark:bg-red-950/40";

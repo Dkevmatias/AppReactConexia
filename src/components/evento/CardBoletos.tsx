@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../../context/useAuth";
+import { useCompras } from "../../context/ComprasContext";
 import { asignarBoletos } from "../../services/boletoServices";
 import ConfirmModal from "../../utils/ConfirmModal";
 import { useNavigate } from "react-router";
@@ -32,6 +33,7 @@ const ticketOptions: TicketOption[] = [
 export default function TicketSelector({ totalCompra,vencido, mesRedencion }: { totalCompra: number, vencido: boolean, mesRedencion: string }) {
 
   const { user } = useAuth();
+  const { mesesCompras } = useCompras();
   const navigate = useNavigate();
   const [isSaving, setIsSaving] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
@@ -172,7 +174,11 @@ export default function TicketSelector({ totalCompra,vencido, mesRedencion }: { 
     />
   )}  
      {/* <PeriodoAlert periodoActivo={periodoActivo} tieneBoletos={tieneBoletos} saldoVencido={vencido} />*/}
-      <PeriodoAlert periodoActivo={periodoActivo}  saldoVencido={vencido} />
+      <PeriodoAlert
+        periodoActivo={periodoActivo}
+        saldoVencido={vencido}
+        mesescomprasanteriores={mesesCompras ?? false}
+      />
         
        {/* HEADER 
       <div className="text-center text-gray-700 dark:text-gray-300">

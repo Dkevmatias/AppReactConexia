@@ -38,14 +38,37 @@ export const isSessionAuthenticated = (
 function normalizeUser(raw: unknown): User | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const o = raw as Record<string, unknown>;
-  const idPersona = pickNumber(o, "idPersona", "IdPersona");
-  const idUsuario = pickNumber(o, "idUsuario", "IdUsuario");
-  const role = pickNumber(o, "role", "Role", "idRol", "IdRol");
-  const cardCode = pickString(o, "cardCode", "CardCode") ?? "";
+
+  // Solo desanidar si parece un envelope (login/checkauth), no el user ya plano.
+  const esEnvelope =
+    "isSuccess" in o ||
+    "authenticated" in o ||
+    "isAuthenticated" in o ||
+    ("user" in o && !("idPersona" in o) && !("IdPersona" in o));
+
+  const nested =
+    esEnvelope && o.user && typeof o.user === "object"
+      ? (o.user as Record<string, unknown>)
+      : esEnvelope && o.usuario && typeof o.usuario === "object"
+        ? (o.usuario as Record<string, unknown>)
+        : null;
+  const src = nested ?? o;
+
+  const idPersona = pickNumber(src, "idPersona", "IdPersona", "idpersona");
+  const idUsuario = pickNumber(
+    src,
+    "idUsuario",
+    "IdUsuario",
+    "idusuario",
+    "idUser",
+    "IdUser",
+  );
+  const role = pickNumber(src, "role", "Role", "idRol", "IdRol");
+  const cardCode = pickString(src, "cardCode", "CardCode") ?? "";
   const fullname =
-    pickString(o, "fullname", "Fullname", "nombre", "Nombre") ?? "";
+    pickString(src, "fullname", "Fullname", "nombre", "Nombre") ?? "";
   const defaultRoute = pickString(
-    o,
+    src,
     "defaultRoute",
     "DefaultRoute",
     "rutaInicial",
@@ -61,6 +84,27 @@ function normalizeUser(raw: unknown): User | undefined {
     cardCode,
     fullname,
     defaultRoute,
+  };
+}
+
+/** Conserva ids válidos si checkauth omite algún campo que sí trajo el login. */
+export function mergeSessionUser(
+  incoming: User,
+  previous: User | null | undefined,
+): User {
+  return {
+    role: incoming.role || previous?.role || 0,
+    idPersona:
+      incoming.idPersona > 0
+        ? incoming.idPersona
+        : (previous?.idPersona ?? 0),
+    idUsuario:
+      incoming.idUsuario > 0
+        ? incoming.idUsuario
+        : (previous?.idUsuario ?? 0),
+    cardCode: incoming.cardCode || previous?.cardCode || "",
+    fullname: incoming.fullname || previous?.fullname || "",
+    defaultRoute: incoming.defaultRoute ?? previous?.defaultRoute ?? null,
   };
 }
 
@@ -100,7 +144,11 @@ export const checkAuthService = async (): Promise<CheckAuthResponse> => {
     validateStatus: (status) => status === 200 || status === 401,
   });
   const data = res.data ?? {};
-  const user = normalizeUser(data.user);
+  // Acepta user en raíz o envelope completo.
+  const user =
+    normalizeUser(data.user) ??
+    normalizeUser(data) ??
+    undefined;
   return user ? { ...data, user } : data;
 };
 

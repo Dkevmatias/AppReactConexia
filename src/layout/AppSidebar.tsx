@@ -22,7 +22,10 @@ import {
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/useAuth";
 import { BoxIcon } from "lucide-react";
-import { permisoActivo, permisoActivoPorClaveORuta } from "../utils/permisosModulo";
+import {
+  permisoActivo,
+  permisoActivoPorClaveORuta,
+} from "../utils/permisosModulo";
 
 type NavItem = {
   name: string;
@@ -103,6 +106,13 @@ const navItems: NavItem[] = [
         name: "Lista de Precios",
         path: "/ventas/ListaPrecios",
         icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+
+      {
+        name: "Cotizador",
+        path: "/ventas/Cotizador",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
         pro: false,
       },
     ],
@@ -316,6 +326,10 @@ const AppSidebar: React.FC = () => {
               clavePermiso: "Ventas.Precios",
               entry: item.subItems[1],
             },
+            {
+              clavePermiso: "Ventas.Cotizador",
+              entry: item.subItems[2],
+            },
           ];
           const subItems = ventasSubs
             .filter(({ clavePermiso }) =>
@@ -358,19 +372,12 @@ const AppSidebar: React.FC = () => {
               entry: item.subItems[0],
             },
             {
-              claves: [
-                "bitacora.ver",
-                "bitacora.lista",
-                "bitacora.listar",
-              ],
+              claves: ["bitacora.ver", "bitacora.lista", "bitacora.listar"],
               ruta: "/operaciones/ListaBitacorasCobranza",
               entry: item.subItems[1],
             },
             {
-              claves: [
-                "comprobacion.ver",
-                "comprobacion.operar",
-              ],
+              claves: ["comprobacion.ver", "comprobacion.operar"],
               ruta: "/operaciones/ComprobacionRutas",
               entry: item.subItems[2],
             },
