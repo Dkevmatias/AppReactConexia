@@ -123,6 +123,46 @@ export interface VentaPorRuta {
   Porcentaje: number;
 }
 
+/** Fila de GET /api/PorSurtirGlobal */
+export interface PorSurtirGlobalItem {
+  base: string;
+  documento: string;
+  fecha: string;
+  folio: string;
+  nombreCliente: string;
+  codCliente: string;
+  vendedor: string;
+  almacen: string;
+  sucursal: string;
+  ruta: string;
+  articulo: string;
+  codigoProv: string;
+  descripcion: string;
+  marca: string;
+  cantidadTotal: number;
+  cantidadPdnte: number;
+  existencia: number;
+  ulkp: number;
+  ulkpsPartPdte: number;
+  importePartPdte: number;
+}
+
+/** Fila de GET /api/TransferStatus */
+export interface TransferStatusItem {
+  docEntry: number;
+  docNum: number;
+  docDate: string;
+  lineNum: number;
+  itemCode: string;
+  dscription: string;
+  origen: string;
+  destino: string;
+  solicitado: number;
+  enviado: number;
+  pendiente: number;
+  status: string;
+}
+
 export interface ComparativoAnual {
   AnioActual: number;
   AnioAnterior: number;
@@ -262,6 +302,94 @@ function normalizeVendedoresPrizmaArray(raw: unknown): Vendedores[] {
     .sort((a, b) =>
       a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" }),
     );
+}
+
+function normalizePorSurtirGlobalItem(
+  raw: unknown,
+): PorSurtirGlobalItem | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const folio = pickString(o, "folio", "Folio") ?? "";
+  const articulo = pickString(o, "articulo", "Articulo") ?? "";
+  if (!folio && !articulo) return null;
+
+  return {
+    base: pickString(o, "base", "Base") ?? "",
+    documento: pickString(o, "documento", "Documento") ?? "",
+    fecha: pickString(o, "fecha", "Fecha") ?? "",
+    folio,
+    nombreCliente: pickString(o, "nombreCliente", "NombreCliente") ?? "",
+    codCliente: pickString(o, "codCliente", "CodCliente") ?? "",
+    vendedor: pickString(o, "vendedor", "Vendedor") ?? "",
+    almacen: pickString(o, "almacen", "Almacen") ?? "",
+    sucursal: pickString(o, "sucursal", "Sucursal") ?? "",
+    ruta: pickString(o, "ruta", "Ruta") ?? "",
+    articulo,
+    codigoProv: pickString(o, "codigoProv", "CodigoProv") ?? "",
+    descripcion: pickString(o, "descripcion", "Descripcion") ?? "",
+    marca: pickString(o, "marca", "Marca") ?? "",
+    cantidadTotal: pickNumber(o, "cantidadTotal", "CantidadTotal") ?? 0,
+    cantidadPdnte: pickNumber(o, "cantidadPdnte", "CantidadPdnte") ?? 0,
+    existencia: pickNumber(o, "existencia", "Existencia") ?? 0,
+    ulkp: pickNumber(o, "ulkp", "Ulkp", "ULKP") ?? 0,
+    ulkpsPartPdte: pickNumber(o, "ulkpsPartPdte", "UlkpsPartPdte") ?? 0,
+    importePartPdte: pickNumber(o, "importePartPdte", "ImportePartPdte") ?? 0,
+  };
+}
+
+function normalizePorSurtirGlobalList(raw: unknown): PorSurtirGlobalItem[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : raw &&
+        typeof raw === "object" &&
+        Array.isArray((raw as { data?: unknown }).data)
+      ? (raw as { data: unknown[] }).data
+      : [];
+  return list
+    .map(normalizePorSurtirGlobalItem)
+    .filter((r): r is PorSurtirGlobalItem => r !== null);
+}
+
+function normalizeTransferStatusItem(
+  raw: unknown,
+): TransferStatusItem | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const docNum = pickNumber(o, "docNum", "DocNum");
+  const itemCode = pickString(o, "itemCode", "ItemCode") ?? "";
+  if (docNum == null && !itemCode) return null;
+
+  return {
+    docEntry: pickNumber(o, "docEntry", "DocEntry") ?? 0,
+    docNum: docNum ?? 0,
+    docDate: pickString(o, "docDate", "DocDate") ?? "",
+    lineNum: pickNumber(o, "lineNum", "LineNum") ?? 0,
+    itemCode,
+    dscription: pickString(o, "dscription", "Dscription", "descripcion") ?? "",
+    origen: pickString(o, "origen", "Origen") ?? "",
+    destino: pickString(o, "destino", "Destino") ?? "",
+    solicitado: pickNumber(o, "solicitado", "Solicitado") ?? 0,
+    enviado: pickNumber(o, "enviado", "Enviado") ?? 0,
+    pendiente: pickNumber(o, "pendiente", "Pendiente") ?? 0,
+    status: pickString(o, "status", "Status", "estatus", "Estatus") ?? "",
+  };
+}
+
+function normalizeTransferStatusList(raw: unknown): TransferStatusItem[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : raw &&
+        typeof raw === "object" &&
+        Array.isArray((raw as { data?: unknown }).data)
+      ? (raw as { data: unknown[] }).data
+      : [];
+  return list
+    .map(normalizeTransferStatusItem)
+    .filter((r): r is TransferStatusItem => r !== null);
 }
 
 const appendFechas = (
@@ -503,5 +631,62 @@ export const getReportesService = {
   getMarcas: async () => {
     const response = await api.get<Marca[]>(`/api/Marcas/GetMarcas`);
     return response.data;
+  },
+
+  /**
+   * Órdenes / partidas pendientes por surtir (global).
+   * GET /api/PorSurtirGlobal
+   */
+  getPorSurtirGlobal: async (): Promise<PorSurtirGlobalItem[]> => {
+    const response = await api.get<unknown>("/api/PorSurtirGlobal", {
+      timeout: 60_000,
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        `No se pudo cargar Por surtir global (HTTP ${response.status}).`,
+      );
+    }
+    return normalizePorSurtirGlobalList(response.data);
+  },
+
+  /**
+   * Estatus de traspasos (líneas).
+   * GET /api/TransferStatus?fechaInicio=&fechaFin=&docNum=
+   */
+  getTransferStatus: async (opts?: {
+    docNum?: string | number | null;
+    fechaInicio?: string | null;
+    fechaFin?: string | null;
+  }): Promise<TransferStatusItem[]> => {
+    const params = new URLSearchParams();
+    const docNum = opts?.docNum != null ? String(opts.docNum).trim() : "";
+    if (docNum) params.set("docNum", docNum);
+    if (opts?.fechaInicio?.trim()) {
+      params.set("fechaInicio", opts.fechaInicio.trim());
+    }
+    if (opts?.fechaFin?.trim()) {
+      params.set("fechaFin", opts.fechaFin.trim());
+    }
+    const qs = params.toString();
+    const response = await api.get<unknown>(
+      `/api/TransferStatus${qs ? `?${qs}` : ""}`,
+      { timeout: 60_000 },
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        `No se pudo cargar Traspasos (HTTP ${response.status}).`,
+      );
+    }
+    return normalizeTransferStatusList(response.data);
+  },
+
+  /** Rango por defecto: 1er día del mes pasado → hoy (GETDATE). */
+  getFechasTraspasosDefault: () => {
+    const fin = new Date();
+    const inicio = new Date(fin.getFullYear(), fin.getMonth() - 1, 1);
+    return {
+      fechaInicio: formatDate(inicio),
+      fechaFin: formatDate(fin),
+    };
   },
 };

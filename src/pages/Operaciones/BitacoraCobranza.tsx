@@ -457,9 +457,7 @@ export default function BitacoraCobranza() {
     [documentosPersistidos],
   );
   const puedeValidarEscaneoFisico =
-    (estatusEncabezado === "B" || estatusEncabezado === "T") &&
-    tieneDetallePersistido &&
-    documentosPersistidos.length > 0;
+    documentos.length > 0 && !bitacoraTerminada;
   const puedeGenerarPdf =
     (estatusEncabezado === "T" || estatusEncabezado === "C") &&
     !!idBitacora &&
@@ -1331,34 +1329,59 @@ export default function BitacoraCobranza() {
     const folio = normalizarFolioEscaneo(folioEscaneoInput);
     if (!folio) return;
 
-    const encontrado = documentosPersistidos.find(
+    const coincidencias = documentos.filter(
       (doc) => String(doc.docNum) === folio,
     );
 
     setFolioEscaneoInput("");
 
-    if (encontrado) {
-      setFoliosEscaneadosValidados((prev) => {
-        const next = new Set(prev);
-        next.add(folio);
-        return next;
-      });
-      setMensajeEscaneoExito(
-        `Documento ${folio} encontrado en la bitácora.`,
-      );
-      const clave = documentoCobranzaUnicoKey(encontrado);
-      window.setTimeout(() => {
-        filaEscaneoRefs.current
-          .get(clave)
-          ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        inputEscaneoFolioRef.current?.focus();
-      }, 0);
+    if (coincidencias.length === 0) {
+      setModalDocNoEncontrado({ abierto: true, folio });
+      inputEscaneoFolioRef.current?.blur();
       return;
     }
 
-    setModalDocNoEncontrado({ abierto: true, folio });
-    inputEscaneoFolioRef.current?.blur();
-  }, [documentosPersistidos, folioEscaneoInput]);
+    setFoliosEscaneadosValidados((prev) => {
+      const next = new Set(prev);
+      next.add(folio);
+      return next;
+    });
+
+    // Antes de guardar: marcar check de los documentos aún no persistidos.
+    const clavesParaSeleccionar = coincidencias
+      .filter(
+        (doc) => !documentoEstaPersistido(doc, clavesDocumentosPersistidos),
+      )
+      .map((doc) => documentoCobranzaUnicoKey(doc));
+
+    if (clavesParaSeleccionar.length > 0) {
+      setDocumentosSeleccionados((prev) => {
+        const next = new Set(prev);
+        clavesParaSeleccionar.forEach((clave) => next.add(clave));
+        return next;
+      });
+    }
+
+    const seleccionadosAhora = clavesParaSeleccionar.length;
+    const yaEnBitacora = coincidencias.length - seleccionadosAhora;
+    setMensajeEscaneoExito(
+      seleccionadosAhora > 0
+        ? `Folio ${folio} seleccionado${seleccionadosAhora > 1 ? ` (${seleccionadosAhora})` : ""}.${
+            yaEnBitacora > 0
+              ? ` ${yaEnBitacora} ya estaban en bitácora.`
+              : ""
+          }`
+        : `Folio ${folio} encontrado (ya en bitácora).`,
+    );
+
+    const claveScroll = documentoCobranzaUnicoKey(coincidencias[0]);
+    window.setTimeout(() => {
+      filaEscaneoRefs.current
+        .get(claveScroll)
+        ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      inputEscaneoFolioRef.current?.focus();
+    }, 0);
+  }, [clavesDocumentosPersistidos, documentos, folioEscaneoInput]);
 
   const cerrarModalDocNoEncontrado = useCallback(() => {
     setModalDocNoEncontrado({ abierto: false, folio: "" });
@@ -1401,6 +1424,10 @@ export default function BitacoraCobranza() {
     setDocumentos([]);
     setDocumentosSeleccionados(new Set());
     setClavesDocumentosPersistidos(new Set());
+    setFolioEscaneoInput("");
+    setFoliosEscaneadosValidados(new Set());
+    setMensajeEscaneoExito(null);
+    setModalDocNoEncontrado({ abierto: false, folio: "" });
     setTotalRegistros(0);
     setDetalleGuardado(false);
     setCobroValidado(false);
@@ -2517,7 +2544,7 @@ export default function BitacoraCobranza() {
             {puedeValidarEscaneoFisico && (
               <div className="min-w-[240px] flex-1">
                 <label className="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Validar folio (escáner / Doc.)
+                  Escanear folio (selecciona el check)
                 </label>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="relative min-w-[180px] flex-1">
@@ -2547,8 +2574,8 @@ export default function BitacoraCobranza() {
                     Buscar
                   </button>
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    {foliosEscaneadosValidados.size}/{documentosPersistidos.length}{" "}
-                    validados
+                    {foliosEscaneadosValidados.size}/{documentos.length}{" "}
+                    escaneados
                   </span>
                 </div>
               </div>
@@ -2694,9 +2721,9 @@ export default function BitacoraCobranza() {
                     documentosSeleccionados.has(claveSeleccion);
                   const estatus = estatusCartera(doc);
                   const esBorrador = estatusEncabezado === "B";
-                  const validadoPorEscaneo =
-                    persistido &&
-                    foliosEscaneadosValidados.has(String(doc.docNum));
+                  const validadoPorEscaneo = foliosEscaneadosValidados.has(
+                    String(doc.docNum),
+                  );
                   const esContadoPrioritario =
                     esBorrador &&
                     esCondicionContadoPrioritaria(doc) &&

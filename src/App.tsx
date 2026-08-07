@@ -37,6 +37,7 @@ import BitacoraCobranza from "./pages/Operaciones/BitacoraCobranza";
 import ListaBitacorasCobranza from "./pages/Operaciones/ListaBitacorasCobranza";
 import ComprobacionRutas from "./pages/Operaciones/ComprobacionRutas";
 import ManagerComprobacionRuta from "./pages/Operaciones/ListadoIncidencias";
+import ReportesOperaciones from "./pages/Operaciones/Reportes";
 import Cotizador from "./pages/Ventas/Cotizador";
 
 export default function App() {
@@ -160,6 +161,10 @@ export default function App() {
             <Route
               path="/operaciones/ManagerComprobacionRuta"
               element={<ManagerComprobacionRuta />}
+            />
+            <Route
+              path="/operaciones/Reportes"
+              element={<ReportesOperaciones />}
             />
           </Route>
         </Routes>

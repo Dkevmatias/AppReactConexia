@@ -20,6 +20,7 @@ const Articulos = () => {
     try {
       const data = await articuloService.buscarArticulos(articulo);
       setResultados(data);
+      console.log("Resultados de la búsqueda:", data);
     } catch (err) {
       setError("Error al buscar artículos");
       setResultados([]);
@@ -86,6 +87,9 @@ const Articulos = () => {
                         Sociedad
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        C. Proveedor
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Artículo
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -110,6 +114,9 @@ const Articulos = () => {
                       >
                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                           {item.sociedad}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          {item.codigoProveedor}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                           {item.articulo}
@@ -146,29 +153,51 @@ const Articulos = () => {
                   <div key={index} className="p-4 space-y-3">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Sociedad</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{item.sociedad}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Sociedad
+                        </p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {item.sociedad}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Precio</p>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">{item.precio}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Precio
+                        </p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {item.precio}
+                        </p>
                       </div>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Artículo</p>
-                      <p className="text-sm text-gray-900 dark:text-white">{item.articulo}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Artículo
+                      </p>
+                      <p className="text-sm text-gray-900 dark:text-white">
+                        {item.articulo}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">Descripción</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">{item.descripcion}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Descripción
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {item.descripcion}
+                      </p>
                     </div>
                     <div className="flex justify-between items-center">
                       <div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Almacén</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-300">{item.almacen}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Almacén
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          {item.almacen}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Disponible</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Disponible
+                        </p>
                         <span
                           className={`inline-block text-sm font-medium ${
                             item.disponible > 0

@@ -10,6 +10,7 @@ import { FaPersonWalkingArrowRight } from "react-icons/fa6";
 import { RxActivityLog } from "react-icons/rx";
 import { GiProcessor } from "react-icons/gi";
 import { HiMiniClipboardDocumentCheck } from "react-icons/hi2";
+import { TbReportAnalytics } from "react-icons/tb";
 
 import {
   Inicio,
@@ -144,6 +145,12 @@ const navItems: NavItem[] = [
         name: "Listado de Incidencias",
         path: "/operaciones/ManagerComprobacionRuta",
         icon: <HiMiniClipboardDocumentCheck className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Reportes Operaciones",
+        path: "/operaciones/Reportes",
+        icon: <TbReportAnalytics className="w-4 h-4 shrink-0" />,
         pro: false,
       },
     ],
@@ -389,6 +396,11 @@ const AppSidebar: React.FC = () => {
               ],
               ruta: "/operaciones/ManagerComprobacionRuta",
               entry: item.subItems[3],
+            },
+            {
+              claves: ["Reportes.Ver"],
+              ruta: "/operaciones/Reportes",
+              entry: item.subItems[4],
             },
           ];
 

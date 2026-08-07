@@ -3,6 +3,8 @@ import { api } from "./apiServices";
 export interface Articulo {
   sociedad: string;
   articulo: string;
+  codigoProveedor: string;
+  unidadMedida: string;
   descripcion: string;
   disponible: number;
   precio: number;
