@@ -3,7 +3,79 @@ import autoTable from "jspdf-autotable";
 import { formatCurrency } from "../../utils/format";
 import type { CotizadorCanastaItem } from "../../services/cotizadorService";
 
-export const LOGO_COTIZACION_URL = "/images/logo/logocodlub_1.svg";
+/** Banner / encabezado del PDF de cotización (public/). */
+export const LOGO_COTIZACION_URL = "/images/logo/CodialubCotizacion.png";
+
+type ImagenHeaderPdf = {
+  dataUrl: string;
+  widthPx: number;
+  heightPx: number;
+  format: "JPEG" | "PNG";
+};
+
+/** Solo cachea cargas exitosas (no bloquea reintentos si falló antes). */
+let cacheHeaderCotizacion: ImagenHeaderPdf | null = null;
+
+function resolverUrlLogoCotizacion(): string {
+  const base = import.meta.env.BASE_URL || "/";
+  const path = "images/logo/CodialubCotizacion.png";
+  if (/^https?:\/\//i.test(base)) {
+    return new URL(path, base.endsWith("/") ? base : `${base}/`).href;
+  }
+  const prefix = base.endsWith("/") ? base : `${base}/`;
+  return `${prefix}${path}`.replace(/\/{2,}/g, "/").replace(/^\/+/, "/");
+}
+
+/**
+ * Carga el logo, lo rasteriza en canvas y exporta JPEG
+ * (más compatible con jsPDF que PNG grandes / especiales).
+ */
+async function cargarImagenHeaderCotizacion(): Promise<ImagenHeaderPdf | null> {
+  if (cacheHeaderCotizacion) return cacheHeaderCotizacion;
+
+  const url = resolverUrlLogoCotizacion();
+
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.decoding = "async";
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error(`No se pudo cargar el logo: ${url}`));
+      el.src = `${url}${url.includes("?") ? "&" : "?"}v=1`;
+    });
+
+    const maxW = 1400;
+    const scale = Math.min(1, maxW / Math.max(1, img.naturalWidth));
+    const widthPx = Math.max(1, Math.round(img.naturalWidth * scale));
+    const heightPx = Math.max(1, Math.round(img.naturalHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = widthPx;
+    canvas.height = heightPx;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas no disponible");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, widthPx, heightPx);
+    ctx.drawImage(img, 0, 0, widthPx, heightPx);
+
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    if (!dataUrl.startsWith("data:image/jpeg")) {
+      throw new Error("No se pudo convertir el logo a JPEG");
+    }
+
+    cacheHeaderCotizacion = {
+      dataUrl,
+      widthPx,
+      heightPx,
+      format: "JPEG",
+    };
+    return cacheHeaderCotizacion;
+  } catch (err) {
+    console.warn("[Cotizacion PDF] No se cargó el encabezado:", err);
+    return null;
+  }
+}
 
 /** Encabezado de empresa fijo hasta existir endpoint de datos de empresa. */
 export const EMPRESA_COTIZACION_FIJA = {
@@ -50,7 +122,7 @@ type AvisoPagoSucursal = {
 const AVISO_PAGO_POR_ID_SUCURSAL: Record<number, AvisoPagoSucursal> = {
   1: {
     cuentas:
-      "BBVA = 0110891525    HSBC = 4061060174    Banamex = 7011587900    Banco Azteca = 01720137714324",
+      "BBVA = 0110891525   Banamex = 7011587900    Banco Azteca = 01720137714324",
     comprobante: "creditoycobranza@codialub.com  Tel. 961 215 3314",
   },
   2: {
@@ -237,7 +309,9 @@ function drawWrappedText(
 /**
  * Genera un PDF real (jsPDF) con el formato de cotización.
  */
-export function crearDocPdfCotizacion(datos: DatosPdfCotizacion): jsPDF {
+export async function crearDocPdfCotizacion(
+  datos: DatosPdfCotizacion,
+): Promise<jsPDF> {
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -250,7 +324,25 @@ export function crearDocPdfCotizacion(datos: DatosPdfCotizacion): jsPDF {
   const cliente = datos.cliente;
   const { subtotal, ivaPct, iva, total } = calcularTotales(datos);
 
-  let y = 12;
+  let y = 8;
+
+  // —— Logo alineado a la izquierda, arriba del nombre de empresa ——
+  const headerImg = await cargarImagenHeaderCotizacion();
+  if (headerImg && headerImg.widthPx > 0 && headerImg.heightPx > 0) {
+    const maxHeaderH = 22;
+    const maxHeaderW = contentW * 0.55; // misma columna que la empresa
+    const ratio = headerImg.widthPx / headerImg.heightPx;
+    let imgW = maxHeaderW;
+    let imgH = imgW / ratio;
+    if (imgH > maxHeaderH) {
+      imgH = maxHeaderH;
+      imgW = imgH * ratio;
+    }
+    doc.addImage(headerImg.dataUrl, headerImg.format, marginX, y, imgW, imgH);
+    y += imgH + 3;
+  }
+
+  const headerTopY = y;
 
   // —— Empresa (izquierda) ——
   doc.setFont("helvetica", "bold");
@@ -271,7 +363,7 @@ export function crearDocPdfCotizacion(datos: DatosPdfCotizacion): jsPDF {
   // —— Cliente (derecha) ——
   const boxX = marginX + contentW * 0.58;
   const boxW = contentW * 0.42;
-  const boxY = 10;
+  const boxY = headerTopY - 2;
   let boxInnerY = boxY + 5;
   doc.setDrawColor(30);
   doc.rect(boxX, boxY, boxW, 38);
@@ -489,8 +581,10 @@ export function crearDocPdfCotizacion(datos: DatosPdfCotizacion): jsPDF {
   return doc;
 }
 
-export function crearBlobPdfCotizacion(datos: DatosPdfCotizacion): Blob {
-  const doc = crearDocPdfCotizacion(datos);
+export async function crearBlobPdfCotizacion(
+  datos: DatosPdfCotizacion,
+): Promise<Blob> {
+  const doc = await crearDocPdfCotizacion(datos);
   return doc.output("blob");
 }
 
@@ -514,8 +608,10 @@ export function descargarBlobPdf(blob: Blob, fileName: string): void {
 /**
  * Abre el PDF en una pestaña nueva (o descarga si el popup está bloqueado).
  */
-export function abrirPdfCotizacion(datos: DatosPdfCotizacion): boolean {
-  const blob = crearBlobPdfCotizacion(datos);
+export async function abrirPdfCotizacion(
+  datos: DatosPdfCotizacion,
+): Promise<boolean> {
+  const blob = await crearBlobPdfCotizacion(datos);
   const url = URL.createObjectURL(blob);
   const win = window.open(url, "_blank");
   if (!win) {
@@ -527,8 +623,10 @@ export function abrirPdfCotizacion(datos: DatosPdfCotizacion): boolean {
   return true;
 }
 
-export function descargarPdfCotizacion(datos: DatosPdfCotizacion): void {
-  const blob = crearBlobPdfCotizacion(datos);
+export async function descargarPdfCotizacion(
+  datos: DatosPdfCotizacion,
+): Promise<void> {
+  const blob = await crearBlobPdfCotizacion(datos);
   descargarBlobPdf(blob, nombreArchivoCotizacion(datos.folio));
 }
 
@@ -589,7 +687,7 @@ export async function enviarCotizacionPorWhatsApp(
     };
   }
 
-  const blob = crearBlobPdfCotizacion(datos);
+  const blob = await crearBlobPdfCotizacion(datos);
   const fileName = nombreArchivoCotizacion(datos.folio);
   const mensaje = mensajeWhatsAppCotizacion(datos);
   const file = new File([blob], fileName, { type: "application/pdf" });

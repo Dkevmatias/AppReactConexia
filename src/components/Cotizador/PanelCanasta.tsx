@@ -30,9 +30,10 @@ export type PanelCanastaProps = {
   onQuitar: (id: string) => void;
   onCambiarCantidad: (id: string, cantidad: number) => void;
   onVaciar: () => void;
-  onGenerarPdf: () => void;
+  onPrevisualizarPdf: () => void;
   onEnviarWhatsApp: () => void;
   onGuardar: () => void;
+  previsualizandoPdf?: boolean;
 };
 
 export default function PanelCanasta({
@@ -61,9 +62,10 @@ export default function PanelCanasta({
   onQuitar,
   onCambiarCantidad,
   onVaciar,
-  onGenerarPdf,
+  onPrevisualizarPdf,
   onEnviarWhatsApp,
   onGuardar,
+  previsualizandoPdf = false,
 }: PanelCanastaProps) {
   const subtotal = items.reduce((sum, item) => sum + item.importe, 0);
   const [isDisabledFolio, setIsDisabledFolio] = useState(true);
@@ -387,11 +389,18 @@ export default function PanelCanasta({
               ) : null}
               <button
                 type="button"
-                disabled={items.length === 0 || guardando}
-                onClick={onGenerarPdf}
-                className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={items.length === 0 || guardando || previsualizandoPdf}
+                onClick={onPrevisualizarPdf}
+                className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Generar PDF
+                {previsualizandoPdf ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generando…
+                  </>
+                ) : (
+                  "Previsualizar PDF"
+                )}
               </button>
             </div>
             <button

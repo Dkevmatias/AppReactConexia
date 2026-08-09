@@ -42,11 +42,14 @@ import {
 } from "../../services/cotizadorService";
 import { formatCurrency } from "../../utils/format";
 import {
-  abrirPdfCotizacion,
+  crearBlobPdfCotizacion,
+  descargarBlobPdf,
   enviarCotizacionPorWhatsApp,
   fechaEmisionCotizacion,
+  nombreArchivoCotizacion,
   type DatosPdfCotizacion,
 } from "./generarPdfCotizacion";
+import ModalPrevisualizarPdfCotizacion from "../../components/Cotizador/ModalPrevisualizarPdfCotizacion";
 
 const ALMACEN_EXCLUIDO = "bodega pencil tuxtla";
 
@@ -1033,6 +1036,9 @@ export default function Cotizador() {
   const [telefonoWhatsApp, setTelefonoWhatsApp] = useState("");
   const [enviandoWhatsApp, setEnviandoWhatsApp] = useState(false);
   const [guardandoCotizacion, setGuardandoCotizacion] = useState(false);
+  const [previsualizandoPdf, setPrevisualizandoPdf] = useState(false);
+  const [modalPdfAbierto, setModalPdfAbierto] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [contextoOperativo, setContextoOperativo] =
     useState<ContextoOperativoPersona | null>(null);
   const [loadingContexto, setLoadingContexto] = useState(false);
@@ -1380,15 +1386,55 @@ export default function Cotizador() {
     };
   };
 
-  const generarPdfCotizacion = () => {
+  const cerrarPreviewPdf = () => {
+    setModalPdfAbierto(false);
+    setPdfPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+  };
+
+  const previsualizarPdfCotizacion = () => {
     const datos = armarDatosPdf();
     if (!datos) return;
-    const ok = abrirPdfCotizacion(datos);
-    if (!ok) {
-      setError(
-        "El navegador bloqueó la vista previa; se descargó el PDF. Permite ventanas emergentes si quieres abrirlo.",
-      );
-    }
+    setError(null);
+    setPrevisualizandoPdf(true);
+    setModalPdfAbierto(true);
+    void (async () => {
+      try {
+        const blob = await crearBlobPdfCotizacion(datos);
+        setPdfPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
+      } catch (err) {
+        console.error(err);
+        setModalPdfAbierto(false);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "No se pudo generar la vista previa del PDF.",
+        );
+      } finally {
+        setPrevisualizandoPdf(false);
+      }
+    })();
+  };
+
+  const descargarPreviewPdf = () => {
+    if (!pdfPreviewUrl) return;
+    void fetch(pdfPreviewUrl)
+      .then((r) => r.blob())
+      .then((blob) => {
+        descargarBlobPdf(
+          blob,
+          nombreArchivoCotizacion(ordenCompra.trim() || "preview"),
+        );
+      })
+      .catch((err) => {
+        console.error(err);
+        setError("No se pudo descargar el PDF.");
+      });
   };
 
   const enviarPorWhatsApp = async () => {
@@ -1468,10 +1514,15 @@ export default function Cotizador() {
     const iva = subTotal * (ivaPct / 100);
     const total = subTotal + iva;
 
+    const esClienteManual = !clienteEsSap;
     const payload = {
       folio: 0,
-      cardCode: clienteCardCode.trim() || "",
-      cardName: clienteNombre.trim() || "CLIENTE MOSTRADOR",
+      cardCode: esClienteManual
+        ? "00001"
+        : clienteCardCode.trim() || "",
+      cardName: esClienteManual
+        ? "Manual"
+        : clienteNombre.trim() || "CLIENTE MOSTRADOR",
       direccionEntrega: entregarEn.trim() || "",
       idUsuarioCreacion,
       idEmpresa,
@@ -1903,9 +1954,19 @@ export default function Cotizador() {
         onQuitar={quitarDeCanasta}
         onCambiarCantidad={cambiarCantidadCanasta}
         onVaciar={vaciarCanasta}
-        onGenerarPdf={generarPdfCotizacion}
+        onPrevisualizarPdf={previsualizarPdfCotizacion}
+        previsualizandoPdf={previsualizandoPdf}
         onEnviarWhatsApp={() => void enviarPorWhatsApp()}
         onGuardar={() => void guardarCotizacion()}
+      />
+
+      <ModalPrevisualizarPdfCotizacion
+        abierto={modalPdfAbierto}
+        url={pdfPreviewUrl}
+        cargando={previsualizandoPdf}
+        folio={ordenCompra}
+        onCerrar={cerrarPreviewPdf}
+        onDescargar={descargarPreviewPdf}
       />
 
       <ModalAgregarClienteSap
