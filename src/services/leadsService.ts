@@ -51,7 +51,10 @@ function errorDesdeRespuesta(data: unknown, fallback: string): string {
   return fallback;
 }
 
-function assertOk<T>(response: { status: number; data: T }, fallback: string): T {
+function assertOk<T>(
+  response: { status: number; data: T },
+  fallback: string,
+): T {
   if (response.status < 200 || response.status >= 300) {
     throw new Error(errorDesdeRespuesta(response.data, fallback));
   }
@@ -70,7 +73,10 @@ function normalizeArray(raw: unknown): unknown[] {
   return [];
 }
 
-function pickString(o: Record<string, unknown>, ...keys: string[]): string | null {
+function pickString(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): string | null {
   for (const key of keys) {
     const v = o[key];
     if (typeof v === "string" && v.trim()) return v.trim();
@@ -78,7 +84,10 @@ function pickString(o: Record<string, unknown>, ...keys: string[]): string | nul
   return null;
 }
 
-function pickNumber(o: Record<string, unknown>, ...keys: string[]): number | null {
+function pickNumber(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): number | null {
   for (const key of keys) {
     const v = o[key];
     if (typeof v === "number" && !Number.isNaN(v)) return v;
@@ -135,7 +144,13 @@ function esTextoDeOtroCampo(
   const v = valor.trim().toLowerCase();
   const otros = [
     pickString(o, "tipoFuente", "TipoFuente"),
-    pickString(o, "nombreFuente", "NombreFuente", "fuenteNombre", "FuenteNombre"),
+    pickString(
+      o,
+      "nombreFuente",
+      "NombreFuente",
+      "fuenteNombre",
+      "FuenteNombre",
+    ),
     pickString(o, "fuente", "Fuente"),
     pickString(o, "ultimaActividad", "UltimaActividad"),
     pickString(o, "tipoActividad", "TipoActividad"),
@@ -178,11 +193,25 @@ function extraerNombrePersona(o: Record<string, unknown>): {
     o,
   );
   const aPaterno = limpiarNombrePersona(
-    pickString(o, "aPaterno", "APaterno", "Apaterno", "apellidoPaterno", "ApellidoPaterno"),
+    pickString(
+      o,
+      "aPaterno",
+      "APaterno",
+      "Apaterno",
+      "apellidoPaterno",
+      "ApellidoPaterno",
+    ),
     o,
   );
   const aMaterno = limpiarNombrePersona(
-    pickString(o, "aMaterno", "AMaterno", "Amaterno", "apellidoMaterno", "ApellidoMaterno"),
+    pickString(
+      o,
+      "aMaterno",
+      "AMaterno",
+      "Amaterno",
+      "apellidoMaterno",
+      "ApellidoMaterno",
+    ),
     o,
   );
 
@@ -213,7 +242,11 @@ function extraerNombrePersona(o: Record<string, unknown>): {
       };
     }
     if (partes.length === 2) {
-      return { nombre: partes[0] ?? null, aPaterno: partes[1] ?? null, aMaterno: null };
+      return {
+        nombre: partes[0] ?? null,
+        aPaterno: partes[1] ?? null,
+        aMaterno: null,
+      };
     }
     return { nombre: nombreCompleto, aPaterno: null, aMaterno: null };
   }
@@ -233,10 +266,16 @@ export function normalizeLead(raw: unknown): Lead {
     }
   }
 
-  const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
 
-  const { nombre: nombreFinal, aPaterno: aPaternoFinal, aMaterno: aMaternoFinal } =
-    extraerNombrePersona(o);
+  const {
+    nombre: nombreFinal,
+    aPaterno: aPaternoFinal,
+    aMaterno: aMaternoFinal,
+  } = extraerNombrePersona(o);
 
   return {
     idLead: pickNumber(o, "idLead", "IdLead") ?? 0,
@@ -273,12 +312,27 @@ export function normalizeLead(raw: unknown): Lead {
     estado: pickString(o, "estado", "Estado"),
     ciudad: pickString(o, "ciudad", "Ciudad"),
     municipio: pickString(o, "municipio", "Municipio"),
-    fechallegada: pickString(o, "fechallegada", "Fechallegada", "fechaLlegada", "FechaLlegada"),
+    fechallegada: pickString(
+      o,
+      "fechallegada",
+      "Fechallegada",
+      "fechaLlegada",
+      "FechaLlegada",
+    ),
     fechaCreacion: pickString(o, "fechaCreacion", "FechaCreacion"),
-    fechaActualizacion: pickString(o, "fechaActualizacion", "FechaActualizacion"),
+    fechaActualizacion: pickString(
+      o,
+      "fechaActualizacion",
+      "FechaActualizacion",
+    ),
     nombreEtapa:
-      pickString(o, "nombreEtapa", "NombreEtapa", "etapaNombre", "EtapaNombre") ??
-      undefined,
+      pickString(
+        o,
+        "nombreEtapa",
+        "NombreEtapa",
+        "etapaNombre",
+        "EtapaNombre",
+      ) ?? undefined,
     nombreEstatus:
       pickString(
         o,
@@ -300,7 +354,8 @@ export function normalizeLead(raw: unknown): Lead {
         "TipoFuente",
       ) ?? undefined,
     nombreEntidadServicio:
-      pickString(o, "nombreEntidadServicio", "NombreEntidadServicio") ?? undefined,
+      pickString(o, "nombreEntidadServicio", "NombreEntidadServicio") ??
+      undefined,
     nombreUsuarioAsignado:
       pickString(
         o,
@@ -346,9 +401,12 @@ export function formatearMoneda(valor: number | null | undefined): string {
 export const leadsService = {
   getLeads: async (): Promise<Lead[]> => {
     const response = await api.get<unknown>("/api/Leads/GetLeads");
-    return normalizeLeads(assertOk(response, "No se pudieron cargar los prospectos."));
+    return normalizeLeads(
+      assertOk(response, "No se pudieron cargar los prospectos."),
+    );
   },
 
+  //Traer el Listado de Prospectos por Usuario, para el listado de prospectos en la pantalla de CRM
   getLeadsListado: async (): Promise<Lead[]> => {
     const response = await api.get<unknown>("/api/Leads/Listado");
     return normalizeLeads(
