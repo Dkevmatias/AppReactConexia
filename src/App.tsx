@@ -31,6 +31,7 @@ import CatalogoSeguimientos from "./pages/CRM/CatalogoSeguimientos";
 import CatalogoEstatus from "./pages/CRM/CatalogoEstatus";
 import CatalogoTipoEstatus from "./pages/CRM/CatalogoTipoEstatus";
 import Prospectos from "./pages/CRM/Prospectos";
+import ProspectoFormPage from "./pages/CRM/ProspectoFormPage";
 import Articulos from "./pages/Ventas/Articulos";
 import ListaPrecios from "./pages/Ventas/ListaPrecios";
 import BitacoraCobranza from "./pages/Operaciones/BitacoraCobranza";
@@ -134,6 +135,14 @@ export default function App() {
               element={<EntregasPremios />}
             />
             <Route path="/CRM/Prospectos" element={<Prospectos />} />
+            <Route
+              path="/CRM/Prospectos/nuevo"
+              element={<ProspectoFormPage />}
+            />
+            <Route
+              path="/CRM/Prospectos/:idLead"
+              element={<ProspectoFormPage />}
+            />
             <Route path="/CRM/Configuración" element={<CrmConfiguracion />} />
             <Route path="/CRM/CatalogoEtapas" element={<CatalogoEtapas />} />
             <Route path="/CRM/CatalogoFuentes" element={<CatalogoFuentes />} />

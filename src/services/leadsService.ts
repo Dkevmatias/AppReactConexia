@@ -16,6 +16,7 @@ export interface Lead {
   idFuente: number | null;
   idEstatus: number | null;
   idEtapa: number | null;
+  idGrupo: number | null;
   idTemperatura: number | null;
   idUsuarioCreacion: number | null;
   idUsuarioAsignado: number | null;
@@ -35,6 +36,16 @@ export interface Lead {
   nombreFuente?: string;
   nombreEntidadServicio?: string;
   nombreUsuarioAsignado?: string;
+}
+
+export interface LeadListado {
+  idLead: number;
+  nombre: string | null;
+  telefono: string | null;
+  estatus: string | null;
+  etapa: string | null;
+  fuente: string | null;
+  fechallegada: string | null;
 }
 
 export type LeadPayload = Omit<
@@ -277,6 +288,23 @@ export function normalizeLead(raw: unknown): Lead {
     aMaterno: aMaternoFinal,
   } = extraerNombrePersona(o);
 
+  const grupoAnidado =
+    o.grupo && typeof o.grupo === "object"
+      ? (o.grupo as Record<string, unknown>)
+      : o.Grupo && typeof o.Grupo === "object"
+        ? (o.Grupo as Record<string, unknown>)
+        : o.grupoSap && typeof o.grupoSap === "object"
+          ? (o.grupoSap as Record<string, unknown>)
+          : o.GrupoSap && typeof o.GrupoSap === "object"
+            ? (o.GrupoSap as Record<string, unknown>)
+            : null;
+
+  const idGrupo =
+    pickNumber(o, "idGrupo", "IdGrupo") ??
+    (grupoAnidado
+      ? pickNumber(grupoAnidado, "idGrupo", "IdGrupo")
+      : null);
+
   return {
     idLead: pickNumber(o, "idLead", "IdLead") ?? 0,
     nombre: nombreFinal,
@@ -293,6 +321,7 @@ export function normalizeLead(raw: unknown): Lead {
     idFuente: pickNumber(o, "idFuente", "IdFuente"),
     idEstatus: pickNumber(o, "idEstatus", "IdEstatus"),
     idEtapa: pickNumber(o, "idEtapa", "IdEtapa"),
+    idGrupo,
     idTemperatura: pickNumber(o, "idTemperatura", "IdTemperatura"),
     idUsuarioCreacion: pickNumber(o, "idUsuarioCreacion", "IdUsuarioCreacion"),
     idUsuarioAsignado: pickNumber(o, "idUsuarioAsignado", "IdUsuarioAsignado"),
@@ -367,16 +396,66 @@ export function normalizeLead(raw: unknown): Lead {
   };
 }
 
+export function normalizeLeadListado(raw: unknown): LeadListado {
+  if (raw && typeof raw === "object") {
+    const wrapper = raw as Record<string, unknown>;
+    if (wrapper.lead && typeof wrapper.lead === "object") {
+      return normalizeLeadListado(wrapper.lead);
+    }
+    if (wrapper.Lead && typeof wrapper.Lead === "object") {
+      return normalizeLeadListado(wrapper.Lead);
+    }
+  }
+
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+
+  return {
+    idLead: pickNumber(o, "idLead", "IdLead") ?? 0,
+    nombre:
+      pickString(o, "nombre", "Nombre", "nombreCompleto", "NombreCompleto") ??
+      null,
+    telefono: pickString(o, "telefono", "Telefono"),
+    estatus: pickString(
+      o,
+      "estatus",
+      "Estatus",
+      "nombreEstatus",
+      "NombreEstatus",
+    ),
+    etapa: pickString(o, "etapa", "Etapa", "nombreEtapa", "NombreEtapa"),
+    fuente: pickString(o, "fuente", "Fuente", "nombreFuente", "NombreFuente"),
+    fechallegada: pickString(
+      o,
+      "fechallegada",
+      "Fechallegada",
+      "fechaLlegada",
+      "FechaLlegada",
+    ),
+  };
+}
+
 function normalizeLeads(raw: unknown): Lead[] {
   return normalizeArray(raw).map((item) => normalizeLead(item));
 }
+function normalizeLeadsListado(raw: unknown): LeadListado[] {
+  return normalizeArray(raw).map((item) => normalizeLeadListado(item));
+}
 
 export function nombreCompletoLead(
-  lead: Pick<Lead, "nombre" | "aPaterno" | "aMaterno">,
+  lead:
+    | Pick<Lead, "nombre" | "aPaterno" | "aMaterno">
+    | Pick<LeadListado, "nombre">,
 ): string {
-  const partes = [lead.nombre, lead.aPaterno, lead.aMaterno].filter(Boolean);
-  const completo = partes.join(" ").trim();
-  return completo || "Sin nombre";
+  if ("aPaterno" in lead || "aMaterno" in lead) {
+    const full = lead as Pick<Lead, "nombre" | "aPaterno" | "aMaterno">;
+    const partes = [full.nombre, full.aPaterno, full.aMaterno].filter(Boolean);
+    const completo = partes.join(" ").trim();
+    return completo || "Sin nombre";
+  }
+  return lead.nombre?.trim() || "Sin nombre";
 }
 
 export function formatearFechaLead(valor: string | null | undefined): string {
@@ -407,9 +486,9 @@ export const leadsService = {
   },
 
   //Traer el Listado de Prospectos por Usuario, para el listado de prospectos en la pantalla de CRM
-  getLeadsListado: async (): Promise<Lead[]> => {
+  getLeadsListado: async (): Promise<LeadListado[]> => {
     const response = await api.get<unknown>("/api/Leads/Listado");
-    return normalizeLeads(
+    return normalizeLeadsListado(
       assertOk(response, "No se pudo cargar el listado de prospectos."),
     );
   },
@@ -419,8 +498,31 @@ export const leadsService = {
     const data = assertOk(response, "No se pudo cargar el prospecto.");
     if (data && typeof data === "object" && !Array.isArray(data)) {
       const o = data as Record<string, unknown>;
-      if (o.data && typeof o.data === "object") return normalizeLead(o.data);
+      const pareceLead = (x: Record<string, unknown>) =>
+        "idLead" in x ||
+        "IdLead" in x ||
+        "idGrupo" in x ||
+        "IdGrupo" in x ||
+        "nombre" in x ||
+        "Nombre" in x;
+
+      // Solo desanidar `data` si el raíz NO parece el lead (evita pisar idGrupo).
+      if (
+        o.data &&
+        typeof o.data === "object" &&
+        !Array.isArray(o.data) &&
+        !pareceLead(o) &&
+        pareceLead(o.data as Record<string, unknown>)
+      ) {
+        return normalizeLead(o.data);
+      }
+      if (Array.isArray(o.data) && o.data.length === 1) {
+        return normalizeLead(o.data[0]);
+      }
       return normalizeLead(data);
+    }
+    if (Array.isArray(data) && data.length === 1) {
+      return normalizeLead(data[0]);
     }
     return normalizeLead(data);
   },

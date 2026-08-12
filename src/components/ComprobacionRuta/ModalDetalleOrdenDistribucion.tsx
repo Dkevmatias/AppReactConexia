@@ -87,7 +87,12 @@ export default function ModalDetalleOrdenDistribucion({
   onMensajeExitoChange,
   onEstatusSistemaChange,
 }: ModalDetalleOrdenDistribucionProps) {
-  const { puedeVerTotales } = useComprobacionPermisos();
+  const {
+    puedeVerTotales,
+    puedeBtnRevisar,
+    puedeBtnFinalizar,
+    puedeBtnGenerar,
+  } = useComprobacionPermisos();
   const [documentos, setDocumentos] = useState<DocODistribucionDetalle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -282,6 +287,7 @@ export default function ModalDetalleOrdenDistribucion({
         `Orden ${folio} registrada sin incidencias en ruta.`,
       );
       onEstatusSistemaChange?.(ESTATUS_PROCESADO);
+      onCerrar();
     } catch (err) {
       console.error(err);
       setError(
@@ -764,58 +770,64 @@ export default function ModalDetalleOrdenDistribucion({
               Sin Incidencias
             </button>
 
-            <button
-              type="button"
-              onClick={() => void marcarRCobranza()}
-              disabled={procesandoEstatus || loading || rCobranzaInactivo}
-              title={
-                rCobranzaInactivo
-                  ? "Disponible cuando la orden esté en R-AM (revisada por almacén)"
-                  : "Actualizar estatus a R-COD (revisada por cobranza)"
-              }
-              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50 dark:bg-sky-700 dark:hover:bg-sky-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
-            >
-              {procesandoRCobranza ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : null}
-              R. Cobranza
-            </button>
+            {puedeBtnRevisar ? (
+              <button
+                type="button"
+                onClick={() => void marcarRCobranza()}
+                disabled={procesandoEstatus || loading || rCobranzaInactivo}
+                title={
+                  rCobranzaInactivo
+                    ? "Disponible cuando la orden esté en R-AM (revisada por almacén)"
+                    : "Actualizar estatus a R-COD (revisada por cobranza)"
+                }
+                className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50 dark:bg-sky-700 dark:hover:bg-sky-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
+              >
+                {procesandoRCobranza ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                R. Cobranza
+              </button>
+            ) : null}
 
-            <button
-              type="button"
-              onClick={() => void marcarFinalizado()}
-              disabled={procesandoEstatus || loading || finalizadoInactivo}
-              title={
-                finalizadoInactivo
-                  ? "Disponible cuando la orden esté en R-COD (revisada por cobranza)"
-                  : "Finalizar orden (actualizar estatus a R-F)"
-              }
-              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 dark:bg-violet-700 dark:hover:bg-violet-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
-            >
-              {procesandoFinalizado ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : null}
-              Finalizado
-            </button>
+            {puedeBtnFinalizar ? (
+              <button
+                type="button"
+                onClick={() => void marcarFinalizado()}
+                disabled={procesandoEstatus || loading || finalizadoInactivo}
+                title={
+                  finalizadoInactivo
+                    ? "Disponible cuando la orden esté en R-COD (revisada por cobranza)"
+                    : "Finalizar orden (actualizar estatus a R-F)"
+                }
+                className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 dark:bg-violet-700 dark:hover:bg-violet-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
+              >
+                {procesandoFinalizado ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                Finalizado
+              </button>
+            ) : null}
 
-            <button
-              type="button"
-              onClick={abrirModalCorte}
-              disabled={
-                procesandoEstatus ||
-                loading ||
-                generarCorteInactivo ||
-                documentos.length === 0
-              }
-              title={
-                generarCorteInactivo
-                  ? "Disponible cuando la orden esté finalizada (R-F)"
-                  : "Generar PDF de corte de la orden"
-              }
-              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-700 dark:hover:bg-indigo-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
-            >
-              Generar Corte
-            </button>
+            {puedeBtnGenerar ? (
+              <button
+                type="button"
+                onClick={abrirModalCorte}
+                disabled={
+                  procesandoEstatus ||
+                  loading ||
+                  generarCorteInactivo ||
+                  documentos.length === 0
+                }
+                title={
+                  generarCorteInactivo
+                    ? "Disponible cuando la orden esté finalizada (R-F)"
+                    : "Generar PDF de corte de la orden"
+                }
+                className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-700 dark:hover:bg-indigo-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
+              >
+                Generar Corte
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

@@ -20,6 +20,13 @@ export interface EntidadServicio {
   estatus: EstatusCrm;
 }
 
+export interface GrupoSAP {
+  idGrupo: number;
+  groupCode: number;
+  groupName: string;
+  activo: boolean;
+}
+
 export interface EntidadServicioPayload {
   nombre: string;
   estatus: EstatusCrm;
@@ -110,7 +117,10 @@ function errorDesdeRespuesta(data: unknown, fallback: string): string {
   return fallback;
 }
 
-function assertOk<T>(response: { status: number; data: T }, fallback: string): T {
+function assertOk<T>(
+  response: { status: number; data: T },
+  fallback: string,
+): T {
   if (response.status < 200 || response.status >= 300) {
     throw new Error(errorDesdeRespuesta(response.data, fallback));
   }
@@ -125,6 +135,83 @@ function normalizeArray<T>(raw: unknown): T[] {
     if (Array.isArray(o.items)) return o.items as T[];
   }
   return [];
+}
+
+function pickNumberCrm(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): number | null {
+  for (const key of keys) {
+    const v = o[key];
+    if (typeof v === "number" && !Number.isNaN(v)) return v;
+    if (typeof v === "string" && v.trim() !== "") {
+      const n = Number(v);
+      if (!Number.isNaN(n)) return n;
+    }
+  }
+  return null;
+}
+
+function pickStringCrm(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): string | null {
+  for (const key of keys) {
+    const v = o[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return null;
+}
+
+function pickBoolCrm(o: Record<string, unknown>, ...keys: string[]): boolean {
+  for (const key of keys) {
+    const v = o[key];
+    if (typeof v === "boolean") return v;
+    if (v === 1 || v === "1" || v === "true" || v === "A") return true;
+    if (v === 0 || v === "0" || v === "false" || v === "I") return false;
+  }
+  return true;
+}
+
+/** Normaliza CatGrupoSap (camelCase / PascalCase / alias). */
+export function normalizeGrupoSAP(raw: unknown): GrupoSAP {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const groupCode =
+    pickNumberCrm(o, "groupCode", "GroupCode", "codigo", "Codigo") ?? 0;
+  // idGrupo = PK de la tabla intermedia (lo que guarda el lead). NUNCA usar groupCode aquí.
+  const idGrupo =
+    pickNumberCrm(
+      o,
+      "idGrupo",
+      "IdGrupo",
+      "idCatGrupoSap",
+      "IdCatGrupoSap",
+      "id",
+      "Id",
+    ) ?? 0;
+
+  return {
+    idGrupo,
+    groupCode,
+    groupName:
+      pickStringCrm(
+        o,
+        "groupName",
+        "GroupName",
+        "nombre",
+        "Nombre",
+        "name",
+        "Name",
+      ) ?? "",
+    activo: pickBoolCrm(o, "activo", "Activo"),
+  };
+}
+
+function normalizeGruposSAP(raw: unknown): GrupoSAP[] {
+  return normalizeArray<unknown>(raw).map((item) => normalizeGrupoSAP(item));
 }
 
 export const ESTATUS_ACTIVO: EstatusCrm = "A";
@@ -180,6 +267,13 @@ export const crmService = {
     );
   },
 
+  getGrupoSAP: async (): Promise<GrupoSAP[]> => {
+    const response = await api.get<unknown>("/api/CatGrupoSap");
+    return normalizeGruposSAP(
+      assertOk(response, "No se pudieron cargar los grupos de SAP."),
+    );
+  },
+
   getEntidadServicio: async (id: number): Promise<EntidadServicio> => {
     const response = await api.get<EntidadServicio>(
       `/api/EntidadServicios/${id}`,
@@ -215,7 +309,9 @@ export const crmService = {
 
   getEtapas: async (): Promise<Etapa[]> => {
     const response = await api.get<unknown>("/api/Etapas/GetEtapas");
-    return normalizeArray<Etapa>(assertOk(response, "No se pudieron cargar las etapas."));
+    return normalizeArray<Etapa>(
+      assertOk(response, "No se pudieron cargar las etapas."),
+    );
   },
 
   getEtapa: async (id: number): Promise<Etapa> => {
@@ -228,7 +324,10 @@ export const crmService = {
     return assertOk(response, "No se pudo crear la etapa.");
   },
 
-  actualizarEtapa: async (id: number, payload: EtapaPayload): Promise<Etapa> => {
+  actualizarEtapa: async (
+    id: number,
+    payload: EtapaPayload,
+  ): Promise<Etapa> => {
     const response = await api.put<Etapa>(`/api/Etapas/${id}`, payload);
     return assertOk(response, "No se pudo actualizar la etapa.");
   },
@@ -284,7 +383,10 @@ export const crmService = {
       `/api/EtapaConfiguracion/${id}`,
       payload,
     );
-    return assertOk(response, "No se pudo actualizar la configuración del funnel.");
+    return assertOk(
+      response,
+      "No se pudo actualizar la configuración del funnel.",
+    );
   },
 
   eliminarEtapaConfiguracion: async (id: number): Promise<void> => {
@@ -309,7 +411,10 @@ export const crmService = {
     return assertOk(response, "No se pudo crear la fuente.");
   },
 
-  actualizarFuente: async (id: number, payload: FuentePayload): Promise<Fuente> => {
+  actualizarFuente: async (
+    id: number,
+    payload: FuentePayload,
+  ): Promise<Fuente> => {
     const response = await api.put<Fuente>(`/api/Fuentes/${id}`, payload);
     return assertOk(response, "No se pudo actualizar la fuente.");
   },
@@ -331,7 +436,9 @@ export const crmService = {
     return assertOk(response, "No se pudo cargar el seguimiento.");
   },
 
-  crearSeguimiento: async (payload: SeguimientoPayload): Promise<Seguimiento> => {
+  crearSeguimiento: async (
+    payload: SeguimientoPayload,
+  ): Promise<Seguimiento> => {
     const response = await api.post<Seguimiento>("/api/Seguimientos", payload);
     return assertOk(response, "No se pudo crear el seguimiento.");
   },
@@ -375,7 +482,10 @@ export const crmService = {
     id: number,
     payload: EstatusCatalogoPayload,
   ): Promise<EstatusCatalogo> => {
-    const response = await api.put<EstatusCatalogo>(`/api/Estatus/${id}`, payload);
+    const response = await api.put<EstatusCatalogo>(
+      `/api/Estatus/${id}`,
+      payload,
+    );
     return assertOk(response, "No se pudo actualizar el estatus.");
   },
 
@@ -391,8 +501,12 @@ export const crmService = {
     );
   },
 
-  getTipoEstatusCatalogoPorId: async (id: number): Promise<TipoEstatusCatalogo> => {
-    const response = await api.get<TipoEstatusCatalogo>(`/api/TipoEstatus/${id}`);
+  getTipoEstatusCatalogoPorId: async (
+    id: number,
+  ): Promise<TipoEstatusCatalogo> => {
+    const response = await api.get<TipoEstatusCatalogo>(
+      `/api/TipoEstatus/${id}`,
+    );
     return assertOk(response, "No se pudo cargar el tipo de estatus.");
   },
 

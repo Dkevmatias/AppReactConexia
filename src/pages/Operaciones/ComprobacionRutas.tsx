@@ -511,6 +511,12 @@ export default function ComprobacionRutas() {
           </div>
         )}
 
+        {mensajeIncidencia && !modalDetalleAbierto && (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+            {mensajeIncidencia}
+          </div>
+        )}
+
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
             {error}
