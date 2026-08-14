@@ -4,9 +4,7 @@ import { permisoActivo } from "../utils/permisosModulo";
 
 const PERMISO_VER = "Comprobacion.ver";
 const PERMISO_OPERAR = "Comprobacion.Operar";
-/** Clave exacta a crear en BD para ver montos/totales cobrados. */
 const PERMISO_VER_TOTALES = "Ver.Totales";
-/** Botones del modal detalle de orden. */
 const PERMISO_BTN_REVISAR = "Comprobacion.Btn.Revisar";
 const PERMISO_BTN_FINALIZAR = "Comprobacion.Btn.Finalizar";
 const PERMISO_BTN_GENERAR = "Comprobacion.Btn.Generar";

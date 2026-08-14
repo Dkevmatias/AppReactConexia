@@ -205,59 +205,6 @@ export default function FormularioProspecto({
 
       <section>
         <h4 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
-          Ubicación y campaña
-        </h4>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div>
-            <label className={prospectoLabelClass}>Unidad</label>
-            <input
-              type="text"
-              value={form.unidad ?? ""}
-              onChange={(e) => onChange("unidad", e.target.value)}
-              className={prospectoInputClass}
-            />
-          </div>
-          <div>
-            <label className={prospectoLabelClass}>Campaña</label>
-            <input
-              type="text"
-              value={form.campaign ?? ""}
-              onChange={(e) => onChange("campaign", e.target.value)}
-              className={prospectoInputClass}
-            />
-          </div>
-          <div>
-            <label className={prospectoLabelClass}>Estado</label>
-            <input
-              type="text"
-              value={form.estado ?? ""}
-              onChange={(e) => onChange("estado", e.target.value)}
-              className={prospectoInputClass}
-            />
-          </div>
-          <div>
-            <label className={prospectoLabelClass}>Ciudad</label>
-            <input
-              type="text"
-              value={form.ciudad ?? ""}
-              onChange={(e) => onChange("ciudad", e.target.value)}
-              className={prospectoInputClass}
-            />
-          </div>
-          <div>
-            <label className={prospectoLabelClass}>Municipio</label>
-            <input
-              type="text"
-              value={form.municipio ?? ""}
-              onChange={(e) => onChange("municipio", e.target.value)}
-              className={prospectoInputClass}
-            />
-          </div>
-        </div>
-      </section>
-
-      <section>
-        <h4 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
           Observaciones
         </h4>
         <textarea

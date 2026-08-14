@@ -1538,7 +1538,7 @@ export default function Cotizador() {
         itemCode: item.codigoCodialub?.trim() || item.codigo?.trim() || "",
         itemName: item.descripcion?.trim() || item.marca || "",
         suppCatNum: item.codigo?.trim() || "",
-        unidad: item.unidad?.trim() || "",
+        unidad: item.unidad?.trim() || "Manual",
         pl: item.precioLista,
         importe: item.importe,
         idUsuarioCreacion,
