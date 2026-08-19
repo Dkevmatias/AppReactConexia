@@ -25,7 +25,7 @@ type AlmacenesSucursal = {
 
 const ALMACENES_POR_SUCURSAL: Record<number, AlmacenesSucursal> = {
   1: { origen: "AM1TX01", destino: "AM1TX03" },
-  2: { origen: "AM1AR01", destino: "AM1AR03" },
+  2: { origen: "AM2AR01", destino: "AM2AR03" },
   3: { origen: "AM3TA01", destino: "AM3TA03" },
   4: { origen: "AM4ES01", destino: "AM4ES03" },
   5: { origen: "AM5CO01", destino: "AM5CO03" },

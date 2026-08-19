@@ -10,7 +10,7 @@ export type SucursalOperativaConfig = {
  */
 export const SUCURSAL_POR_ID: Record<number, SucursalOperativaConfig> = {
   1: { nombre: "TUXTLA", almacenes: ["AM1TX01", "AM1TX05"] },
-  2: { nombre: "ARRIAGA", almacenes: ["AM1AR01"] },
+  2: { nombre: "ARRIAGA", almacenes: ["AM2AR01"] },
   3: { nombre: "TAPACHULA", almacenes: ["AM3TA01"] },
   4: { nombre: "ESPINAL", almacenes: ["AM4ES01"] },
   5: { nombre: "COMITAN", almacenes: ["AM5CO01"] },
