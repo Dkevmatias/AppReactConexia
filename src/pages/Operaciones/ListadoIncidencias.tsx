@@ -75,7 +75,11 @@ function aFilas(incidencias: IncidenciaCompleta[]): FilaIncidenciaManager[] {
 function documentoStubDesdeIncidencia(
   incidencia: Pick<
     IncidenciaCompleta,
-    "idIncidencia" | "idODistribucion" | "idOrdenEntrega"
+    | "idIncidencia"
+    | "idODistribucion"
+    | "idOrdenEntrega"
+    | "cardCode"
+    | "cardName"
   >,
 ): DocODistribucionDetalle {
   return {
@@ -99,8 +103,8 @@ function documentoStubDesdeIncidencia(
     idIncidencia: incidencia.idIncidencia,
     cantidadIncidencias: 1,
     idsIncidencia: [incidencia.idIncidencia],
-    cardCode: null,
-    cardName: null,
+    cardCode: incidencia.cardCode,
+    cardName: incidencia.cardName,
     fechaDoc: null,
     total: 0,
     slpName: null,

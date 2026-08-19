@@ -1647,6 +1647,10 @@ export default function BitacoraCobranza() {
       (sum, doc) => sum + montoCobrado(doc),
       0,
     );
+    const totalSaldo = docsPdf.reduce(
+      (sum, doc) => sum + (doc.saldoDocumento || 0),
+      0,
+    );
     const fecha = new Date().toLocaleDateString("es-MX");
     const hora = new Date().toLocaleTimeString("es-MX", {
       hour: "2-digit",
@@ -1672,6 +1676,7 @@ export default function BitacoraCobranza() {
             <td class="center col-compact">${escapeHtml(formatearFecha(doc.docDueDate))}</td>
             <td class="center col-money col-total">${escapeHtml(formatCurrency(doc.docTotal))}</td>
             <td class="center col-money">${escapeHtml(formatCurrency(montoCobrado(doc)))}</td>
+            <td class="center col-money">${escapeHtml(formatCurrency(doc.saldoDocumento))}</td>
             <td class="center col-status">${escapeHtml(estatusCartera(doc))}</td>
             <td class="center col-status">${escapeHtml(estatusLabel(doc.estatus))}</td>
             <td class="center col-folio">&nbsp;</td>
@@ -1999,13 +2004,14 @@ export default function BitacoraCobranza() {
               <col style="width:36px" />
               <col style="width:44px" />
               <col style="width:44px" />
+              <col style="width:44px" />
               <col style="width:22px" />
               <col style="width:22px" />
               <col style="width:52px" />
             </colgroup>
             <thead>
               <tr>
-                <td colspan="12" class="cell-banner">
+                <td colspan="13" class="cell-banner">
                   ${pdfEncabezadoHtml}
                 </td>
               </tr>
@@ -2019,6 +2025,7 @@ export default function BitacoraCobranza() {
                 <th class="col-compact">Vence</th>
                 <th class="col-money">Total</th>
                 <th class="col-money">Cobr.</th>
+                <th class="col-money">Saldo</th>
                 <th class="col-status">Estatus</th>
                 <th class="col-status">Entrega</th>
                 <th class="col-folio">Folio</th>
@@ -2030,12 +2037,13 @@ export default function BitacoraCobranza() {
                 <td colspan="7" class="right">Totales</td>
                 <td class="center col-money col-total">${escapeHtml(formatCurrency(total))}</td>
                 <td class="center col-money">${escapeHtml(formatCurrency(totalCobrado))}</td>
+                <td class="center col-money">${escapeHtml(formatCurrency(totalSaldo))}</td>
                 <td colspan="3"></td>
               </tr>
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="12" class="cell-footer">
+                <td colspan="13" class="cell-footer">
                   <div class="signatures">
                     <div class="signature">Nombre y Firma de Entrega</div>
                     <div class="signature">Nombre y Firma de Recibo</div>

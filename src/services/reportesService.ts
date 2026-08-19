@@ -233,7 +233,8 @@ function pickString(
 ): string | undefined {
   for (const key of keys) {
     const v = o[key];
-    if (typeof v === "string" && v.trim()) return v;
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "number" && !Number.isNaN(v)) return String(v);
   }
   return undefined;
 }
@@ -339,15 +340,19 @@ function normalizePorSurtirGlobalItem(
   };
 }
 
+function unwrapList(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== "object") return [];
+  const o = raw as Record<string, unknown>;
+  for (const key of ["data", "Data", "items", "Items", "resultado", "Resultado"]) {
+    const v = o[key];
+    if (Array.isArray(v)) return v;
+  }
+  return [];
+}
+
 function normalizePorSurtirGlobalList(raw: unknown): PorSurtirGlobalItem[] {
-  const list = Array.isArray(raw)
-    ? raw
-    : raw &&
-        typeof raw === "object" &&
-        Array.isArray((raw as { data?: unknown }).data)
-      ? (raw as { data: unknown[] }).data
-      : [];
-  return list
+  return unwrapList(raw)
     .map(normalizePorSurtirGlobalItem)
     .filter((r): r is PorSurtirGlobalItem => r !== null);
 }
@@ -634,13 +639,21 @@ export const getReportesService = {
   },
 
   /**
-   * Órdenes / partidas pendientes por surtir (global).
-   * GET /api/PorSurtirGlobal
+   * Órdenes / partidas pendientes por surtir.
+   * GET /api/PorSurtirGlobal?sucursal={almacen}
+   * `sucursal` es el código de almacén SAP (ej. AM1TX01).
    */
-  getPorSurtirGlobal: async (): Promise<PorSurtirGlobalItem[]> => {
-    const response = await api.get<unknown>("/api/PorSurtirGlobal", {
-      timeout: 60_000,
-    });
+  getPorSurtirGlobal: async (opts?: {
+    sucursal?: string | null;
+  }): Promise<PorSurtirGlobalItem[]> => {
+    const params = new URLSearchParams();
+    const sucursal = opts?.sucursal?.trim() ?? "";
+    if (sucursal) params.set("sucursal", sucursal);
+    const qs = params.toString();
+    const response = await api.get<unknown>(
+      `/api/PorSurtirGlobal${qs ? `?${qs}` : ""}`,
+      { timeout: 60_000 },
+    );
     if (response.status < 200 || response.status >= 300) {
       throw new Error(
         `No se pudo cargar Por surtir global (HTTP ${response.status}).`,

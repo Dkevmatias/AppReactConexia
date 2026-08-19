@@ -10,6 +10,7 @@ export interface ModalVerIncidenciasEntregaProps {
   abierto: boolean;
   entrega: number | null;
   idsIncidencia: number[];
+  cardName?: string | null;
   onCerrar: () => void;
   onVerDetalle?: (idIncidencia: number) => void;
 }
@@ -18,6 +19,7 @@ export default function ModalVerIncidenciasEntrega({
   abierto,
   entrega,
   idsIncidencia,
+  cardName,
   onCerrar,
   onVerDetalle,
 }: ModalVerIncidenciasEntregaProps) {
@@ -97,6 +99,9 @@ export default function ModalVerIncidenciasEntrega({
             </h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Entrega {entrega ?? "—"} · {idsIncidencia.length} registro(s)
+            </p>
+            <p className="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-200">
+              Cliente: {cardName?.trim() || "—"}
             </p>
             {onVerDetalle && incidencias.length > 0 && !loading && !error && (
               <p className="mt-1 text-xs text-violet-700 dark:text-violet-300">

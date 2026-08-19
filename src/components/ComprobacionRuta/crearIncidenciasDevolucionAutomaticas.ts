@@ -88,6 +88,8 @@ export async function crearIncidenciasDevolucionAutomaticas(
       observaciones: OBSERVACIONES_INCIDENCIA_AUTOMATICA,
       estatus: ESTATUS_INCIDENCIA_PENDIENTE,
       activo: true,
+      cardCode: doc.cardCode?.trim() || null,
+      cardName: doc.cardName?.trim() || null,
       detalles: lineas.map((linea) => ({
         idOrdenEntrega: doc.entrega,
         itemCode: linea.itemCode,

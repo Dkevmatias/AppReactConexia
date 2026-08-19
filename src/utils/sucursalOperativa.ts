@@ -13,7 +13,7 @@ export const SUCURSAL_POR_ID: Record<number, SucursalOperativaConfig> = {
   2: { nombre: "ARRIAGA", almacenes: ["AM1AR01"] },
   3: { nombre: "TAPACHULA", almacenes: ["AM3TA01"] },
   4: { nombre: "ESPINAL", almacenes: ["AM4ES01"] },
-  5: { nombre: "COMITAN", almacenes: ["AM5C001"] },
+  5: { nombre: "COMITAN", almacenes: ["AM5CO01"] },
 };
 
 export function configSucursalPorId(
@@ -23,8 +23,16 @@ export function configSucursalPorId(
   return SUCURSAL_POR_ID[idSucursal] ?? null;
 }
 
+function sinAcentos(value: string): string {
+  return value
+    .trim()
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 export function sameCode(a: string, b: string): boolean {
-  return a.trim().toUpperCase() === b.trim().toUpperCase();
+  return sinAcentos(a) === sinAcentos(b);
 }
 
 /** Etiqueta UI: "TUXTLA · AM1TX01" */
@@ -48,5 +56,8 @@ export function perteneceASucursalUsuario(
   const alm = (row.almacen ?? "").trim();
   if (alm && cfg.almacenes.some((a) => sameCode(a, alm))) return true;
   const suc = (row.sucursal ?? "").trim();
-  return Boolean(suc && sameCode(suc, cfg.nombre));
+  if (!suc) return false;
+  const nombreCfg = sinAcentos(cfg.nombre);
+  const nombreRow = sinAcentos(suc);
+  return nombreRow === nombreCfg || nombreRow.includes(nombreCfg);
 }

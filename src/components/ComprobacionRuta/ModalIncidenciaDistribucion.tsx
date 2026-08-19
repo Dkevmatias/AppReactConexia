@@ -465,6 +465,8 @@ export default function ModalIncidenciaDistribucion({
         observaciones: form.observacionesEncabezado.trim(),
         estatus: estatusIncidencia,
         activo: true,
+        cardCode: contexto.documento.cardCode?.trim() || null,
+        cardName: contexto.documento.cardName?.trim() || null,
         detalles: esTipoConDetalle
           ? form.lineas.map((linea) => ({
               idOrdenEntrega,
@@ -756,9 +758,14 @@ export default function ModalIncidenciaDistribucion({
                 ? ` · Detalle ${contexto.idIncidenciaDetalle}`
                 : ""}
             </p>
-            <p className="truncate text-sm text-gray-700 dark:text-gray-300">
-              {documento.cardName ?? "—"}
-              {documento.cardCode ? ` (${documento.cardCode})` : ""}
+            <p className="mt-0.5 truncate text-sm font-medium text-gray-800 dark:text-gray-200">
+              Cliente:{" "}
+              {documento.cardName?.trim() ||
+                incidenciaVer?.cardName?.trim() ||
+                "—"}
+              {documento.cardCode?.trim() || incidenciaVer?.cardCode?.trim()
+                ? ` (${documento.cardCode?.trim() || incidenciaVer?.cardCode})`
+                : ""}
             </p>
           </div>
           <button

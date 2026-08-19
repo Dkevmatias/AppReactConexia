@@ -28,6 +28,8 @@ export interface IncidenciaCreatePayload {
   observaciones: string;
   estatus: string;
   activo: boolean;
+  cardCode?: string | null;
+  cardName?: string | null;
   detalles?: IncidenciaDetallePayload[];
 }
 
@@ -197,6 +199,8 @@ export interface IncidenciaResumen {
   nombreUsuarioCreacion: string | null;
   fechaCreacion: string | null;
   fechaCierre: string | null;
+  cardCode: string | null;
+  cardName: string | null;
 }
 
 function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
@@ -265,6 +269,8 @@ function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
     ),
     fechaCreacion: pickString(o, "fechaCreacion", "FechaCreacion"),
     fechaCierre: pickString(o, "fechaCierre", "FechaCierre"),
+    cardCode: pickString(o, "cardCode", "CardCode"),
+    cardName: pickString(o, "cardName", "CardName"),
   };
 }
 

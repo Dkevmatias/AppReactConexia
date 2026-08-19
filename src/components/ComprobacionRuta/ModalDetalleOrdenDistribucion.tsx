@@ -953,6 +953,7 @@ export default function ModalDetalleOrdenDistribucion({
         abierto={verIncidenciasCtx !== null}
         entrega={verIncidenciasCtx?.entrega ?? null}
         idsIncidencia={verIncidenciasCtx?.idsIncidencia ?? []}
+        cardName={verIncidenciasCtx?.documento.cardName ?? null}
         onCerrar={() => setVerIncidenciasCtx(null)}
         onVerDetalle={
           onVerIncidenciaCompleta

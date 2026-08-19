@@ -19,7 +19,6 @@ import { formatCurrency, formatNumber } from "../../../utils/format";
 import {
   configSucursalPorId,
   etiquetaSucursalAlmacen,
-  perteneceASucursalUsuario,
 } from "../../../utils/sucursalOperativa";
 
 type GrupoFolio = {
@@ -181,13 +180,12 @@ export default function ReportesPorSurtir() {
     [contexto?.idSucursal],
   );
 
-  /** Solo partidas de la sucursal del usuario (idSucursal → almacenes). */
-  const rowsSucursal = useMemo(() => {
+  /** Códigos de almacén que van en `?sucursal=` (el API pagina el global). */
+  const almacenesConsulta = useMemo(() => {
     if (!cfgSucursal) return [];
-    return rows.filter((r) =>
-      perteneceASucursalUsuario(r, contexto?.idSucursal),
-    );
-  }, [rows, cfgSucursal, contexto?.idSucursal]);
+    if (filtroAlmacen.trim()) return [filtroAlmacen.trim()];
+    return [...cfgSucursal.almacenes];
+  }, [cfgSucursal, filtroAlmacen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,11 +214,27 @@ export default function ReportesPorSurtir() {
   }, [user?.idPersona]);
 
   const cargar = async () => {
+    if (!contextoListo) return;
+    if (!cfgSucursal || almacenesConsulta.length === 0) {
+      setRows([]);
+      setLoading(false);
+      setError(
+        contextoListo && !cfgSucursal
+          ? "No se pudo resolver el almacén de tu sucursal."
+          : null,
+      );
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const data = await getReportesService.getPorSurtirGlobal();
-      setRows(data);
+      const listas = await Promise.all(
+        almacenesConsulta.map((whs) =>
+          getReportesService.getPorSurtirGlobal({ sucursal: whs }),
+        ),
+      );
+      setRows(listas.flat());
     } catch (err) {
       console.error(err);
       setRows([]);
@@ -236,27 +250,19 @@ export default function ReportesPorSurtir() {
 
   useEffect(() => {
     void cargar();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recarga al cambiar almacén/sucursal
+  }, [contextoListo, cfgSucursal?.nombre, almacenesConsulta.join("|")]);
 
   const almacenes = useMemo(() => {
     if (cfgSucursal) return [...cfgSucursal.almacenes];
-    return uniqueSorted(rowsSucursal.map((r) => r.almacen));
-  }, [cfgSucursal, rowsSucursal]);
+    return uniqueSorted(rows.map((r) => r.almacen));
+  }, [cfgSucursal, rows]);
 
-  const rutas = useMemo(
-    () => uniqueSorted(rowsSucursal.map((r) => r.ruta)),
-    [rowsSucursal],
-  );
+  const rutas = useMemo(() => uniqueSorted(rows.map((r) => r.ruta)), [rows]);
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    return rowsSucursal.filter((r) => {
-      if (
-        filtroAlmacen &&
-        r.almacen.toUpperCase() !== filtroAlmacen.toUpperCase()
-      ) {
-        return false;
-      }
+    return rows.filter((r) => {
       if (filtroRuta && r.ruta !== filtroRuta) return false;
       if (!q) return true;
       const haystack = [
@@ -279,7 +285,7 @@ export default function ReportesPorSurtir() {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [rowsSucursal, busqueda, filtroAlmacen, filtroRuta]);
+  }, [rows, busqueda, filtroRuta]);
 
   const grupos = useMemo(
     () => agruparPorClienteYFolio(filtrados),
@@ -399,14 +405,13 @@ export default function ReportesPorSurtir() {
             Por surtir
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Solo tu sucursal. Agrupado por cliente y folio.
+            Filtrado por almacén en el servidor. Agrupado por cliente y folio.
           </p>
           {cfgSucursal ? (
             <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-              Sucursal filtrada (
-              {contexto?.sucursal || cfgSucursal.nombre}):{" "}
+              {contexto?.sucursal || cfgSucursal.nombre} · consultando{" "}
               <span className="font-medium text-gray-900 dark:text-white">
-                {cfgSucursal.nombre} · {cfgSucursal.almacenes.join(", ")}
+                {almacenesConsulta.join(", ")}
               </span>
             </p>
           ) : contextoListo ? (
@@ -564,7 +569,9 @@ export default function ReportesPorSurtir() {
         </p>
       ) : grupos.length === 0 ? (
         <p className="py-10 text-center text-gray-500 dark:text-gray-400">
-          No hay partidas por surtir de tu sucursal con los filtros actuales.
+          {rows.length === 0
+            ? "No hay partidas por surtir para el almacén consultado."
+            : "No hay partidas con los filtros actuales."}
         </p>
       ) : (
         <div className="space-y-2">

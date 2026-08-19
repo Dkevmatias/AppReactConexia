@@ -28,7 +28,7 @@ const ALMACENES_POR_SUCURSAL: Record<number, AlmacenesSucursal> = {
   2: { origen: "AM1AR01", destino: "AM1AR03" },
   3: { origen: "AM3TA01", destino: "AM3TA03" },
   4: { origen: "AM4ES01", destino: "AM4ES03" },
-  5: { origen: "AM5C001", destino: "AM5C003" },
+  5: { origen: "AM5CO01", destino: "AM5CO03" },
 };
 
 function sameAlmacen(a: string, b: string): boolean {
@@ -104,9 +104,14 @@ function csvEscape(value: string | number): string {
 
 function fechaSoloDia(iso: string): string {
   if (!iso?.trim()) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return d.toISOString().slice(0, 10);
+  const raw = iso.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw.slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function statusBadgeClass(status: string): string {
@@ -342,10 +347,7 @@ export default function ReportesTraspasos() {
         if (rol !== "destino" && rol !== "ambos") return false;
       } else if (filtroAlmacen) {
         const code = filtroAlmacen.toUpperCase();
-        if (
-          !sameAlmacen(r.origen, code) &&
-          !sameAlmacen(r.destino, code)
-        ) {
+        if (!sameAlmacen(r.origen, code) && !sameAlmacen(r.destino, code)) {
           return false;
         }
       }
@@ -794,11 +796,15 @@ export default function ReportesTraspasos() {
                           <th className="min-w-[180px] px-3 py-2">
                             Descripción
                           </th>
-                          <th className="whitespace-nowrap px-3 py-2">Origen</th>
+                          <th className="whitespace-nowrap px-3 py-2">
+                            Origen
+                          </th>
                           <th className="whitespace-nowrap px-3 py-2">
                             Destino
                           </th>
-                          <th className="whitespace-nowrap px-3 py-2">Mi rol</th>
+                          <th className="whitespace-nowrap px-3 py-2">
+                            Mi rol
+                          </th>
                           <th className="whitespace-nowrap px-3 py-2 text-right">
                             Solicitado
                           </th>
