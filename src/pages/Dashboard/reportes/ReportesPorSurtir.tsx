@@ -21,6 +21,9 @@ import {
   etiquetaSucursalAlmacen,
 } from "../../../utils/sucursalOperativa";
 
+type FiltroAtraso = "" | "0-7" | "8-14" | "15+" | "8+";
+type FiltroExistencia = "" | "sin-cero" | "solo-cero";
+
 type GrupoFolio = {
   key: string;
   folio: string;
@@ -35,6 +38,7 @@ type GrupoFolio = {
   cantidadPdnte: number;
   ulkpPdnte: number;
   importePdnte: number;
+  diasAtraso: number;
 };
 
 type GrupoCliente = {
@@ -46,17 +50,77 @@ type GrupoCliente = {
   cantidadPdnte: number;
   ulkpPdnte: number;
   importePdnte: number;
+  /** Máximo atraso entre folios del cliente (para orden / semáforo). */
+  diasAtrasoMax: number;
+  fechaMasAntigua: string;
 };
+
+function parseFechaLocal(iso: string): Date | null {
+  if (!iso?.trim()) return null;
+  const raw = iso.trim();
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
+  if (m) {
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function hoyLocal(): Date {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+}
+
+/** Días de atraso: hoy vs DocDate (fecha). Negativos se tratan como 0. */
+function diasAtrasoDesdeFecha(iso: string): number {
+  const doc = parseFechaLocal(iso);
+  if (!doc) return 0;
+  const ms = hoyLocal().getTime() - doc.getTime();
+  return Math.max(0, Math.floor(ms / 86_400_000));
+}
+
+function pasaFiltroAtraso(dias: number, filtro: FiltroAtraso): boolean {
+  if (!filtro) return true;
+  if (filtro === "0-7") return dias <= 7;
+  if (filtro === "8-14") return dias >= 8 && dias <= 14;
+  if (filtro === "15+") return dias >= 15;
+  if (filtro === "8+") return dias >= 8;
+  return true;
+}
+
+function claseSemáforoAtraso(dias: number): string {
+  if (dias >= 15) {
+    return "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/40";
+  }
+  if (dias >= 8) {
+    return "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30";
+  }
+  return "border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800";
+}
+
+function etiquetaAtraso(dias: number): string {
+  if (dias <= 0) return "0 d";
+  return `${dias} d`;
+}
 
 function formatFechaCorta(iso: string): string {
   if (!iso?.trim()) return "—";
-  const d = new Date(iso);
+  const d = parseFechaLocal(iso) ?? new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
   return d.toLocaleDateString("es-MX", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
+}
+
+function compararFechaAsc(a: string, b: string): number {
+  const da = parseFechaLocal(a)?.getTime() ?? Number.POSITIVE_INFINITY;
+  const db = parseFechaLocal(b)?.getTime() ?? Number.POSITIVE_INFINITY;
+  if (da !== db) return da - db;
+  return 0;
 }
 
 function csvEscape(value: string | number): string {
@@ -119,14 +183,19 @@ function agruparPorClienteYFolio(items: PorSurtirGlobalItem[]): GrupoCliente[] {
           (s, a) => s + (a.importePartPdte || 0),
           0,
         ),
+        diasAtraso: diasAtrasoDesdeFecha(first.fecha),
       });
     }
 
-    folios.sort((a, b) =>
-      a.folio.localeCompare(b.folio, "es", { numeric: true }),
-    );
+    // DocDate ASC: lo más antiguo primero
+    folios.sort((a, b) => {
+      const byFecha = compararFechaAsc(a.fecha, b.fecha);
+      if (byFecha !== 0) return byFecha;
+      return a.folio.localeCompare(b.folio, "es", { numeric: true });
+    });
 
     const first = clienteItems[0];
+    const fechaMasAntigua = folios[0]?.fecha ?? first.fecha;
     grupos.push({
       key: ck,
       codCliente: first.codCliente,
@@ -142,16 +211,21 @@ function agruparPorClienteYFolio(items: PorSurtirGlobalItem[]): GrupoCliente[] {
         (s, a) => s + (a.importePartPdte || 0),
         0,
       ),
+      diasAtrasoMax: folios.reduce((m, f) => Math.max(m, f.diasAtraso), 0),
+      fechaMasAntigua,
     });
   }
 
-  grupos.sort((a, b) =>
-    (a.nombreCliente || a.codCliente).localeCompare(
+  // Clientes por DocDate más antiguo ASC (mantiene agrupación, prioriza atraso)
+  grupos.sort((a, b) => {
+    const byFecha = compararFechaAsc(a.fechaMasAntigua, b.fechaMasAntigua);
+    if (byFecha !== 0) return byFecha;
+    return (a.nombreCliente || a.codCliente).localeCompare(
       b.nombreCliente || b.codCliente,
       "es",
       { sensitivity: "base" },
-    ),
-  );
+    );
+  });
 
   return grupos;
 }
@@ -164,6 +238,10 @@ export default function ReportesPorSurtir() {
   const [busqueda, setBusqueda] = useState("");
   const [filtroAlmacen, setFiltroAlmacen] = useState("");
   const [filtroRuta, setFiltroRuta] = useState("");
+  const [filtroVendedor, setFiltroVendedor] = useState("");
+  const [filtroAtraso, setFiltroAtraso] = useState<FiltroAtraso>("");
+  const [filtroExistencia, setFiltroExistencia] =
+    useState<FiltroExistencia>("");
   const [clientesAbiertos, setClientesAbiertos] = useState<Set<string>>(
     () => new Set(),
   );
@@ -260,10 +338,27 @@ export default function ReportesPorSurtir() {
 
   const rutas = useMemo(() => uniqueSorted(rows.map((r) => r.ruta)), [rows]);
 
+  const vendedores = useMemo(
+    () => uniqueSorted(rows.map((r) => r.vendedor)),
+    [rows],
+  );
+
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     return rows.filter((r) => {
       if (filtroRuta && r.ruta !== filtroRuta) return false;
+      if (filtroVendedor && r.vendedor !== filtroVendedor) return false;
+      if (filtroExistencia === "sin-cero" && (r.existencia ?? 0) <= 0) {
+        return false;
+      }
+      if (filtroExistencia === "solo-cero" && (r.existencia ?? 0) > 0) {
+        return false;
+      }
+      if (
+        !pasaFiltroAtraso(diasAtrasoDesdeFecha(r.fecha), filtroAtraso)
+      ) {
+        return false;
+      }
       if (!q) return true;
       const haystack = [
         r.folio,
@@ -285,7 +380,14 @@ export default function ReportesPorSurtir() {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [rows, busqueda, filtroRuta]);
+  }, [
+    rows,
+    busqueda,
+    filtroRuta,
+    filtroVendedor,
+    filtroExistencia,
+    filtroAtraso,
+  ]);
 
   const grupos = useMemo(
     () => agruparPorClienteYFolio(filtrados),
@@ -337,6 +439,7 @@ export default function ReportesPorSurtir() {
       "Base",
       "Documento",
       "Fecha",
+      "DiasAtraso",
       "Folio",
       "Cliente",
       "CodCliente",
@@ -363,6 +466,7 @@ export default function ReportesPorSurtir() {
           r.base,
           r.documento,
           formatFechaCorta(r.fecha),
+          diasAtrasoDesdeFecha(r.fecha),
           r.folio,
           r.nombreCliente,
           r.codCliente,
@@ -405,7 +509,22 @@ export default function ReportesPorSurtir() {
             Por surtir
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Filtrado por almacén en el servidor. Agrupado por cliente y folio.
+            Filtrado por almacén. Agrupado por cliente; folios por fecha ASC
+            (más antiguo primero).
+          </p>
+          <p className="mt-1 flex flex-wrap gap-3 text-[11px] text-gray-500 dark:text-gray-400">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm border border-gray-300 bg-white" />
+              0–7 días
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm border border-amber-400 bg-amber-200" />
+              8–14 días
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm border border-red-400 bg-red-200" />
+              15+ días
+            </span>
           </p>
           {cfgSucursal ? (
             <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
@@ -551,6 +670,67 @@ export default function ReportesPorSurtir() {
             ))}
           </select>
         </div>
+        <div className="w-full sm:w-40">
+          <label
+            htmlFor="por-surtir-vendedor"
+            className="mb-1 block text-xs text-gray-500"
+          >
+            Vendedor
+          </label>
+          <select
+            id="por-surtir-vendedor"
+            value={filtroVendedor}
+            onChange={(e) => setFiltroVendedor(e.target.value)}
+            className="w-full min-h-[40px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          >
+            <option value="">Todos</option>
+            {vendedores.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="w-full sm:w-44">
+          <label
+            htmlFor="por-surtir-atraso"
+            className="mb-1 block text-xs text-gray-500"
+          >
+            Atraso (hoy vs DocDate)
+          </label>
+          <select
+            id="por-surtir-atraso"
+            value={filtroAtraso}
+            onChange={(e) => setFiltroAtraso(e.target.value as FiltroAtraso)}
+            className="w-full min-h-[40px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          >
+            <option value="">Todos</option>
+            <option value="0-7">0–7 días</option>
+            <option value="8-14">8–14 días (amarillo)</option>
+            <option value="15+">15+ días (rojo)</option>
+            <option value="8+">8+ días (amarillo y rojo)</option>
+          </select>
+        </div>
+        <div className="w-full sm:w-44">
+          <label
+            htmlFor="por-surtir-existencia"
+            className="mb-1 block text-xs text-gray-500"
+          >
+            Existencia
+          </label>
+          <select
+            id="por-surtir-existencia"
+            value={filtroExistencia}
+            onChange={(e) =>
+              setFiltroExistencia(e.target.value as FiltroExistencia)
+            }
+            className="w-full min-h-[40px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+          >
+            <option value="">Todas</option>
+            <option value="sin-cero">Sin existencia 0</option>
+            <option value="solo-cero">Solo existencia 0</option>
+          </select>
+        </div>
       </div>
 
       {error ? (
@@ -580,12 +760,12 @@ export default function ReportesPorSurtir() {
             return (
               <div
                 key={cliente.key}
-                className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"
+                className={`overflow-hidden rounded-lg border shadow-sm ${claseSemáforoAtraso(cliente.diasAtrasoMax)}`}
               >
                 <button
                   type="button"
                   onClick={() => toggleCliente(cliente.key)}
-                  className="flex w-full items-start gap-3 px-3 py-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 sm:items-center"
+                  className="flex w-full items-start gap-3 px-3 py-3 text-left hover:bg-black/5 dark:hover:bg-white/5 sm:items-center"
                   aria-expanded={abierto}
                 >
                   <span className="mt-0.5 shrink-0 text-gray-500 sm:mt-0">
@@ -605,6 +785,9 @@ export default function ReportesPorSurtir() {
                       {cliente.folios.length === 1 ? "" : "s"} ·{" "}
                       {cliente.partidas} partida
                       {cliente.partidas === 1 ? "" : "s"}
+                      {cliente.diasAtrasoMax > 0
+                        ? ` · atraso máx. ${etiquetaAtraso(cliente.diasAtrasoMax)}`
+                        : ""}
                     </p>
                   </div>
                   <div className="hidden shrink-0 grid-cols-3 gap-4 text-right text-xs sm:grid md:text-sm">
@@ -630,18 +813,18 @@ export default function ReportesPorSurtir() {
                 </button>
 
                 {abierto ? (
-                  <div className="space-y-2 border-t border-gray-100 bg-gray-50/80 px-2 py-2 dark:border-gray-700 dark:bg-gray-900/40 sm:px-3">
+                  <div className="space-y-2 border-t border-black/5 bg-black/[0.02] px-2 py-2 dark:border-white/10 dark:bg-black/20 sm:px-3">
                     {cliente.folios.map((folio) => {
                       const folioAbierto = foliosAbiertos.has(folio.key);
                       return (
                         <div
                           key={folio.key}
-                          className="overflow-hidden rounded-lg border border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800"
+                          className={`overflow-hidden rounded-lg border ${claseSemáforoAtraso(folio.diasAtraso)}`}
                         >
                           <button
                             type="button"
                             onClick={() => toggleFolio(folio.key)}
-                            className="flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-700/40 sm:items-center"
+                            className="flex w-full items-start gap-2 px-3 py-2.5 text-left hover:bg-black/5 dark:hover:bg-white/5 sm:items-center"
                             aria-expanded={folioAbierto}
                           >
                             <span className="mt-0.5 shrink-0 text-gray-500 sm:mt-0">
@@ -656,6 +839,17 @@ export default function ReportesPorSurtir() {
                                 Folio {folio.folio || "—"}
                                 <span className="ml-2 font-normal text-gray-500">
                                   · {formatFechaCorta(folio.fecha)}
+                                </span>
+                                <span
+                                  className={`ml-2 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                                    folio.diasAtraso >= 15
+                                      ? "bg-red-200 text-red-900 dark:bg-red-900/60 dark:text-red-100"
+                                      : folio.diasAtraso >= 8
+                                        ? "bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-100"
+                                        : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                  }`}
+                                >
+                                  {etiquetaAtraso(folio.diasAtraso)}
                                 </span>
                               </p>
                               <p className="text-[11px] text-gray-500 dark:text-gray-400">
@@ -680,9 +874,9 @@ export default function ReportesPorSurtir() {
                           </button>
 
                           {folioAbierto ? (
-                            <div className="overflow-x-auto border-t border-gray-100 dark:border-gray-700">
+                            <div className="overflow-x-auto border-t border-black/5 dark:border-white/10">
                               <table className="min-w-full text-xs sm:text-sm">
-                                <thead className="bg-gray-50 dark:bg-gray-700/80">
+                                <thead className="bg-black/[0.03] dark:bg-black/30">
                                   <tr className="text-left text-gray-600 dark:text-gray-200">
                                     <th className="whitespace-nowrap px-3 py-2">
                                       Artículo
@@ -717,7 +911,7 @@ export default function ReportesPorSurtir() {
                                   {folio.articulos.map((r, idx) => (
                                     <tr
                                       key={`${r.articulo}-${r.almacen}-${idx}`}
-                                      className="border-t border-gray-100 dark:border-gray-700"
+                                      className="border-t border-black/5 dark:border-white/10"
                                     >
                                       <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px]">
                                         {r.articulo || "—"}
@@ -740,7 +934,13 @@ export default function ReportesPorSurtir() {
                                       <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums font-medium">
                                         {formatNumber(r.cantidadPdnte)}
                                       </td>
-                                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                      <td
+                                        className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
+                                          (r.existencia ?? 0) <= 0
+                                            ? "font-semibold text-red-700 dark:text-red-300"
+                                            : ""
+                                        }`}
+                                      >
                                         {formatNumber(r.existencia)}
                                       </td>
                                       <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">

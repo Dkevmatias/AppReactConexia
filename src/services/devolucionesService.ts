@@ -5,6 +5,7 @@ export interface DevolucionLinea {
   docNum: number;
   cardName: string | null;
   itemCode: string;
+  codigoProveedor: string | null;
   descripcion: string;
   quantity: number;
 }
@@ -50,6 +51,7 @@ function pickString(
   for (const key of keys) {
     const v = o[key];
     if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "number" && !Number.isNaN(v)) return String(v);
   }
   return null;
 }
@@ -59,8 +61,7 @@ function normalizeDevolucionLinea(raw: unknown): DevolucionLinea | null {
     string,
     unknown
   >;
-  const itemCode =
-    pickString(o, "itemCode", "ItemCode", "item", "Item") ?? "";
+  const itemCode = pickString(o, "itemCode", "ItemCode", "item", "Item") ?? "";
   if (!itemCode) return null;
 
   return {
@@ -68,18 +69,39 @@ function normalizeDevolucionLinea(raw: unknown): DevolucionLinea | null {
     docNum: pickNumber(o, "docNum", "DocNum") ?? 0,
     cardName: pickString(o, "cardName", "CardName"),
     itemCode,
+    codigoProveedor:
+      pickString(
+        o,
+        "codigoProveedor",
+        "CodigoProveedor",
+        "codigoProv",
+        "CodigoProv",
+      ) ?? null,
     descripcion:
-      pickString(o, "descripcion", "Descripcion", "itemName", "ItemName") ??
-      "",
-    quantity: pickNumber(o, "quantity", "Quantity", "cantidad", "Cantidad") ?? 0,
+      pickString(o, "descripcion", "Descripcion", "itemName", "ItemName") ?? "",
+    quantity:
+      pickNumber(o, "quantity", "Quantity", "cantidad", "Cantidad") ?? 0,
   };
 }
 
 function normalizeDevolucionList(raw: unknown): DevolucionLinea[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map(normalizeDevolucionLinea)
-    .filter((item): item is DevolucionLinea => item !== null);
+  if (Array.isArray(raw)) {
+    return raw
+      .map(normalizeDevolucionLinea)
+      .filter((item): item is DevolucionLinea => item !== null);
+  }
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    for (const key of ["data", "Data", "items", "Items", "resultado"]) {
+      const list = o[key];
+      if (Array.isArray(list)) {
+        return list
+          .map(normalizeDevolucionLinea)
+          .filter((item): item is DevolucionLinea => item !== null);
+      }
+    }
+  }
+  return [];
 }
 
 export const devolucionesService = {
@@ -89,9 +111,7 @@ export const devolucionesService = {
     if (!num || num <= 0) {
       throw new Error("El número de devolución no es válido.");
     }
-    const response = await api.get<unknown>(
-      `/api/Devoluciones?docNum=${num}`,
-    );
+    const response = await api.get<unknown>(`/api/Devoluciones?docNum=${num}`);
     return normalizeDevolucionList(
       assertOk(response, "No se pudieron consultar las líneas de devolución."),
     );

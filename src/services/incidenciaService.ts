@@ -10,6 +10,7 @@ export interface IncidenciaDetallePayload {
   idOrdenEntrega: number;
   itemCode: string;
   itemName: string;
+  codigoProveedor: string;
   cantidad: number;
   idEstado: number;
   vendedor: string;
@@ -277,6 +278,7 @@ function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
 export interface IncidenciaDetalleItem {
   idIncidenciaDetalle: number | null;
   itemCode: string;
+  codigoProveedor: string;
   itemName: string;
   cantidad: number;
   idEstado: number;
@@ -353,6 +355,7 @@ function normalizeIncidenciaDetalleItem(
         ? idIncidenciaDetalle
         : null,
     itemCode,
+    codigoProveedor: pickString(o, "codigoProveedor", "CodigoProveedor") ?? "",
     itemName:
       pickString(o, "itemName", "ItemName", "descripcion", "Descripcion") ?? "",
     cantidad: pickNumber(o, "cantidad", "Cantidad") ?? 0,
@@ -642,7 +645,10 @@ export const incidenciaService = {
       body,
     );
 
-    return assertOk(response, "No se pudo guardar la solución de la incidencia.");
+    return assertOk(
+      response,
+      "No se pudo guardar la solución de la incidencia.",
+    );
   },
 
   /**
@@ -669,7 +675,9 @@ export const incidenciaService = {
         );
       }
       if (!idIncidencia || idIncidencia <= 0) {
-        throw new Error("La incidencia no es válida para actualizar el detalle.");
+        throw new Error(
+          "La incidencia no es válida para actualizar el detalle.",
+        );
       }
       if (!idUsuarioEdicion || idUsuarioEdicion <= 0) {
         throw new Error("No se pudo resolver el usuario de edición.");

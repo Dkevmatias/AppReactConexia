@@ -35,9 +35,9 @@ export async function crearIncidenciasDevolucionAutomaticas(
 
   if (candidatos.length === 0) return 0;
 
-  let vendedoresCache:
-    | Awaited<ReturnType<typeof getReportesService.getVendedoresReparto>>
-    | null = null;
+  let vendedoresCache: Awaited<
+    ReturnType<typeof getReportesService.getVendedoresReparto>
+  > | null = null;
 
   const resolverIdUsuarioCreacion = async (
     slpName: string | null | undefined,
@@ -93,6 +93,7 @@ export async function crearIncidenciasDevolucionAutomaticas(
       detalles: lineas.map((linea) => ({
         idOrdenEntrega: doc.entrega,
         itemCode: linea.itemCode,
+        codigoProveedor: linea.codigoProveedor ?? "",
         itemName: linea.descripcion,
         cantidad: linea.quantity,
         idEstado: ESTADO_ITEM_DEVOLUCION_DEFAULT,

@@ -5,6 +5,7 @@ export interface ItemEntrega {
   folio: number;
   origen: string;
   item: string;
+  codigoProveedor: string;
   descripcion: string;
   cantidad: number;
   almacen: string;
@@ -65,9 +66,9 @@ function normalizeItemEntrega(raw: unknown): ItemEntrega | null {
     folio: pickNumber(o, "folio", "Folio") ?? 0,
     origen: pickString(o, "origen", "Origen") ?? "",
     item,
+    codigoProveedor: pickString(o, "codigoProveedor", "CodigoProveedor") ?? "",
     descripcion:
-      pickString(o, "descripcion", "Descripcion", "itemName", "ItemName") ??
-      "",
+      pickString(o, "descripcion", "Descripcion", "itemName", "ItemName") ?? "",
     cantidad: pickNumber(o, "cantidad", "Cantidad") ?? 0,
     almacen: pickString(o, "almacen", "Almacen") ?? "",
   };
@@ -94,9 +95,7 @@ function normalizeItemEntregaList(raw: unknown): ItemEntrega[] {
 }
 
 export const itemEntregaService = {
-  getByOrdenEntrega: async (
-    idOrdenEntrega: number,
-  ): Promise<ItemEntrega[]> => {
+  getByOrdenEntrega: async (idOrdenEntrega: number): Promise<ItemEntrega[]> => {
     const response = await api.get<unknown>("/api/ItemEntrega", {
       params: { idOrdenEntrega },
     });
