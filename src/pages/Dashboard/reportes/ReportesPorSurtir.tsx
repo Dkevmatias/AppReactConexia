@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
   Download,
   RefreshCw,
   Search,
+  Warehouse,
 } from "lucide-react";
+import ModalExistenciasArticulo, {
+  type ContextoExistenciasArticulo,
+} from "../../../components/reportes/ModalExistenciasArticulo";
 import { useAuth } from "../../../hooks/useAuth";
 import {
   getContextoOperativoPersona,
@@ -34,6 +38,7 @@ type GrupoFolio = {
   almacen: string;
   sucursal: string;
   ruta: string;
+  comentarios: string;
   articulos: PorSurtirGlobalItem[];
   cantidadPdnte: number;
   ulkpPdnte: number;
@@ -166,6 +171,10 @@ function agruparPorClienteYFolio(items: PorSurtirGlobalItem[]): GrupoCliente[] {
     const folios: GrupoFolio[] = [];
     for (const [fk, articulos] of porFolio) {
       const first = articulos[0];
+      const comentarios =
+        articulos
+          .map((a) => a.comentarios?.trim())
+          .find((c) => c && c.length > 0) ?? "";
       folios.push({
         key: fk,
         folio: first.folio,
@@ -176,8 +185,12 @@ function agruparPorClienteYFolio(items: PorSurtirGlobalItem[]): GrupoCliente[] {
         almacen: first.almacen,
         sucursal: first.sucursal,
         ruta: first.ruta,
+        comentarios,
         articulos,
-        cantidadPdnte: articulos.reduce((s, a) => s + (a.cantidadPdnte || 0), 0),
+        cantidadPdnte: articulos.reduce(
+          (s, a) => s + (a.cantidadPdnte || 0),
+          0,
+        ),
         ulkpPdnte: articulos.reduce((s, a) => s + (a.ulkpsPartPdte || 0), 0),
         importePdnte: articulos.reduce(
           (s, a) => s + (a.importePartPdte || 0),
@@ -252,6 +265,20 @@ export default function ReportesPorSurtir() {
     null,
   );
   const [contextoListo, setContextoListo] = useState(false);
+  const [existenciasCtx, setExistenciasCtx] =
+    useState<ContextoExistenciasArticulo | null>(null);
+
+  const abrirExistenciasArticulo = useCallback((row: PorSurtirGlobalItem) => {
+    const articulo = (row.articulo ?? "").trim();
+    const codigoProv = (row.codigoProv ?? "").trim();
+    if (!articulo && !codigoProv) return;
+    setExistenciasCtx({
+      articulo,
+      codigoProv,
+      descripcion: row.descripcion,
+      marca: row.marca,
+    });
+  }, []);
 
   const cfgSucursal = useMemo(
     () => configSucursalPorId(contexto?.idSucursal),
@@ -354,9 +381,7 @@ export default function ReportesPorSurtir() {
       if (filtroExistencia === "solo-cero" && (r.existencia ?? 0) > 0) {
         return false;
       }
-      if (
-        !pasaFiltroAtraso(diasAtrasoDesdeFecha(r.fecha), filtroAtraso)
-      ) {
+      if (!pasaFiltroAtraso(diasAtrasoDesdeFecha(r.fecha), filtroAtraso)) {
         return false;
       }
       if (!q) return true;
@@ -389,10 +414,7 @@ export default function ReportesPorSurtir() {
     filtroAtraso,
   ]);
 
-  const grupos = useMemo(
-    () => agruparPorClienteYFolio(filtrados),
-    [filtrados],
-  );
+  const grupos = useMemo(() => agruparPorClienteYFolio(filtrados), [filtrados]);
 
   const resumen = useMemo(() => {
     const folios = new Set(filtrados.map((r) => r.folio).filter(Boolean));
@@ -426,7 +448,9 @@ export default function ReportesPorSurtir() {
 
   const expandirTodo = () => {
     setClientesAbiertos(new Set(grupos.map((g) => g.key)));
-    setFoliosAbiertos(new Set(grupos.flatMap((g) => g.folios.map((f) => f.key))));
+    setFoliosAbiertos(
+      new Set(grupos.flatMap((g) => g.folios.map((f) => f.key))),
+    );
   };
 
   const colapsarTodo = () => {
@@ -440,6 +464,7 @@ export default function ReportesPorSurtir() {
       "Documento",
       "Fecha",
       "DiasAtraso",
+      "Comentarios",
       "Folio",
       "Cliente",
       "CodCliente",
@@ -467,6 +492,7 @@ export default function ReportesPorSurtir() {
           r.documento,
           formatFechaCorta(r.fecha),
           diasAtrasoDesdeFecha(r.fecha),
+          r.comentarios ?? "",
           r.folio,
           r.nombreCliente,
           r.codCliente,
@@ -851,6 +877,11 @@ export default function ReportesPorSurtir() {
                                 >
                                   {etiquetaAtraso(folio.diasAtraso)}
                                 </span>
+                                {folio.comentarios ? (
+                                  <span className="ml-2 font-bold text-gray-900 dark:text-white">
+                                    · Comentarios: {folio.comentarios}
+                                  </span>
+                                ) : null}
                               </p>
                               <p className="text-[11px] text-gray-500 dark:text-gray-400">
                                 {folio.documento || "—"} ·{" "}
@@ -905,13 +936,26 @@ export default function ReportesPorSurtir() {
                                     <th className="whitespace-nowrap px-3 py-2 text-right">
                                       Importe pdte.
                                     </th>
+                                    <th
+                                      className="whitespace-nowrap px-2 py-2 text-center"
+                                      aria-label="Existencias por almacén"
+                                    >
+                                      <span className="sr-only">
+                                        Existencias
+                                      </span>
+                                      <Warehouse className="mx-auto h-3.5 w-3.5 text-gray-400" />
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {folio.articulos.map((r, idx) => (
                                     <tr
                                       key={`${r.articulo}-${r.almacen}-${idx}`}
-                                      className="border-t border-black/5 dark:border-white/10"
+                                      className="cursor-pointer border-t border-black/5 hover:bg-sky-50/60 dark:border-white/10 dark:hover:bg-sky-950/20"
+                                      title="Doble clic o botón para ver existencias por almacén"
+                                      onDoubleClick={() =>
+                                        abrirExistenciasArticulo(r)
+                                      }
                                     >
                                       <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px]">
                                         {r.articulo || "—"}
@@ -949,6 +993,24 @@ export default function ReportesPorSurtir() {
                                       <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                                         {formatCurrency(r.importePartPdte)}
                                       </td>
+                                      <td className="whitespace-nowrap px-2 py-2 text-center">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            abrirExistenciasArticulo(r);
+                                          }}
+                                          disabled={
+                                            !r.articulo?.trim() &&
+                                            !r.codigoProv?.trim()
+                                          }
+                                          title="Ver existencias por almacén"
+                                          className="inline-flex min-h-[32px] min-w-[32px] items-center justify-center rounded-lg border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-900/50"
+                                          aria-label={`Ver existencias de ${r.articulo || r.codigoProv}`}
+                                        >
+                                          <Warehouse className="h-3.5 w-3.5" />
+                                        </button>
+                                      </td>
                                     </tr>
                                   ))}
                                 </tbody>
@@ -965,6 +1027,12 @@ export default function ReportesPorSurtir() {
           })}
         </div>
       )}
+
+      <ModalExistenciasArticulo
+        abierto={existenciasCtx !== null}
+        contexto={existenciasCtx}
+        onCerrar={() => setExistenciasCtx(null)}
+      />
     </div>
   );
 }

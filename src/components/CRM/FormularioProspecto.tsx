@@ -1,3 +1,5 @@
+import { useState } from "react";
+import ModalConfirmacion from "../common/ModalConfirmacion";
 import {
   EntidadServicio,
   EstatusCatalogo,
@@ -6,7 +8,9 @@ import {
   GrupoSAP,
 } from "../../services/crmService";
 import { LeadPayload } from "../../services/leadsService";
+import TabsCreacionCliente from "./TabsCreacionCliente";
 import {
+  esEtapaCliente,
   fechaParaInput,
   prospectoInputClass,
   prospectoLabelClass,
@@ -34,11 +38,46 @@ export default function FormularioProspecto({
   servicios,
   gruposSAP,
 }: FormularioProspectoProps) {
+  const [crearClienteActivo, setCrearClienteActivo] = useState(false);
+  const [modalCrearCliente, setModalCrearCliente] = useState(false);
+  const [idEtapaPendiente, setIdEtapaPendiente] = useState("");
+
   const setIdSelect = (key: keyof LeadPayload, value: string) => {
     onChange(key, value ? Number(value) : null);
   };
 
+  const handleEtapaChange = (value: string) => {
+    const nuevoId = value ? Number(value) : null;
+    const eraCliente = esEtapaCliente(form.idEtapa, etapas);
+    const seraCliente = esEtapaCliente(nuevoId, etapas);
+
+    if (!eraCliente && seraCliente) {
+      setIdEtapaPendiente(value);
+      setModalCrearCliente(true);
+      return;
+    }
+
+    if (eraCliente && !seraCliente) {
+      setCrearClienteActivo(false);
+    }
+
+    setIdSelect("idEtapa", value);
+  };
+
+  const confirmarCrearCliente = () => {
+    setCrearClienteActivo(true);
+    setIdSelect("idEtapa", idEtapaPendiente);
+    setModalCrearCliente(false);
+    setIdEtapaPendiente("");
+  };
+
+  const cancelarCrearCliente = () => {
+    setModalCrearCliente(false);
+    setIdEtapaPendiente("");
+  };
+
   return (
+    <>
     <div className="space-y-6">
       <section>
         <h4 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
@@ -112,7 +151,7 @@ export default function FormularioProspecto({
             <label className={prospectoLabelClass}>Etapa</label>
             <select
               value={form.idEtapa ?? ""}
-              onChange={(e) => setIdSelect("idEtapa", e.target.value)}
+              onChange={(e) => handleEtapaChange(e.target.value)}
               className={prospectoInputClass}
             >
               <option value="">Sin etapa</option>
@@ -214,6 +253,19 @@ export default function FormularioProspecto({
           className={prospectoInputClass}
         />
       </section>
+
+      <TabsCreacionCliente visible={crearClienteActivo} />
     </div>
+
+      <ModalConfirmacion
+        abierto={modalCrearCliente}
+        titulo="¿Desea crear el cliente?"
+        mensaje="Se habilitarán las pestañas para capturar los datos de alta en SAP (General, Direcciones, Condición Pago, Método Pago, Finanzas y Campos de Usuario)."
+        textoConfirmar="Sí, crear cliente"
+        textoCancelar="No, cancelar"
+        onConfirmar={confirmarCrearCliente}
+        onCancelar={cancelarCrearCliente}
+      />
+    </>
   );
 }

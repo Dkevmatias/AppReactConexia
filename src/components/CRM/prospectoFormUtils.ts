@@ -1,5 +1,37 @@
 import { Lead, LeadPayload } from "../../services/leadsService";
 
+import { Etapa } from "../../services/crmService";
+
+export const TABS_CREACION_CLIENTE = [
+  { id: "general", label: "General" },
+  { id: "direcciones", label: "Direcciones" },
+  { id: "condicion-pago", label: "Condición Pago" },
+  { id: "metodo-pago", label: "Método Pago" },
+  { id: "finanzas", label: "Finanzas" },
+  { id: "campos-usuario", label: "Campos de Usuario" },
+] as const;
+
+export type TabCreacionClienteId = (typeof TABS_CREACION_CLIENTE)[number]["id"];
+
+function normalizarEtapaNombre(nombre: string): string {
+  return nombre
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+/** Etapa cuyo nombre es "Cliente" (sin importar acentos/mayúsculas). */
+export function esEtapaCliente(
+  idEtapa: number | null | undefined,
+  etapas: Etapa[],
+): boolean {
+  if (idEtapa == null || idEtapa <= 0) return false;
+  const etapa = etapas.find((e) => e.idEtapa === idEtapa);
+  if (!etapa?.nombre?.trim()) return false;
+  return normalizarEtapaNombre(etapa.nombre) === "cliente";
+}
+
 export function leadVacio(): LeadPayload {
   return {
     nombre: "",

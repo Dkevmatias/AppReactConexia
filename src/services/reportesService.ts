@@ -145,6 +145,7 @@ export interface PorSurtirGlobalItem {
   ulkp: number;
   ulkpsPartPdte: number;
   importePartPdte: number;
+  comentarios?: string;
 }
 
 /** Fila de GET /api/TransferStatus */
@@ -337,6 +338,7 @@ function normalizePorSurtirGlobalItem(
     ulkp: pickNumber(o, "ulkp", "Ulkp", "ULKP") ?? 0,
     ulkpsPartPdte: pickNumber(o, "ulkpsPartPdte", "UlkpsPartPdte") ?? 0,
     importePartPdte: pickNumber(o, "importePartPdte", "ImportePartPdte") ?? 0,
+    comentarios: pickString(o, "comentarios", "Comentarios") ?? undefined,
   };
 }
 
@@ -344,7 +346,14 @@ function unwrapList(raw: unknown): unknown[] {
   if (Array.isArray(raw)) return raw;
   if (!raw || typeof raw !== "object") return [];
   const o = raw as Record<string, unknown>;
-  for (const key of ["data", "Data", "items", "Items", "resultado", "Resultado"]) {
+  for (const key of [
+    "data",
+    "Data",
+    "items",
+    "Items",
+    "resultado",
+    "Resultado",
+  ]) {
     const v = o[key];
     if (Array.isArray(v)) return v;
   }
@@ -357,9 +366,7 @@ function normalizePorSurtirGlobalList(raw: unknown): PorSurtirGlobalItem[] {
     .filter((r): r is PorSurtirGlobalItem => r !== null);
 }
 
-function normalizeTransferStatusItem(
-  raw: unknown,
-): TransferStatusItem | null {
+function normalizeTransferStatusItem(raw: unknown): TransferStatusItem | null {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<
     string,
     unknown
@@ -622,9 +629,7 @@ export const getReportesService = {
   },
 
   /** Vendedores de reparto: GET /api/Vendedores/reparto?soloActivos=true */
-  getVendedoresReparto: async (
-    soloActivos = true,
-  ): Promise<Vendedores[]> => {
+  getVendedoresReparto: async (soloActivos = true): Promise<Vendedores[]> => {
     const qs = new URLSearchParams();
     if (soloActivos) qs.set("soloActivos", "true");
     const response = await api.get<unknown>(
@@ -659,6 +664,27 @@ export const getReportesService = {
         `No se pudo cargar Por surtir global (HTTP ${response.status}).`,
       );
     }
+
+    // DEBUG: quitar cuando se confirme comentarios
+    const listaRaw = unwrapList(response.data);
+    console.log(
+      `[PorSurtirGlobal] ${sucursal || "(sin sucursal)"} — ${listaRaw.length} filas. JSON completo:`,
+    );
+    console.log(JSON.stringify(response.data, null, 2));
+    (window as unknown as { __porSurtirDebug?: unknown }).__porSurtirDebug =
+      response.data;
+    const conComentario = listaRaw.filter((row) => {
+      if (!row || typeof row !== "object") return false;
+      const o = row as Record<string, unknown>;
+      const c =
+        o.comentarios ?? o.Comentarios ?? o.comentario ?? o.Comentario ?? "";
+      return String(c).trim().length > 0;
+    });
+    console.log(
+      `[PorSurtirGlobal] filas con comentarios: ${conComentario.length}`,
+      conComentario.slice(0, 20),
+    );
+
     return normalizePorSurtirGlobalList(response.data);
   },
 
@@ -686,9 +712,7 @@ export const getReportesService = {
       { timeout: 60_000 },
     );
     if (response.status < 200 || response.status >= 300) {
-      throw new Error(
-        `No se pudo cargar Traspasos (HTTP ${response.status}).`,
-      );
+      throw new Error(`No se pudo cargar Traspasos (HTTP ${response.status}).`);
     }
     return normalizeTransferStatusList(response.data);
   },
