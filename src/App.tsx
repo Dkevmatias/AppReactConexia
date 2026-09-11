@@ -25,11 +25,9 @@ import CambiarContrasena from "./pages/Clientes/CambiarContrasena";
 import RespuestaClientes from "./pages/ConfigPage/RespuestaClientes";
 import EntregasPremios from "./pages/ConfigPage/EntregasPremios";
 import CrmConfiguracion from "./pages/CRM/CrmConfiguracion";
-import CatalogoEtapas from "./pages/CRM/CatalogoEtapas";
-import CatalogoFuentes from "./pages/CRM/CatalogoFuentes";
-import CatalogoSeguimientos from "./pages/CRM/CatalogoSeguimientos";
-import CatalogoEstatus from "./pages/CRM/CatalogoEstatus";
-import CatalogoTipoEstatus from "./pages/CRM/CatalogoTipoEstatus";
+import CrmCatalogos from "./pages/CRM/CrmCatalogos";
+import CrmClientes from "./pages/CRM/CrmClientes";
+import CrmSeguimientos from "./pages/CRM/CrmSeguimientos";
 import Prospectos from "./pages/CRM/Prospectos";
 import ProspectoFormPage from "./pages/CRM/ProspectoFormPage";
 import Articulos from "./pages/Ventas/Articulos";
@@ -143,17 +141,33 @@ export default function App() {
               path="/CRM/Prospectos/:idLead"
               element={<ProspectoFormPage />}
             />
+            <Route path="/CRM/Seguimientos" element={<CrmSeguimientos />} />
+            <Route path="/CRM/Clientes" element={<CrmClientes />} />
             <Route path="/CRM/Configuración" element={<CrmConfiguracion />} />
-            <Route path="/CRM/CatalogoEtapas" element={<CatalogoEtapas />} />
-            <Route path="/CRM/CatalogoFuentes" element={<CatalogoFuentes />} />
+            <Route path="/CRM/Catalogos" element={<CrmCatalogos />} />
+            <Route
+              path="/CRM/CatalogoEtapas"
+              element={<Navigate to="/CRM/Catalogos?tab=etapas" replace />}
+            />
+            <Route
+              path="/CRM/CatalogoFuentes"
+              element={<Navigate to="/CRM/Catalogos?tab=fuentes" replace />}
+            />
             <Route
               path="/CRM/CatalogoSeguimientos"
-              element={<CatalogoSeguimientos />}
+              element={
+                <Navigate to="/CRM/Catalogos?tab=seguimientos" replace />
+              }
             />
-            <Route path="/CRM/CatalogoEstatus" element={<CatalogoEstatus />} />
+            <Route
+              path="/CRM/CatalogoEstatus"
+              element={<Navigate to="/CRM/Catalogos?tab=estatus" replace />}
+            />
             <Route
               path="/CRM/CatalogoTipoEstatus"
-              element={<CatalogoTipoEstatus />}
+              element={
+                <Navigate to="/CRM/Catalogos?tab=tipo-estatus" replace />
+              }
             />
             <Route
               path="/operaciones/BitacoraCobranza"

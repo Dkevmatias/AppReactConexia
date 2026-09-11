@@ -36,8 +36,13 @@ const isAuthBypassUrl = (url?: string) => {
   return (
     u.includes("/api/acceso/login") ||
     u.includes("/api/acceso/refresh") ||
-    u.includes("/api/acceso/checkauth")
+    u.includes("/api/acceso/logout")
   );
+};
+
+const isCheckAuthUrl = (url?: string) => {
+  if (!url) return false;
+  return url.toLowerCase().includes("/api/acceso/checkauth");
 };
 
 type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
@@ -90,44 +95,58 @@ async function callRefreshEndpoint(): Promise<boolean> {
   return true;
 }
 
-async function handleUnauthorized(
-  originalRequest: RetryableConfig,
-): Promise<AxiosResponse> {
-  if (isAuthBypassUrl(originalRequest.url) || originalRequest._retry) {
-    return api(originalRequest);
-  }
-
+/** Renueva la sesión. Usado por el interceptor y por AuthProvider (intervalo / visibilidad). */
+export async function tryRefreshSession(): Promise<boolean> {
   if (isRefreshing) {
-    await new Promise<void>((resolve, reject) => {
-      failedQueue.push({
-        resolve: () => resolve(),
-        reject,
+    try {
+      await new Promise<void>((resolve, reject) => {
+        failedQueue.push({
+          resolve: () => resolve(),
+          reject,
+        });
       });
-    });
-    return api(originalRequest);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
-  originalRequest._retry = true;
   isRefreshing = true;
-
   try {
     const ok = await callRefreshEndpoint();
     if (!ok) {
       processQueue(new Error("Refresh failed"));
-      clearTokenFallback();
-      window.location.href = "/signin";
-      return Promise.reject(new Error("Sesión expirada"));
+      return false;
     }
     processQueue();
-    return api(originalRequest);
+    return true;
   } catch (refreshError) {
     processQueue(refreshError);
-    clearTokenFallback();
-    window.location.href = "/signin";
-    return Promise.reject(refreshError);
+    return false;
   } finally {
     isRefreshing = false;
   }
+}
+
+async function handleUnauthorized(
+  originalRequest: RetryableConfig,
+  originalResponse: AxiosResponse,
+): Promise<AxiosResponse> {
+  if (isAuthBypassUrl(originalRequest.url) || originalRequest._retry) {
+    return originalResponse;
+  }
+
+  originalRequest._retry = true;
+  const ok = await tryRefreshSession();
+  if (!ok) {
+    clearTokenFallback();
+    if (!isCheckAuthUrl(originalRequest.url)) {
+      window.location.href = "/signin";
+    }
+    return originalResponse;
+  }
+
+  return api(originalRequest);
 }
 
 api.interceptors.response.use(
@@ -135,12 +154,12 @@ api.interceptors.response.use(
     if (response.status !== 401) return response;
 
     const originalRequest = response.config as RetryableConfig;
-    return handleUnauthorized(originalRequest);
+    return handleUnauthorized(originalRequest, response);
   },
   async (error) => {
     const originalRequest = error.config as RetryableConfig | undefined;
     if (error.response?.status === 401 && originalRequest) {
-      return handleUnauthorized(originalRequest);
+      return handleUnauthorized(originalRequest, error.response);
     }
     return Promise.reject(error);
   },

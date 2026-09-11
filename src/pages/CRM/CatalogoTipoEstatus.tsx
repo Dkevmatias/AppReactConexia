@@ -19,7 +19,11 @@ function estatusActivoClass(estatus: EstatusCrm): string {
     : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300";
 }
 
-export default function CatalogoTipoEstatus() {
+export default function CatalogoTipoEstatus({
+  embebido = false,
+}: {
+  embebido?: boolean;
+}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,31 +115,46 @@ export default function CatalogoTipoEstatus() {
   };
 
   return (
-    <div className="space-y-6 p-6">
-      <PageMeta
-        title="Catálogo de Tipo Estatus"
-        description="Administre los tipos de estatus del CRM."
-      />
+    <div className={embebido ? "space-y-4" : "space-y-6 p-6"}>
+      {!embebido ? (
+        <PageMeta
+          title="Catálogo de Tipo Estatus"
+          description="Administre los tipos de estatus del CRM."
+        />
+      ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Catálogo de Tipo Estatus
-          </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Defina los tipos de estatus que agrupan o clasifican los estatus del
-            CRM.
-          </p>
+      {!embebido ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+              Catálogo de Tipo Estatus
+            </h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Defina los tipos de estatus que agrupan o clasifican los estatus
+              del CRM.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void cargar()}
+            disabled={loading}
+            className="text-sm font-medium text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
+          >
+            Actualizar
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => void cargar()}
-          disabled={loading}
-          className="text-sm font-medium text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
-        >
-          Actualizar
-        </button>
-      </div>
+      ) : (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => void cargar()}
+            disabled={loading}
+            className="text-sm font-medium text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
+          >
+            Actualizar
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/30 dark:text-red-200">

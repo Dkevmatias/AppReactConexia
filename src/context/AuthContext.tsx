@@ -7,7 +7,10 @@ import {
   mergeSessionUser,
   Modulo,
 } from "../services/authService";
+import { tryRefreshSession } from "../services/apiServices";
 import { clearTokenFallback } from "../utils/tokenFallback";
+
+const SESSION_REFRESH_MS = 10 * 60 * 1000;
 
 interface User {
   role: number;
@@ -42,6 +45,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     void checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "hidden") return;
+      void tryRefreshSession();
+    };
+
+    const intervalId = window.setInterval(refreshIfVisible, SESSION_REFRESH_MS);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
+  }, [user]);
 
   const checkAuth = async () => {
     try {

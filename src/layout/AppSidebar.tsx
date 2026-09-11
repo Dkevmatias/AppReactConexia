@@ -172,7 +172,7 @@ const navItems: NavItem[] = [
         pro: false,
       },
       {
-        name: "Seguimintos de Prospectos",
+        name: "Seguimientos de Prospectos",
         path: "/CRM/Seguimientos",
         icon: <RxActivityLog className="w-4 h-4 shrink-0" />,
         pro: false,
@@ -184,39 +184,8 @@ const navItems: NavItem[] = [
         pro: false,
       },
       {
-        name: "Catalogo de Etapas",
-        path: "/CRM/CatalogoEtapas",
-        icon: <MdViewList className="w-4 h-4 shrink-0" />,
-        pro: false,
-      },
-      {
-        name: "Catalogo de Fuentes",
-        path: "/CRM/CatalogoFuentes",
-        icon: <MdViewList className="w-4 h-4 shrink-0" />,
-        pro: false,
-      },
-
-      {
-        name: "Catalogo de Seguimientos",
-        path: "/CRM/CatalogoSeguimientos",
-        icon: <MdViewList className="w-4 h-4 shrink-0" />,
-        pro: false,
-      },
-      {
-        name: "Catalogo de Estatus",
-        path: "/CRM/CatalogoEstatus",
-        icon: <MdViewList className="w-4 h-4 shrink-0" />,
-        pro: false,
-      },
-      {
-        name: "Catalogo de Tipo Estatus",
-        path: "/CRM/CatalogoTipoEstatus",
-        icon: <MdViewList className="w-4 h-4 shrink-0" />,
-        pro: false,
-      },
-      {
-        name: "Citas y Actividades",
-        path: "/CRM/CitasActividades",
+        name: "Catálogos",
+        path: "/CRM/Catalogos",
         icon: <MdViewList className="w-4 h-4 shrink-0" />,
         pro: false,
       },

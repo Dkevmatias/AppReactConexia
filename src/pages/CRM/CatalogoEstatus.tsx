@@ -36,7 +36,11 @@ function primerTipoActivo(tipos: TipoEstatusCatalogo[]): number {
   return activo?.idTipoEstatus ?? tipos[0]?.idTipoEstatus ?? 0;
 }
 
-export default function CatalogoEstatus() {
+export default function CatalogoEstatus({
+  embebido = false,
+}: {
+  embebido?: boolean;
+}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -160,36 +164,51 @@ export default function CatalogoEstatus() {
   const sinTipos = !loading && tiposEstatus.length === 0;
 
   return (
-    <div className="space-y-6 p-6">
-      <PageMeta
-        title="Catálogo de Estatus"
-        description="Administre los estatus disponibles en el CRM."
-      />
+    <div className={embebido ? "space-y-4" : "space-y-6 p-6"}>
+      {!embebido ? (
+        <PageMeta
+          title="Catálogo de Estatus"
+          description="Administre los estatus disponibles en el CRM."
+        />
+      ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Catálogo de Estatus
-          </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Cada estatus debe asociarse a un tipo de estatus del catálogo
-            correspondiente.
-          </p>
+      {!embebido ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+              Catálogo de Estatus
+            </h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Cada estatus debe asociarse a un tipo de estatus del catálogo
+              correspondiente.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void cargar()}
+            disabled={loading}
+            className="text-sm font-medium text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
+          >
+            Actualizar
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => void cargar()}
-          disabled={loading}
-          className="text-sm font-medium text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
-        >
-          Actualizar
-        </button>
-      </div>
+      ) : (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => void cargar()}
+            disabled={loading}
+            className="text-sm font-medium text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
+          >
+            Actualizar
+          </button>
+        </div>
+      )}
 
       {sinTipos && (
         <div className="rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-          No hay tipos de estatus registrados. Cree al menos uno en el{" "}
-          <strong>Catálogo de Tipo Estatus</strong> antes de agregar estatus.
+          No hay tipos de estatus registrados. Cree al menos uno en la pestaña{" "}
+          <strong>Tipo Estatus</strong> antes de agregar estatus.
         </div>
       )}
 

@@ -58,6 +58,8 @@ function errorDesdeRespuesta(data: unknown, fallback: string): string {
     const o = data as Record<string, unknown>;
     if (typeof o.message === "string" && o.message) return o.message;
     if (typeof o.mensaje === "string" && o.mensaje) return o.mensaje;
+    if (typeof o.detail === "string" && o.detail) return o.detail;
+    if (typeof o.title === "string" && o.title) return o.title;
   }
   return fallback;
 }
@@ -533,7 +535,11 @@ export const leadsService = {
   },
 
   actualizarLead: async (id: number, payload: LeadPayload): Promise<Lead> => {
-    const response = await api.put<Lead>(`/api/Leads/${id}`, payload);
+    const response = await api.put<Lead>(`/api/Leads/${id}`, {
+      ...payload,
+      idLead: id,
+      fechaLlegada: payload.fechallegada,
+    });
     return assertOk(response, "No se pudo actualizar el prospecto.");
   },
 

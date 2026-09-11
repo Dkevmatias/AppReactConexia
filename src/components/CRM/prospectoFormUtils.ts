@@ -1,19 +1,17 @@
 import { Lead, LeadPayload } from "../../services/leadsService";
 
-import { Etapa } from "../../services/crmService";
+import { EstatusCatalogo, Etapa, EtapaConfiguracion } from "../../services/crmService";
 
 export const TABS_CREACION_CLIENTE = [
   { id: "general", label: "General" },
   { id: "direcciones", label: "Direcciones" },
   { id: "condicion-pago", label: "Condición Pago" },
-  { id: "metodo-pago", label: "Método Pago" },
-  { id: "finanzas", label: "Finanzas" },
   { id: "campos-usuario", label: "Campos de Usuario" },
 ] as const;
 
 export type TabCreacionClienteId = (typeof TABS_CREACION_CLIENTE)[number]["id"];
 
-function normalizarEtapaNombre(nombre: string): string {
+function normalizarNombreCatalogo(nombre: string): string {
   return nombre
     .trim()
     .toLowerCase()
@@ -21,7 +19,62 @@ function normalizarEtapaNombre(nombre: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-/** Etapa cuyo nombre es "Cliente" (sin importar acentos/mayúsculas). */
+function buscarEtapaPorNombre(
+  etapas: Etapa[],
+  nombre: string,
+): number | null {
+  const target = normalizarNombreCatalogo(nombre);
+  const etapa = etapas.find(
+    (e) => normalizarNombreCatalogo(e.nombre) === target,
+  );
+  return etapa?.idEtapa ?? null;
+}
+
+function buscarEstatusPorNombre(
+  estatusLista: EstatusCatalogo[],
+  nombre: string,
+): number | null {
+  const target = normalizarNombreCatalogo(nombre);
+  const estatus = estatusLista.find(
+    (e) => normalizarNombreCatalogo(e.nombre) === target,
+  );
+  return estatus?.idEstatus ?? null;
+}
+
+/** Etapas del funnel (orden). Si no hay funnel, se usan todas las del catálogo. */
+export function etapasDelFunnel(
+  etapas: Etapa[],
+  funnel: EtapaConfiguracion[],
+  idEtapaActual?: number | null,
+): Etapa[] {
+  const activos = funnel
+    .filter((c) => {
+      const e = (c.estatus ?? "").trim().toLowerCase();
+      return e !== "i" && e !== "inactivo";
+    })
+    .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0));
+
+  if (activos.length === 0) return etapas;
+
+  const byId = new Map(etapas.map((e) => [e.idEtapa, e]));
+  const ordered: Etapa[] = [];
+  const seen = new Set<number>();
+
+  for (const c of activos) {
+    const etapa = byId.get(c.idEtapa);
+    if (etapa && !seen.has(etapa.idEtapa)) {
+      ordered.push(etapa);
+      seen.add(etapa.idEtapa);
+    }
+  }
+
+  if (idEtapaActual && !seen.has(idEtapaActual)) {
+    const extra = byId.get(idEtapaActual);
+    if (extra) ordered.push(extra);
+  }
+
+  return ordered.length > 0 ? ordered : etapas;
+}
 export function esEtapaCliente(
   idEtapa: number | null | undefined,
   etapas: Etapa[],
@@ -29,7 +82,7 @@ export function esEtapaCliente(
   if (idEtapa == null || idEtapa <= 0) return false;
   const etapa = etapas.find((e) => e.idEtapa === idEtapa);
   if (!etapa?.nombre?.trim()) return false;
-  return normalizarEtapaNombre(etapa.nombre) === "cliente";
+  return normalizarNombreCatalogo(etapa.nombre) === "cliente";
 }
 
 export function leadVacio(): LeadPayload {
@@ -61,6 +114,20 @@ export function leadVacio(): LeadPayload {
     ciudad: "",
     municipio: "",
     fechallegada: null,
+  };
+}
+
+/** Valores iniciales al crear un prospecto nuevo. */
+export function valoresDefectoNuevoProspecto(
+  base: LeadPayload,
+  etapas: Etapa[],
+  estatusLista: EstatusCatalogo[],
+): LeadPayload {
+  return {
+    ...base,
+    idEtapa: buscarEtapaPorNombre(etapas, "Contacto") ?? base.idEtapa,
+    idEstatus: buscarEstatusPorNombre(estatusLista, "Nuevo") ?? base.idEstatus,
+    fechallegada: new Date().toISOString(),
   };
 }
 

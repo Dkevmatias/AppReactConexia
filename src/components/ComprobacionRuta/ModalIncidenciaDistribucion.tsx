@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Plus, Printer, Trash2, X } from "lucide-react";
 import { DocODistribucionDetalle } from "../../services/oDistribucionService";
 import {
   esIncidenciaFinalizada,
@@ -19,6 +19,7 @@ import {
   ItemEntrega,
   itemEntregaService,
 } from "../../services/itemEntregaService";
+import { abrirPdfDevolucionIncidencia } from "./generarPdfDevolucionIncidencia";
 
 const inputClass =
   "box-border w-full max-w-full min-w-0 min-h-[44px] rounded-lg border border-gray-300 bg-white px-2.5 py-2 text-base sm:min-h-[40px] sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white touch-manipulation";
@@ -36,6 +37,7 @@ function formDesdeIncidencia(incidencia: IncidenciaCompleta) {
       idIncidenciaDetalle: detalle.idIncidenciaDetalle,
       articulo: detalle.itemCode,
       descripcion: detalle.itemName,
+      codigoProveedor: detalle.codigoProveedor || "",
       cantidad: String(detalle.cantidad > 0 ? detalle.cantidad : 1),
       idEstado: detalle.idEstado > 0 ? String(detalle.idEstado) : "",
       observaciones: detalle.observaciones,
@@ -63,6 +65,7 @@ export type ContextoIncidenciaDistribucion = {
 type LineaDetalleIncidencia = {
   idLocal: string;
   idIncidenciaDetalle?: number | null;
+  codigoProveedor: string;
   articulo: string;
   descripcion: string;
   cantidad: string;
@@ -79,6 +82,7 @@ function nuevaLineaDetalle(idEstadoDefault = ""): LineaDetalleIncidencia {
     cantidad: "1",
     idEstado: idEstadoDefault,
     observaciones: "",
+    codigoProveedor: "",
   };
 }
 
@@ -268,8 +272,7 @@ export default function ModalIncidenciaDistribucion({
         }
 
         const solucion =
-          solucionDesdeIncidencia(incidencia) ||
-          (solucionInicial ?? "").trim();
+          solucionDesdeIncidencia(incidencia) || (solucionInicial ?? "").trim();
 
         setIncidenciaVer({
           ...incidencia,
@@ -277,7 +280,10 @@ export default function ModalIncidenciaDistribucion({
           detalles: incidencia.detalles.map((detalle, index) => {
             const linea = formData.lineas[index];
             if (!linea?.idIncidenciaDetalle) return detalle;
-            if (detalle.idIncidenciaDetalle && detalle.idIncidenciaDetalle > 0) {
+            if (
+              detalle.idIncidenciaDetalle &&
+              detalle.idIncidenciaDetalle > 0
+            ) {
               return detalle;
             }
             return {
@@ -397,6 +403,80 @@ export default function ModalIncidenciaDistribucion({
     }));
   };
 
+  /** Mapeo provisional — confirma de dónde debe salir cada campo del formato. */
+  const handleImprimir = () => {
+    if (!contexto) return;
+    const { documento } = contexto;
+
+    const mapaCodigoProv = new Map<string, string>();
+    for (const item of itemsEntrega) {
+      if (item.item?.trim()) {
+        mapaCodigoProv.set(
+          item.item.trim(),
+          item.codigoProveedor?.trim() || "",
+        );
+      }
+    }
+    for (const d of incidenciaVer?.detalles ?? []) {
+      if (d.itemCode?.trim() && d.codigoProveedor?.trim()) {
+        mapaCodigoProv.set(d.itemCode.trim(), d.codigoProveedor.trim());
+      }
+    }
+
+    const productos = form.lineas
+      .filter((l) => l.articulo.trim() || l.descripcion.trim())
+      .map((l) => ({
+        codigoProveedor:
+          mapaCodigoProv.get(l.articulo.trim()) || l.articulo.trim(),
+        cantidad: l.cantidad,
+        descripcion: l.descripcion,
+      }));
+
+    const fechaRaw = (incidenciaVer?.fechaCreacion ?? "").trim();
+    let fecha = "";
+    if (fechaRaw) {
+      const d = new Date(fechaRaw);
+      if (!Number.isNaN(d.getTime())) {
+        fecha = d.toLocaleDateString("es-MX", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+      } else {
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fechaRaw);
+        fecha = m ? `${m[3]}/${m[2]}/${m[1]}` : fechaRaw;
+      }
+    }
+
+    const vendedorDetalle =
+      incidenciaVer?.detalles
+        .find((d) => d.vendedor?.trim())
+        ?.vendedor?.trim() || "";
+
+    const ok = abrirPdfDevolucionIncidencia({
+      nombreCliente:
+        documento.cardName?.trim() || incidenciaVer?.cardName?.trim() || "",
+      folio: String(
+        documento.entrega || contexto.folioOrden || contexto.idIncidencia || "",
+      ),
+      vendedor: documento.slpName?.trim() || vendedorDetalle,
+      fecha,
+      ruta: "",
+      noCuenta:
+        documento.cardCode?.trim() || incidenciaVer?.cardCode?.trim() || "",
+      odistribucion: contexto.folioOrden || documento.documento || 0,
+      productos,
+      observaciones: form.observacionesEncabezado.trim(),
+      importe: "",
+    });
+
+    if (!ok) {
+      setError(
+        "No se pudo abrir la ventana de impresión. Revisa el bloqueo de ventanas emergentes.",
+      );
+    }
+  };
+
   const handleGuardar = async () => {
     if (!contexto || modoVer) return;
     const idTipo = Number(form.idTipoIncidencia);
@@ -471,6 +551,7 @@ export default function ModalIncidenciaDistribucion({
           ? form.lineas.map((linea) => ({
               idOrdenEntrega,
               itemCode: linea.articulo.trim(),
+              codigoProveedor: linea.codigoProveedor.trim(), // Temporal, hasta que se defina de dónde sale
               itemName: linea.descripcion.trim(),
               cantidad: Number(linea.cantidad),
               idEstado: Number(linea.idEstado),
@@ -565,9 +646,7 @@ export default function ModalIncidenciaDistribucion({
       }
       const idEstado = Number(linea.idEstado);
       if (!Number.isFinite(idEstado) || idEstado <= 0) {
-        setError(
-          `Seleccione el estado del artículo en la fila ${index + 1}.`,
-        );
+        setError(`Seleccione el estado del artículo en la fila ${index + 1}.`);
         return;
       }
     }
@@ -576,8 +655,7 @@ export default function ModalIncidenciaDistribucion({
     setError(null);
     try {
       const vendedorFallback = (contexto?.documento.slpName ?? "").trim();
-      const estatusFallback =
-        (incidenciaVer.estatus ?? "").trim() || "P";
+      const estatusFallback = (incidenciaVer.estatus ?? "").trim() || "P";
 
       const lote = form.lineas.map((linea) => {
         const idDetalle = linea.idIncidenciaDetalle!;
@@ -595,14 +673,11 @@ export default function ModalIncidenciaDistribucion({
           itemName: linea.descripcion.trim(),
           cantidad: Number(linea.cantidad) || detalleOrig?.cantidad || 0,
           idEstado: Number(linea.idEstado),
-          vendedor:
-            (detalleOrig?.vendedor ?? "").trim() || vendedorFallback,
+          vendedor: (detalleOrig?.vendedor ?? "").trim() || vendedorFallback,
           observaciones:
-            linea.observaciones.trim() ||
-            form.observacionesEncabezado.trim(),
+            linea.observaciones.trim() || form.observacionesEncabezado.trim(),
           idUsuarioEdicion: idUsuarioCreacion,
-          estatus:
-            (detalleOrig?.estatus ?? "").trim() || estatusFallback,
+          estatus: (detalleOrig?.estatus ?? "").trim() || estatusFallback,
           activo: true,
         };
       });
@@ -1014,9 +1089,7 @@ export default function ModalIncidenciaDistribucion({
                                     : inputClass
                                 }
                                 value={linea.observaciones}
-                                readOnly={
-                                  modoVer && !puedeActualizarDevolucion
-                                }
+                                readOnly={modoVer && !puedeActualizarDevolucion}
                                 onChange={(e) =>
                                   actualizarLinea(
                                     linea.idLocal,
@@ -1165,8 +1238,8 @@ export default function ModalIncidenciaDistribucion({
                     </p>
                   ) : (
                     <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                      La solución queda a nivel incidencia (no por cada
-                      artículo del detalle).
+                      La solución queda a nivel incidencia (no por cada artículo
+                      del detalle).
                     </p>
                   )}
                 </section>
@@ -1185,6 +1258,15 @@ export default function ModalIncidenciaDistribucion({
                 className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 touch-manipulation"
               >
                 Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={handleImprimir}
+                disabled={loadingIncidencia}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 touch-manipulation"
+              >
+                <Printer className="h-4 w-4" />
+                Imprimir
               </button>
               {puedeActualizarDevolucion ? (
                 <button
@@ -1231,6 +1313,15 @@ export default function ModalIncidenciaDistribucion({
                 className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 touch-manipulation"
               >
                 Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleImprimir}
+                disabled={guardando || loadingTipos}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 touch-manipulation"
+              >
+                <Printer className="h-4 w-4" />
+                Imprimir
               </button>
               <button
                 type="button"

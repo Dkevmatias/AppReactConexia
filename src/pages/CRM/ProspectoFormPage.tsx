@@ -2,11 +2,35 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
+import ActivityTimeline from "../../components/CRM/ActivityTimeline";
 import FormularioProspecto from "../../components/CRM/FormularioProspecto";
+import ModalJsonSapCliente from "../../components/CRM/ModalJsonSapCliente";
 import {
+  clienteAltaVacio,
+  clienteAltaDesdeApi,
+  contactoFormDesdeApi,
+  direccionFormDesdeApi,
+  prellenarClienteDesdeLead,
+  armarPayloadClienteCreate,
+  armarPayloadClienteUpdate,
+  armarPayloadsContactos,
+  armarPayloadContacto,
+  armarPayloadDireccion,
+  armarPayloadSapBusinessPartner,
+  validarClienteAlta,
+  esClienteEnviadoSap,
+  PERMISO_CLIENTE_EDITAR_POST_SAP,
+  type ClienteAltaForm,
+  type ContactoClienteForm,
+  type DireccionClienteForm,
+} from "../../components/CRM/clienteAltaUtils";
+import {
+  esEtapaCliente,
+  etapasDelFunnel,
   leadToForm,
   leadVacio,
   prepararPayload,
+  valoresDefectoNuevoProspecto,
 } from "../../components/CRM/prospectoFormUtils";
 import {
   crmService,
@@ -16,13 +40,20 @@ import {
   Fuente,
   GrupoSAP,
 } from "../../services/crmService";
-import { LeadPayload, leadsService } from "../../services/leadsService";
+import { LeadPayload, leadsService, normalizeLead } from "../../services/leadsService";
 import { useAuth } from "../../hooks/useAuth";
+import { clienteService } from "../../services/clienteService";
+import { getContextoOperativoPersona } from "../../services/authService";
+import {
+  activityTimelineService,
+  type ActivityTimelineItem,
+} from "../../services/activityTimelineService";
+import { permisoActivo } from "../../utils/permisosModulo";
 
 export default function ProspectoFormPage() {
   const { idLead: idLeadParam } = useParams<{ idLead?: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, menu } = useAuth();
 
   const idLead = idLeadParam ? Number(idLeadParam) : null;
   const esEdicion = idLead != null && !Number.isNaN(idLead) && idLead > 0;
@@ -36,6 +67,26 @@ export default function ProspectoFormPage() {
   const [estatusLista, setEstatusLista] = useState<EstatusCatalogo[]>([]);
   const [servicios, setServicios] = useState<EntidadServicio[]>([]);
   const [gruposSAP, setGruposSAP] = useState<GrupoSAP[]>([]);
+  const [clienteAlta, setClienteAlta] = useState<ClienteAltaForm>(clienteAltaVacio());
+  const [clienteGuardadoId, setClienteGuardadoId] = useState<number | null>(null);
+  const [clienteCardCode, setClienteCardCode] = useState<string | null>(null);
+  const [clienteEstatusSap, setClienteEstatusSap] = useState<string | null>(null);
+  const [cardCodeDraft, setCardCodeDraft] = useState("");
+  const [mensajeOk, setMensajeOk] = useState<string | null>(null);
+  const [jsonSapVisible, setJsonSapVisible] = useState(false);
+  const [enviandoSap, setEnviandoSap] = useState(false);
+  const [mensajeEnvioSap, setMensajeEnvioSap] = useState<string | null>(null);
+  const [errorEnvioSap, setErrorEnvioSap] = useState<string | null>(null);
+  const [actividades, setActividades] = useState<ActivityTimelineItem[]>([]);
+  const [loadingActividades, setLoadingActividades] = useState(false);
+
+  const clienteYaEnviadoSap = esClienteEnviadoSap(clienteEstatusSap);
+  const puedeEditarPostSap = menu.some((m) =>
+    permisoActivo(m.permisos, PERMISO_CLIENTE_EDITAR_POST_SAP),
+  );
+  const clienteSoloLectura = clienteYaEnviadoSap && !puedeEditarPostSap;
+  const puedeEnviarASap =
+    clienteGuardadoId != null && !clienteYaEnviadoSap;
 
   const volverAlListado = () => {
     navigate("/CRM/Prospectos");
@@ -45,8 +96,15 @@ export default function ProspectoFormPage() {
     setLoading(true);
     setError(null);
 
+    setClienteAlta(clienteAltaVacio());
+    setClienteGuardadoId(null);
+    setClienteCardCode(null);
+    setClienteEstatusSap(null);
+    setActividades([]);
+
     const [
       etapasRes,
+      funnelRes,
       fuentesRes,
       estatusRes,
       serviciosRes,
@@ -54,6 +112,7 @@ export default function ProspectoFormPage() {
       leadRes,
     ] = await Promise.allSettled([
       crmService.getEtapas(),
+      crmService.getEtapaConfiguraciones(),
       crmService.getFuentes(),
       crmService.getEstatusCatalogo(),
       crmService.getEntidadesServicio(),
@@ -63,7 +122,12 @@ export default function ProspectoFormPage() {
         : Promise.resolve(null),
     ]);
 
-    if (etapasRes.status === "fulfilled") setEtapas(etapasRes.value);
+    const etapasCatalogo =
+      etapasRes.status === "fulfilled" ? etapasRes.value : [];
+    const funnel =
+      funnelRes.status === "fulfilled" ? funnelRes.value : [];
+    const etapasCargadas = etapasDelFunnel(etapasCatalogo, funnel);
+    setEtapas(etapasCargadas);
     if (fuentesRes.status === "fulfilled") setFuentes(fuentesRes.value);
     if (estatusRes.status === "fulfilled") setEstatusLista(estatusRes.value);
     if (serviciosRes.status === "fulfilled") setServicios(serviciosRes.value);
@@ -71,7 +135,66 @@ export default function ProspectoFormPage() {
 
     if (esEdicion) {
       if (leadRes.status === "fulfilled" && leadRes.value) {
-        setForm(leadToForm(leadRes.value));
+        const leadForm = leadToForm(leadRes.value);
+        setForm(leadForm);
+        const etapasCargadas = etapasDelFunnel(
+          etapasCatalogo,
+          funnel,
+          leadForm.idEtapa,
+        );
+        setEtapas(etapasCargadas);
+        if (idLead) {
+          try {
+            const existente = await clienteService.getPorLeadOrigen(idLead);
+            if (existente) {
+              setClienteGuardadoId(existente.idCliente);
+              setClienteCardCode(existente.cardCode);
+              setClienteEstatusSap(existente.estatusSap);
+              const detalle = await clienteService.getById(existente.idCliente);
+              const alta = clienteAltaDesdeApi(detalle);
+              let contactos = alta.contactos;
+              try {
+                const contactosApi = await clienteService.getContactos({
+                  idLead,
+                  idCliente: existente.idCliente,
+                });
+                if (contactosApi.length > 0) {
+                  contactos = contactosApi.map(contactoFormDesdeApi);
+                }
+              } catch {
+                /* se usan los contactos del GET Cliente si existen */
+              }
+              setClienteAlta({ ...alta, contactos });
+            } else if (esEtapaCliente(leadForm.idEtapa, etapasCargadas)) {
+              setClienteAlta(
+                prellenarClienteDesdeLead({
+                  actual: clienteAltaVacio(),
+                  nombre: leadForm.nombre,
+                  aPaterno: leadForm.aPaterno,
+                  telefono: leadForm.telefono,
+                  correo: leadForm.correo,
+                }),
+              );
+            }
+          } catch (err) {
+            setError(
+              err instanceof Error
+                ? err.message
+                : "No se pudo cargar el cliente ligado al prospecto.",
+            );
+          }
+
+          setLoadingActividades(true);
+          try {
+            const timeline = await activityTimelineService.getByLead(idLead);
+            setActividades(timeline);
+          } catch (err) {
+            console.error("No se pudo cargar el timeline", err);
+            setActividades([]);
+          } finally {
+            setLoadingActividades(false);
+          }
+        }
       } else {
         setError(
           leadRes.status === "rejected" && leadRes.reason instanceof Error
@@ -81,19 +204,37 @@ export default function ProspectoFormPage() {
       }
     } else {
       const base = leadVacio();
-      if (user?.idPersona) {
-        base.idUsuarioCreacion = user.idPersona;
-        base.idUsuarioAsignado = user.idPersona;
+      if (user?.idUsuario) {
+        base.idUsuarioCreacion = user.idUsuario;
+        base.idUsuarioAsignado = user.idUsuario;
       }
-      setForm(base);
+      const estatusCargados =
+        estatusRes.status === "fulfilled" ? estatusRes.value : [];
+      setForm(valoresDefectoNuevoProspecto(base, etapasCargadas, estatusCargados));
     }
 
     setLoading(false);
-  }, [esEdicion, idLead, user?.idPersona]);
+  }, [esEdicion, idLead, user?.idUsuario]);
 
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  const recargarActividades = useCallback(async () => {
+    if (!idLead || idLead <= 0) {
+      setActividades([]);
+      return;
+    }
+    setLoadingActividades(true);
+    try {
+      const timeline = await activityTimelineService.getByLead(idLead);
+      setActividades(timeline);
+    } catch (err) {
+      console.error("No se pudo cargar el timeline", err);
+    } finally {
+      setLoadingActividades(false);
+    }
+  }, [idLead]);
 
   const setCampo = <K extends keyof LeadPayload>(
     key: K,
@@ -102,19 +243,345 @@ export default function ProspectoFormPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const actualizarClienteAlta = (parcial: Partial<ClienteAltaForm>) => {
+    if (clienteSoloLectura) return;
+    setClienteAlta((prev) => ({ ...prev, ...parcial }));
+  };
+
+  const guardarContactosDesdeModal = async (contactos: ContactoClienteForm[]) => {
+    if (clienteSoloLectura) {
+      throw new Error(
+        "El cliente ya fue enviado a SAP; no se pueden modificar contactos.",
+      );
+    }
+    if (!clienteGuardadoId || !idLead) {
+      actualizarClienteAlta({ contactos });
+      setMensajeOk(
+        "Contactos listos en el formulario. Pulse Guardar para grabarlos en el CRM.",
+      );
+      return;
+    }
+
+    const contexto = user?.idPersona
+      ? await getContextoOperativoPersona(user.idPersona)
+      : null;
+    const idEmpresa = form.idEmpresa || contexto?.idEmpresa || 0;
+    const idsNuevos = new Set(
+      contactos
+        .map((c) => c.idContacto)
+        .filter((id): id is number => typeof id === "number" && id > 0),
+    );
+
+    for (const previo of clienteAlta.contactos) {
+      const idPrev = previo.idContacto ?? 0;
+      if (idPrev > 0 && !idsNuevos.has(idPrev)) {
+        await clienteService.eliminarContacto(idPrev);
+      }
+    }
+
+    const persistidos: ContactoClienteForm[] = [];
+    for (const contacto of contactos) {
+      if (!contacto.nombre.trim()) continue;
+      const payload = armarPayloadContacto(contacto, {
+        idCliente: clienteGuardadoId,
+        idLead,
+        idEmpresa: idEmpresa || null,
+      });
+      if (contacto.idContacto && contacto.idContacto > 0) {
+        await clienteService.actualizarContacto(contacto.idContacto, payload);
+        persistidos.push(contacto);
+      } else {
+        const idContacto = await clienteService.crearContacto(payload);
+        persistidos.push({
+          ...contacto,
+          idContacto: idContacto > 0 ? idContacto : null,
+        });
+      }
+    }
+
+    actualizarClienteAlta({ contactos: persistidos });
+    setMensajeOk(
+      persistidos.length === 1
+        ? "Contacto guardado en el CRM."
+        : `${persistidos.length} contacto(s) guardados en el CRM.`,
+    );
+  };
+
+  const guardarDireccionDesdeTab = async (direccion: DireccionClienteForm) => {
+    if (clienteSoloLectura) {
+      throw new Error(
+        "El cliente ya fue enviado a SAP; no se pueden modificar direcciones.",
+      );
+    }
+    if (!direccion.nombre.trim() && !direccion.calle.trim()) {
+      throw new Error("Capture al menos nombre o calle de la dirección.");
+    }
+
+    if (!clienteGuardadoId) {
+      setMensajeOk(
+        "Dirección lista en el formulario. Pulse Guardar el prospecto para crearla en el CRM (o cree el cliente primero).",
+      );
+      return;
+    }
+
+    const fiscales = clienteAlta.direcciones.filter((d) => d.tipo === "FISCAL");
+    const entregas = clienteAlta.direcciones.filter((d) => d.tipo === "ENTREGA");
+    const payload = armarPayloadDireccion(direccion, {
+      idCliente: clienteGuardadoId,
+      rfc: clienteAlta.rfc,
+      esDefaultBillTo: fiscales[0]?.idLocal === direccion.idLocal,
+      esDefaultShipTo: entregas[0]?.idLocal === direccion.idLocal,
+    });
+
+    let idClienteDireccion = direccion.idClienteDireccion ?? 0;
+    if (idClienteDireccion > 0) {
+      await clienteService.actualizarDireccion(idClienteDireccion, payload);
+    } else {
+      idClienteDireccion = await clienteService.crearDireccion(payload);
+    }
+
+    actualizarClienteAlta({
+      direcciones: clienteAlta.direcciones.map((d) =>
+        d.idLocal === direccion.idLocal
+          ? {
+              ...direccion,
+              idClienteDireccion:
+                idClienteDireccion > 0 ? idClienteDireccion : null,
+            }
+          : d,
+      ),
+    });
+    setMensajeOk(
+      idClienteDireccion > 0 && (direccion.idClienteDireccion ?? 0) > 0
+        ? "Dirección actualizada en el CRM."
+        : "Dirección guardada en el CRM.",
+    );
+  };
+
+  const sincronizarDirecciones = async (
+    idCliente: number,
+    formCliente: ClienteAltaForm,
+  ) => {
+    const fiscales = formCliente.direcciones.filter((d) => d.tipo === "FISCAL");
+    const entregas = formCliente.direcciones.filter((d) => d.tipo === "ENTREGA");
+    const persistidas: DireccionClienteForm[] = [];
+
+    for (const direccion of formCliente.direcciones) {
+      if (!direccion.nombre.trim() && !direccion.calle.trim()) {
+        persistidas.push(direccion);
+        continue;
+      }
+      const payload = armarPayloadDireccion(direccion, {
+        idCliente,
+        rfc: formCliente.rfc,
+        esDefaultBillTo: fiscales[0]?.idLocal === direccion.idLocal,
+        esDefaultShipTo: entregas[0]?.idLocal === direccion.idLocal,
+      });
+      if (direccion.idClienteDireccion && direccion.idClienteDireccion > 0) {
+        await clienteService.actualizarDireccion(
+          direccion.idClienteDireccion,
+          payload,
+        );
+        persistidas.push(direccion);
+      } else {
+        const id = await clienteService.crearDireccion(payload);
+        persistidas.push({
+          ...direccion,
+          idClienteDireccion: id > 0 ? id : null,
+        });
+      }
+    }
+
+    // Si el create del cliente ya insertó direcciones sin id en form, recargar evita duplicados
+    try {
+      const remotas = await clienteService.getDirecciones(idCliente);
+      if (remotas.length > 0) {
+        const mapeadas = remotas.map(direccionFormDesdeApi);
+        // Conserva idLocal de form cuando coincide por idClienteDireccion
+        const merged = mapeadas.map((remota) => {
+          const local = persistidas.find(
+            (p) =>
+              p.idClienteDireccion &&
+              p.idClienteDireccion === remota.idClienteDireccion,
+          );
+          return local ? { ...remota, idLocal: local.idLocal } : remota;
+        });
+        actualizarClienteAlta({ direcciones: merged });
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+    actualizarClienteAlta({ direcciones: persistidas });
+  };
+
+  const guardarClienteSiAplica = async (idLeadGuardado: number): Promise<boolean> => {
+    if (!esEtapaCliente(form.idEtapa, etapas)) return false;
+    if (clienteSoloLectura) return false;
+
+    const errorCliente = validarClienteAlta(clienteAlta);
+    if (errorCliente) throw new Error(errorCliente);
+
+    const contexto = user?.idPersona
+      ? await getContextoOperativoPersona(user.idPersona)
+      : null;
+    const idEmpresa = form.idEmpresa || contexto?.idEmpresa || 0;
+    if (!idEmpresa) {
+      throw new Error(
+        "No se pudo determinar la empresa para crear el cliente. Revise el contexto operativo.",
+      );
+    }
+
+    const groupCode =
+      gruposSAP.find((g) => g.idGrupo === form.idGrupo)?.groupCode ?? null;
+
+    const existente = await clienteService.getPorLeadOrigen(idLeadGuardado);
+
+    const duplicados = await clienteService.buscarDuplicados({
+      telefono: clienteAlta.phone1 || form.telefono,
+      correo: clienteAlta.emailAddress || form.correo,
+      nombre: clienteAlta.cardName,
+      rfc: clienteAlta.rfc,
+      excluirIdCliente: existente?.idCliente ?? null,
+      excluirIdLeadOrigen: idLeadGuardado,
+    });
+    if (duplicados.length > 0) {
+      const d = duplicados[0];
+      const campos = d.campos.join(", ");
+      throw new Error(
+        `Ya existe un cliente con los mismos datos (${campos}): ` +
+          `"${d.cardName || "Sin nombre"}"${d.cardCode ? ` · ${d.cardCode}` : ""}. ` +
+          `Corrija teléfono, correo, nombre o RFC para evitar duplicados.`,
+      );
+    }
+
+    if (existente) {
+      await clienteService.actualizar(
+        existente.idCliente,
+        armarPayloadClienteUpdate({
+          form: clienteAlta,
+          idEmpresa,
+          idSucursal: contexto?.idSucursal ?? null,
+          idLeadOrigen: idLeadGuardado,
+          idUsuarioActualizacion: user?.idUsuario ?? null,
+          groupCode,
+        }),
+      );
+      await sincronizarContactos(
+        existente.idCliente,
+        idLeadGuardado,
+        idEmpresa,
+      );
+      await sincronizarDirecciones(existente.idCliente, clienteAlta);
+      setClienteGuardadoId(existente.idCliente);
+      setClienteCardCode(existente.cardCode);
+      setClienteEstatusSap(existente.estatusSap);
+      return true;
+    }
+
+    const creado = await clienteService.crear(
+      armarPayloadClienteCreate({
+        form: clienteAlta,
+        idEmpresa,
+        idSucursal: contexto?.idSucursal ?? null,
+        idLeadOrigen: idLeadGuardado,
+        idUsuarioCreacion: user?.idUsuario ?? null,
+        groupCode,
+      }),
+    );
+
+    await sincronizarContactos(creado.idCliente, idLeadGuardado, idEmpresa);
+    // El create ya inserta direcciones; recarga para obtener idClienteDireccion
+    try {
+      const remotas = await clienteService.getDirecciones(creado.idCliente);
+      if (remotas.length > 0) {
+        actualizarClienteAlta({
+          direcciones: remotas.map(direccionFormDesdeApi),
+        });
+      }
+    } catch {
+      /* ignore */
+    }
+    setClienteGuardadoId(creado.idCliente);
+    setClienteCardCode(creado.cardCode);
+    setClienteEstatusSap(creado.estatusSap);
+    return true;
+  };
+
+  const sincronizarContactos = async (
+    idCliente: number,
+    idLeadGuardado: number,
+    idEmpresa: number,
+  ) => {
+    const idsEnFormulario = new Set(
+      clienteAlta.contactos
+        .map((c) => c.idContacto)
+        .filter((id): id is number => typeof id === "number" && id > 0),
+    );
+
+    const remotos = await clienteService.getContactos({
+      idCliente,
+      idLead: idLeadGuardado,
+    });
+    for (const raw of remotos) {
+      const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+        string,
+        unknown
+      >;
+      const idRemoto =
+        typeof o.idContacto === "number"
+          ? o.idContacto
+          : typeof o.IdContacto === "number"
+            ? o.IdContacto
+            : Number(o.idContacto ?? o.IdContacto ?? 0);
+      if (idRemoto > 0 && !idsEnFormulario.has(idRemoto)) {
+        await clienteService.eliminarContacto(idRemoto);
+      }
+    }
+
+    const contactos = armarPayloadsContactos({
+      form: clienteAlta,
+      idCliente,
+      idLead: idLeadGuardado,
+      idEmpresa,
+    });
+    for (const payload of contactos) {
+      if (payload.idContacto && payload.idContacto > 0) {
+        await clienteService.actualizarContacto(payload.idContacto, payload);
+      } else {
+        await clienteService.crearContacto(payload);
+      }
+    }
+  };
+
   const guardar = async () => {
     if (!(form.nombre ?? "").trim()) {
       alert("El nombre es obligatorio.");
       return;
     }
+    if (!(form.telefono ?? "").trim()) {
+      alert("El teléfono es obligatorio.");
+      return;
+    }
 
     setSaving(true);
+    setMensajeOk(null);
     try {
-      const payload = prepararPayload(form, user?.idPersona);
+      const payload = prepararPayload(form, user?.idUsuario);
+      let idLeadGuardado = idLead ?? 0;
       if (esEdicion && idLead) {
         await leadsService.actualizarLead(idLead, payload);
       } else {
-        await leadsService.crearLead(payload);
+        const creado = await leadsService.crearLead(payload);
+        idLeadGuardado = normalizeLead(creado).idLead;
+      }
+      if (!idLeadGuardado) {
+        throw new Error("No se obtuvo el identificador del prospecto.");
+      }
+      const guardoCliente = await guardarClienteSiAplica(idLeadGuardado);
+      if (guardoCliente) {
+        setMensajeOk("Cliente guardado en CRM. Ya puede enviarlo a SAP.");
+        return;
       }
       volverAlListado();
     } catch (err) {
@@ -122,6 +589,74 @@ export default function ProspectoFormPage() {
       alert(err instanceof Error ? err.message : "No se pudo guardar.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const jsonSapPreview = JSON.stringify(
+    armarPayloadSapBusinessPartner({
+      form: clienteAlta,
+      groupCode:
+        gruposSAP.find((g) => g.idGrupo === form.idGrupo)?.groupCode ?? null,
+      cardCode: cardCodeDraft.trim() || clienteCardCode,
+    }),
+    null,
+    2,
+  );
+
+  const abrirModalSap = () => {
+    if (!puedeEnviarASap) return;
+    setMensajeEnvioSap(null);
+    setErrorEnvioSap(null);
+    setCardCodeDraft((clienteCardCode ?? "").trim());
+    setJsonSapVisible(true);
+  };
+
+  const enviarClienteASap = async () => {
+    if (!clienteGuardadoId || clienteYaEnviadoSap) return;
+    const code = cardCodeDraft.trim().toUpperCase();
+    if (!code) {
+      setErrorEnvioSap("Indique el CardCode antes de enviar.");
+      return;
+    }
+    if (code.length > 15) {
+      setErrorEnvioSap("CardCode no puede exceder 15 caracteres.");
+      return;
+    }
+
+    setEnviandoSap(true);
+    setErrorEnvioSap(null);
+    setMensajeEnvioSap(null);
+    try {
+      if (code !== (clienteCardCode ?? "").trim().toUpperCase()) {
+        const asignado = await clienteService.asignarCardCode(
+          clienteGuardadoId,
+          code,
+        );
+        setClienteCardCode(asignado.cardCode);
+        setCardCodeDraft(asignado.cardCode ?? code);
+      }
+
+      const result = await clienteService.enviarASap(clienteGuardadoId);
+      const texto =
+        result.mensaje ||
+        (result.accion === "Updated"
+          ? "Cliente actualizado en SAP."
+          : "Cliente creado en SAP.");
+      setMensajeEnvioSap(texto);
+      setMensajeOk(texto);
+      if (result.cardCode) {
+        setClienteCardCode(result.cardCode);
+        setCardCodeDraft(result.cardCode);
+      }
+      setClienteEstatusSap(
+        result.estatusSap?.trim() || "Enviado",
+      );
+    } catch (err) {
+      setErrorEnvioSap(
+        err instanceof Error ? err.message : "No se pudo enviar el cliente a SAP.",
+      );
+    } finally {
+      setEnviandoSap(false);
     }
   };
 
@@ -159,14 +694,20 @@ export default function ProspectoFormPage() {
         </div>
       )}
 
-      <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-16 text-gray-500">
-            <Loader2 className="h-10 w-10 animate-spin" />
-            <p className="text-sm">Cargando formulario…</p>
-          </div>
-        ) : (
-          <>
+      {mensajeOk && (
+        <div className="rounded-md bg-green-50 p-3 text-sm text-green-800 dark:bg-green-900/30 dark:text-green-200">
+          {mensajeOk}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white py-16 text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+          <Loader2 className="h-10 w-10 animate-spin" />
+          <p className="text-sm">Cargando formulario…</p>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <FormularioProspecto
               form={form}
               onChange={setCampo}
@@ -175,9 +716,33 @@ export default function ProspectoFormPage() {
               estatusLista={estatusLista}
               servicios={servicios}
               gruposSAP={gruposSAP}
+              clienteAlta={clienteAlta}
+              onClienteAltaChange={actualizarClienteAlta}
+              clienteExistente={clienteGuardadoId != null}
+              etapaBloqueada={clienteGuardadoId != null}
+              onGuardarContactos={guardarContactosDesdeModal}
+              onGuardarDireccion={guardarDireccionDesdeTab}
+              actividades={actividades}
+              loadingActividades={loadingActividades}
+              idLead={idLead && idLead > 0 ? idLead : null}
+              idUsuarioCreacion={
+                user?.idUsuario || form.idUsuarioCreacion || null
+              }
+              onSeguimientoGuardado={async () => {
+                await recargarActividades();
+                setMensajeOk("Seguimiento registrado.");
+              }}
+              clienteSoloLectura={clienteSoloLectura}
+              avisoClienteSap={
+                clienteYaEnviadoSap
+                  ? clienteSoloLectura
+                    ? `Cliente enviado a SAP${clienteCardCode ? ` (${clienteCardCode})` : ""}. Los datos están bloqueados; el reenvío no está permitido.`
+                    : `Cliente enviado a SAP${clienteCardCode ? ` (${clienteCardCode})` : ""}. Puede editar por permiso ${PERMISO_CLIENTE_EDITAR_POST_SAP}; el reenvío sigue deshabilitado.`
+                  : null
+              }
             />
 
-            <div className="mt-6 flex justify-end gap-2 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <div className="mt-6 flex flex-col-reverse justify-end gap-2 border-t border-gray-200 pt-4 sm:flex-row dark:border-gray-700">
               <button
                 type="button"
                 onClick={volverAlListado}
@@ -185,6 +750,21 @@ export default function ProspectoFormPage() {
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
               >
                 Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={abrirModalSap}
+                disabled={!puedeEnviarASap}
+                title={
+                  clienteYaEnviadoSap
+                    ? "Este cliente ya fue enviado a SAP"
+                    : clienteGuardadoId
+                      ? "Revisar y enviar el cliente a SAP"
+                      : "Guarde el cliente en CRM primero"
+                }
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+              >
+                {clienteYaEnviadoSap ? "Enviado a SAP" : "Enviar a SAP"}
               </button>
               <button
                 type="button"
@@ -196,9 +776,29 @@ export default function ProspectoFormPage() {
                 Guardar
               </button>
             </div>
-          </>
-        )}
-      </div>
+          </div>
+
+          <ActivityTimeline
+            items={actividades}
+            loading={loadingActividades}
+          />
+        </>
+      )}
+
+      <ModalJsonSapCliente
+        abierto={jsonSapVisible}
+        json={jsonSapPreview}
+        onCerrar={() => {
+          if (!enviandoSap) setJsonSapVisible(false);
+        }}
+        onEnviar={() => void enviarClienteASap()}
+        enviando={enviandoSap}
+        puedeEnviar={puedeEnviarASap}
+        cardCode={cardCodeDraft}
+        onCardCodeChange={setCardCodeDraft}
+        mensaje={mensajeEnvioSap}
+        errorEnvio={errorEnvioSap}
+      />
     </div>
   );
 }

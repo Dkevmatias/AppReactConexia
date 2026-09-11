@@ -1,6 +1,7 @@
 import { api } from "./apiServices";
 import {
   applyMobileAuthHeaders,
+  getRefreshFallback,
   persistTokensFromAuthResponse,
 } from "../utils/tokenFallback";
 
@@ -154,11 +155,20 @@ export const checkAuthService = async (): Promise<CheckAuthResponse> => {
 
 // LOGOUT
 export const logout = async () => {
+  const headers: Record<string, string> = {};
+  applyMobileAuthHeaders({ headers });
+
+  const fallbackRefresh = getRefreshFallback();
+  if (fallbackRefresh) {
+    headers["X-Refresh-Token"] = fallbackRefresh;
+  }
+
   await api.post(
     "/api/Acceso/logout",
-    {},
+    fallbackRefresh ? { refreshToken: fallbackRefresh } : {},
     {
       withCredentials: true,
+      headers,
       validateStatus: (status) => status < 500,
     },
   );
