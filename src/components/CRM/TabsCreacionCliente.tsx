@@ -5,6 +5,7 @@ import TabCamposUsuarioCliente from "./TabCamposUsuarioCliente";
 import TabCondicionPagoCliente from "./TabCondicionPagoCliente";
 import TabDireccionesCliente from "./TabDireccionesCliente";
 import TabGeneralCliente from "./TabGeneralCliente";
+import TabDescuentosCliente from "./TabDescuentosCliente";
 import {
   TABS_CREACION_CLIENTE,
   type TabCreacionClienteId,
@@ -21,10 +22,15 @@ type TabsCreacionClienteProps = {
   onGuardarDireccion?: (
     direccion: ClienteAltaForm["direcciones"][number],
   ) => void | Promise<void>;
+  onGuardarDescuentos?: () => void | Promise<void>;
+  onEnviarDescuentosSap?: () => void | Promise<void>;
+  cardCode?: string | null;
   /** Si true, no renderiza el encabezado/borde externo (para usar dentro de otra tab). */
   embebido?: boolean;
   /** Cliente enviado a SAP: formularios en solo lectura. */
   soloLectura?: boolean;
+  /** Campos obligatorios faltantes para resaltar. */
+  camposInvalidos?: Set<string>;
 };
 
 export default function TabsCreacionCliente({
@@ -34,11 +40,14 @@ export default function TabsCreacionCliente({
   onGuardarContactos,
   clientePersistido = false,
   onGuardarDireccion,
+  onGuardarDescuentos,
+  onEnviarDescuentosSap,
+  cardCode = null,
   embebido = false,
   soloLectura = false,
+  camposInvalidos,
 }: TabsCreacionClienteProps) {
-  const [tabActiva, setTabActiva] =
-    useState<TabCreacionClienteId>("general");
+  const [tabActiva, setTabActiva] = useState<TabCreacionClienteId>("general");
   const [modalContactosAbierto, setModalContactosAbierto] = useState(false);
 
   if (!visible) return null;
@@ -52,6 +61,7 @@ export default function TabsCreacionCliente({
             onChange={onChange}
             onAbrirContactos={() => setModalContactosAbierto(true)}
             soloLectura={soloLectura}
+            camposInvalidos={camposInvalidos}
           />
         );
       case "direcciones":
@@ -62,6 +72,7 @@ export default function TabsCreacionCliente({
             clientePersistido={clientePersistido}
             onGuardarDireccion={onGuardarDireccion}
             soloLectura={soloLectura}
+            camposInvalidos={camposInvalidos}
           />
         );
       case "condicion-pago":
@@ -72,6 +83,20 @@ export default function TabsCreacionCliente({
             datos={datos}
             onChange={onChange}
             soloLectura={soloLectura}
+            camposInvalidos={camposInvalidos}
+          />
+        );
+      case "descuentos":
+        return (
+          <TabDescuentosCliente
+            descuentos={datos.descuentos}
+            onChange={(descuentos) => onChange({ descuentos })}
+            clientePersistido={clientePersistido}
+            onGuardarDescuentos={onGuardarDescuentos}
+            onEnviarDescuentosSap={onEnviarDescuentosSap}
+            cardCode={cardCode}
+            soloLectura={false}
+            camposInvalidos={camposInvalidos}
           />
         );
       default:

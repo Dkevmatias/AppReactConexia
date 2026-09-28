@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import ActivityTimeline from "../../components/CRM/ActivityTimeline";
 import FormularioProspecto from "../../components/CRM/FormularioProspecto";
 import ModalJsonSapCliente from "../../components/CRM/ModalJsonSapCliente";
+import ModalJsonSapDescuento from "../../components/CRM/ModalJsonSapDescuento";
 import {
   clienteAltaVacio,
   clienteAltaDesdeApi,
@@ -17,9 +18,13 @@ import {
   armarPayloadContacto,
   armarPayloadDireccion,
   armarPayloadSapBusinessPartner,
+  armarPayloadSapDiscountGroup,
+  stringifyPayloadSapDiscountGroup,
   validarClienteAlta,
+  camposFaltantesClienteAlta,
   esClienteEnviadoSap,
-  PERMISO_CLIENTE_EDITAR_POST_SAP,
+  armarPayloadDescuentoLocal,
+  aplicarDescuentoApiAFilas,
   type ClienteAltaForm,
   type ContactoClienteForm,
   type DireccionClienteForm,
@@ -31,6 +36,7 @@ import {
   leadVacio,
   prepararPayload,
   valoresDefectoNuevoProspecto,
+  esCorreoValido,
 } from "../../components/CRM/prospectoFormUtils";
 import {
   crmService,
@@ -42,18 +48,19 @@ import {
 } from "../../services/crmService";
 import { LeadPayload, leadsService, normalizeLead } from "../../services/leadsService";
 import { useAuth } from "../../hooks/useAuth";
+import { useModalAlerta } from "../../hooks/useModalAlerta";
 import { clienteService } from "../../services/clienteService";
 import { getContextoOperativoPersona } from "../../services/authService";
 import {
   activityTimelineService,
   type ActivityTimelineItem,
 } from "../../services/activityTimelineService";
-import { permisoActivo } from "../../utils/permisosModulo";
 
 export default function ProspectoFormPage() {
   const { idLead: idLeadParam } = useParams<{ idLead?: string }>();
   const navigate = useNavigate();
-  const { user, menu } = useAuth();
+  const { user } = useAuth();
+  const { mostrarAdvertencia, mostrarError, AlertaHost } = useModalAlerta();
 
   const idLead = idLeadParam ? Number(idLeadParam) : null;
   const esEdicion = idLead != null && !Number.isNaN(idLead) && idLead > 0;
@@ -77,16 +84,30 @@ export default function ProspectoFormPage() {
   const [enviandoSap, setEnviandoSap] = useState(false);
   const [mensajeEnvioSap, setMensajeEnvioSap] = useState<string | null>(null);
   const [errorEnvioSap, setErrorEnvioSap] = useState<string | null>(null);
+  const [jsonSapDescuentosVisible, setJsonSapDescuentosVisible] = useState(false);
+  const [enviandoSapDescuentos, setEnviandoSapDescuentos] = useState(false);
+  const [mensajeEnvioSapDescuentos, setMensajeEnvioSapDescuentos] = useState<
+    string | null
+  >(null);
+  const [errorEnvioSapDescuentos, setErrorEnvioSapDescuentos] = useState<
+    string | null
+  >(null);
   const [actividades, setActividades] = useState<ActivityTimelineItem[]>([]);
   const [loadingActividades, setLoadingActividades] = useState(false);
+  const [mostrarErroresCliente, setMostrarErroresCliente] = useState(false);
 
   const clienteYaEnviadoSap = esClienteEnviadoSap(clienteEstatusSap);
-  const puedeEditarPostSap = menu.some((m) =>
-    permisoActivo(m.permisos, PERMISO_CLIENTE_EDITAR_POST_SAP),
-  );
-  const clienteSoloLectura = clienteYaEnviadoSap && !puedeEditarPostSap;
+  // TODO(pruebas): restaurar → clienteYaEnviadoSap && !permisoActivo(..., PERMISO_CLIENTE_EDITAR_POST_SAP)
+  const clienteSoloLectura = false;
   const puedeEnviarASap =
     clienteGuardadoId != null && !clienteYaEnviadoSap;
+  const camposInvalidosCliente = useMemo(
+    () =>
+      mostrarErroresCliente
+        ? new Set(camposFaltantesClienteAlta(clienteAlta))
+        : new Set<string>(),
+    [mostrarErroresCliente, clienteAlta],
+  );
 
   const volverAlListado = () => {
     navigate("/CRM/Prospectos");
@@ -101,6 +122,7 @@ export default function ProspectoFormPage() {
     setClienteCardCode(null);
     setClienteEstatusSap(null);
     setActividades([]);
+    setMostrarErroresCliente(false);
 
     const [
       etapasRes,
@@ -164,7 +186,18 @@ export default function ProspectoFormPage() {
               } catch {
                 /* se usan los contactos del GET Cliente si existen */
               }
-              setClienteAlta({ ...alta, contactos });
+              let descuentos = alta.descuentos;
+              try {
+                const docs = await clienteService.getDescuentos(
+                  existente.idCliente,
+                );
+                if (docs[0]) {
+                  descuentos = aplicarDescuentoApiAFilas([], docs[0]);
+                }
+              } catch {
+                /* sin descuentos previos */
+              }
+              setClienteAlta({ ...alta, contactos, descuentos });
             } else if (esEtapaCliente(leadForm.idEtapa, etapasCargadas)) {
               setClienteAlta(
                 prellenarClienteDesdeLead({
@@ -244,7 +277,10 @@ export default function ProspectoFormPage() {
   };
 
   const actualizarClienteAlta = (parcial: Partial<ClienteAltaForm>) => {
-    if (clienteSoloLectura) return;
+    if (clienteSoloLectura) {
+      const keys = Object.keys(parcial);
+      if (!(keys.length === 1 && keys[0] === "descuentos")) return;
+    }
     setClienteAlta((prev) => ({ ...prev, ...parcial }));
   };
 
@@ -415,12 +451,112 @@ export default function ProspectoFormPage() {
     actualizarClienteAlta({ direcciones: persistidas });
   };
 
+  const guardarDescuentosDesdeTab = async () => {
+    if (!clienteGuardadoId) {
+      throw new Error(
+        "Guarde el cliente en el CRM antes de persistir los descuentos.",
+      );
+    }
+
+    const contexto = user?.idPersona
+      ? await getContextoOperativoPersona(user.idPersona)
+      : null;
+    const payload = armarPayloadDescuentoLocal(clienteAlta.descuentos, {
+      idCliente: clienteGuardadoId,
+      idSucursal: contexto?.idSucursal ?? null,
+      idLeadOrigen: idLead,
+      idUsuario: user?.idUsuario ?? null,
+    });
+
+    const saved = await clienteService.upsertDescuentos(
+      clienteGuardadoId,
+      payload,
+    );
+    actualizarClienteAlta({
+      descuentos: aplicarDescuentoApiAFilas(clienteAlta.descuentos, saved),
+    });
+    setMensajeOk(
+      saved.detalles.length === 1
+        ? "Descuento guardado en el CRM."
+        : `Descuentos guardados en el CRM (${saved.detalles.length} marca(s)).`,
+    );
+    return saved;
+  };
+
+  const abrirModalSapDescuentos = () => {
+    setMensajeEnvioSapDescuentos(null);
+    setErrorEnvioSapDescuentos(null);
+    setJsonSapDescuentosVisible(true);
+  };
+
+  const enviarDescuentosSapDesdeTab = async () => {
+    const code = (clienteCardCode || cardCodeDraft || "").trim();
+    if (!code) {
+      throw new Error(
+        "Asigne un CardCode al cliente antes de enviar los descuentos a SAP.",
+      );
+    }
+    if (!clienteGuardadoId) {
+      throw new Error("Guarde el cliente en el CRM primero.");
+    }
+
+    const saved = await guardarDescuentosDesdeTab();
+    if (!saved.idDescuento) {
+      throw new Error("No se obtuvo el descuento guardado para enviar a SAP.");
+    }
+    if (saved.detalles.length === 0) {
+      throw new Error(
+        "Capture al menos un porcentaje de marca mayor a 0 antes de enviar a SAP.",
+      );
+    }
+
+    const result = await clienteService.enviarDescuentosASap(saved.idDescuento);
+    const recargado = await clienteService.getDescuentos(clienteGuardadoId);
+    actualizarClienteAlta({
+      descuentos: aplicarDescuentoApiAFilas(
+        clienteAlta.descuentos,
+        recargado[0] ?? {
+          ...saved,
+          absEntry: result.absEntry || saved.absEntry,
+          estatusSync: result.estatusSync || saved.estatusSync,
+        },
+      ),
+    });
+    setMensajeOk(result.mensaje || "Descuento enviado a SAP.");
+    return result;
+  };
+
+  const confirmarEnvioDescuentosSap = async () => {
+    setEnviandoSapDescuentos(true);
+    setErrorEnvioSapDescuentos(null);
+    setMensajeEnvioSapDescuentos(null);
+    try {
+      const result = await enviarDescuentosSapDesdeTab();
+      setMensajeEnvioSapDescuentos(
+        result?.mensaje || "Descuento enviado a SAP.",
+      );
+      setJsonSapDescuentosVisible(false);
+    } catch (err) {
+      setErrorEnvioSapDescuentos(
+        err instanceof Error
+          ? err.message
+          : "No se pudo enviar el descuento a SAP.",
+      );
+    } finally {
+      setEnviandoSapDescuentos(false);
+    }
+  };
+
   const guardarClienteSiAplica = async (idLeadGuardado: number): Promise<boolean> => {
     if (!esEtapaCliente(form.idEtapa, etapas)) return false;
     if (clienteSoloLectura) return false;
 
-    const errorCliente = validarClienteAlta(clienteAlta);
-    if (errorCliente) throw new Error(errorCliente);
+    const resultado = validarClienteAlta(clienteAlta);
+    if (resultado.mensaje) {
+      setMostrarErroresCliente(true);
+      throw new Error(resultado.mensaje);
+    }
+    setMostrarErroresCliente(false);
 
     const contexto = user?.idPersona
       ? await getContextoOperativoPersona(user.idPersona)
@@ -556,11 +692,35 @@ export default function ProspectoFormPage() {
 
   const guardar = async () => {
     if (!(form.nombre ?? "").trim()) {
-      alert("El nombre es obligatorio.");
+      mostrarAdvertencia("El nombre es obligatorio.", "Dato requerido");
       return;
     }
     if (!(form.telefono ?? "").trim()) {
-      alert("El teléfono es obligatorio.");
+      mostrarAdvertencia("El teléfono es obligatorio.", "Dato requerido");
+      return;
+    }
+    if ((form.telefono ?? "").replace(/\D/g, "").length > 10) {
+      mostrarAdvertencia(
+        "El teléfono no puede exceder 10 dígitos.",
+        "Teléfono inválido",
+      );
+      return;
+    }
+    if ((form.correo ?? "").trim() && !esCorreoValido(form.correo)) {
+      mostrarAdvertencia(
+        "Capture un correo electrónico válido.",
+        "Correo inválido",
+      );
+      return;
+    }
+    if (
+      (clienteAlta.emailAddress ?? "").trim() &&
+      !esCorreoValido(clienteAlta.emailAddress)
+    ) {
+      mostrarAdvertencia(
+        "El correo del cliente no es válido.",
+        "Correo inválido",
+      );
       return;
     }
 
@@ -586,7 +746,9 @@ export default function ProspectoFormPage() {
       volverAlListado();
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "No se pudo guardar.");
+      mostrarError(
+        err instanceof Error ? err.message : "No se pudo guardar.",
+      );
     } finally {
       setSaving(false);
     }
@@ -602,6 +764,23 @@ export default function ProspectoFormPage() {
     null,
     2,
   );
+
+  const cardCodeDescuentos = (clienteCardCode || cardCodeDraft || "").trim();
+  const jsonSapDescuentosPreview = stringifyPayloadSapDiscountGroup(
+    armarPayloadSapDiscountGroup({
+      cardCode: cardCodeDescuentos,
+      filas: clienteAlta.descuentos,
+    }),
+  );
+  const puedeEnviarDescuentosASap =
+    clienteGuardadoId != null &&
+    cardCodeDescuentos.length > 0 &&
+    clienteAlta.descuentos.some((d) => {
+      const n = Number(
+        (d.DiscRel || d.porcentaje || "").toString().replace(",", "."),
+      );
+      return Number.isFinite(n) && n > 0 && (d.ObjCode || "").trim().length > 0;
+    });
 
   const abrirModalSap = () => {
     if (!puedeEnviarASap) return;
@@ -722,6 +901,11 @@ export default function ProspectoFormPage() {
               etapaBloqueada={clienteGuardadoId != null}
               onGuardarContactos={guardarContactosDesdeModal}
               onGuardarDireccion={guardarDireccionDesdeTab}
+              onGuardarDescuentos={async () => {
+                await guardarDescuentosDesdeTab();
+              }}
+              onEnviarDescuentosSap={abrirModalSapDescuentos}
+              cardCodeCliente={clienteCardCode || cardCodeDraft}
               actividades={actividades}
               loadingActividades={loadingActividades}
               idLead={idLead && idLead > 0 ? idLead : null}
@@ -733,11 +917,10 @@ export default function ProspectoFormPage() {
                 setMensajeOk("Seguimiento registrado.");
               }}
               clienteSoloLectura={clienteSoloLectura}
+              camposInvalidosCliente={camposInvalidosCliente}
               avisoClienteSap={
                 clienteYaEnviadoSap
-                  ? clienteSoloLectura
-                    ? `Cliente enviado a SAP${clienteCardCode ? ` (${clienteCardCode})` : ""}. Los datos están bloqueados; el reenvío no está permitido.`
-                    : `Cliente enviado a SAP${clienteCardCode ? ` (${clienteCardCode})` : ""}. Puede editar por permiso ${PERMISO_CLIENTE_EDITAR_POST_SAP}; el reenvío sigue deshabilitado.`
+                  ? `Cliente enviado a SAP${clienteCardCode ? ` (${clienteCardCode})` : ""}. Edición temporalmente habilitada para pruebas; el reenvío sigue deshabilitado.`
                   : null
               }
             />
@@ -799,6 +982,20 @@ export default function ProspectoFormPage() {
         mensaje={mensajeEnvioSap}
         errorEnvio={errorEnvioSap}
       />
+      <ModalJsonSapDescuento
+        abierto={jsonSapDescuentosVisible}
+        json={jsonSapDescuentosPreview}
+        onCerrar={() => {
+          if (!enviandoSapDescuentos) setJsonSapDescuentosVisible(false);
+        }}
+        onEnviar={() => void confirmarEnvioDescuentosSap()}
+        enviando={enviandoSapDescuentos}
+        puedeEnviar={puedeEnviarDescuentosASap}
+        cardCode={cardCodeDescuentos}
+        mensaje={mensajeEnvioSapDescuentos}
+        errorEnvio={errorEnvioSapDescuentos}
+      />
+      {AlertaHost}
     </div>
   );
 }

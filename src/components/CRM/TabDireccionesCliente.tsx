@@ -6,9 +6,16 @@ import {
   DireccionClienteForm,
   ESTADOS_MEXICO,
   etiquetaTipoDireccion,
+  claveCampoDireccion,
   TipoDireccionCliente,
 } from "./clienteAltaUtils";
-import { prospectoInputClass, prospectoLabelClass } from "./prospectoFormUtils";
+import {
+  prospectoInputClass,
+  prospectoInputClassError,
+  prospectoLabelClass,
+  prospectoLabelClassError,
+} from "./prospectoFormUtils";
+import ModalAlerta from "../common/ModalAlerta";
 import {
   etiquetaSatItem,
   normalizarPaisClaveSat,
@@ -26,6 +33,7 @@ type TabDireccionesClienteProps = {
     direccion: DireccionClienteForm,
   ) => void | Promise<void>;
   soloLectura?: boolean;
+  camposInvalidos?: Set<string>;
 };
 
 function actualizarDireccion(
@@ -66,6 +74,7 @@ function FormularioDireccion({
   clientePersistido,
   onGuardarDireccion,
   soloLectura = false,
+  camposInvalidos,
 }: {
   direccion: DireccionClienteForm;
   indice: number;
@@ -77,6 +86,7 @@ function FormularioDireccion({
     direccion: DireccionClienteForm,
   ) => void | Promise<void>;
   soloLectura?: boolean;
+  camposInvalidos?: Set<string>;
 }) {
   const paisClave = normalizarPaisClaveSat(
     direccion.paisSat || PAIS_SAT_DEFAULT,
@@ -96,6 +106,10 @@ function FormularioDireccion({
   const [guardando, setGuardando] = useState(false);
   const [errorCatalogo, setErrorCatalogo] = useState<string | null>(null);
   const [infoCp, setInfoCp] = useState<string | null>(null);
+  const [alertaDir, setAlertaDir] = useState<{
+    titulo: string;
+    mensaje: string;
+  } | null>(null);
   const ultimoCpResuelto = useRef<string>("");
 
   const pendientePersistir =
@@ -287,22 +301,33 @@ function FormularioDireccion({
     key: keyof DireccionClienteForm,
     label: string,
     id: string,
-  ) => (
-    <div key={key}>
-      <label className={prospectoLabelClass} htmlFor={id}>
-        {label}
-      </label>
-      <input
-        id={id}
-        type="text"
-        value={String(direccion[key] ?? "")}
-        onChange={(e) =>
-          onChange({ [key]: e.target.value } as Partial<DireccionClienteForm>)
-        }
-        className={prospectoInputClass}
-      />
-    </div>
-  );
+    obligatorio = true,
+  ) => {
+    const err =
+      obligatorio &&
+      Boolean(camposInvalidos?.has(claveCampoDireccion(direccion.idLocal, key)));
+    return (
+      <div key={key}>
+        <label className={prospectoLabelClassError(err)} htmlFor={id}>
+          {label}
+          {obligatorio ? (
+            <span className="ml-0.5 text-red-500" aria-hidden="true">
+              *
+            </span>
+          ) : null}
+        </label>
+        <input
+          id={id}
+          type="text"
+          value={String(direccion[key] ?? "")}
+          onChange={(e) =>
+            onChange({ [key]: e.target.value } as Partial<DireccionClienteForm>)
+          }
+          className={prospectoInputClassError(err)}
+        />
+      </div>
+    );
+  };
 
   const cambiarCp = (valor: string) => {
     const cp = valor.replace(/\D/g, "").slice(0, 5);
@@ -359,11 +384,13 @@ function FormularioDireccion({
     try {
       await onGuardarDireccion(direccion);
     } catch (err) {
-      alert(
-        err instanceof Error
-          ? err.message
-          : "No se pudo guardar la dirección.",
-      );
+      setAlertaDir({
+        titulo: "Error al guardar",
+        mensaje:
+          err instanceof Error
+            ? err.message
+            : "No se pudo guardar la dirección.",
+      });
     } finally {
       setGuardando(false);
     }
@@ -379,6 +406,7 @@ function FormularioDireccion({
       : "");
 
   return (
+    <>
     <fieldset
       disabled={soloLectura}
       className="min-w-0 rounded-lg border border-gray-200 bg-white p-0 disabled:opacity-90 dark:border-gray-600 dark:bg-gray-800/80"
@@ -470,10 +498,19 @@ function FormularioDireccion({
 
           <div>
             <label
-              className={prospectoLabelClass}
+              className={prospectoLabelClassError(
+                Boolean(
+                  camposInvalidos?.has(
+                    claveCampoDireccion(direccion.idLocal, "cp"),
+                  ),
+                ),
+              )}
               htmlFor={`${direccion.idLocal}-cp`}
             >
               Código postal
+              <span className="ml-0.5 text-red-500" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id={`${direccion.idLocal}-cp`}
@@ -483,7 +520,13 @@ function FormularioDireccion({
               placeholder="Ej. 44100"
               value={direccion.cp}
               onChange={(e) => cambiarCp(e.target.value)}
-              className={prospectoInputClass}
+              className={prospectoInputClassError(
+                Boolean(
+                  camposInvalidos?.has(
+                    claveCampoDireccion(direccion.idLocal, "cp"),
+                  ),
+                ),
+              )}
             />
             <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
               {loadingCp
@@ -496,16 +539,31 @@ function FormularioDireccion({
 
           <div>
             <label
-              className={prospectoLabelClass}
+              className={prospectoLabelClassError(
+                Boolean(
+                  camposInvalidos?.has(
+                    claveCampoDireccion(direccion.idLocal, "coloniaSat"),
+                  ),
+                ),
+              )}
               htmlFor={`${direccion.idLocal}-colonia-sat`}
             >
               Colonia
+              <span className="ml-0.5 text-red-500" aria-hidden="true">
+                *
+              </span>
             </label>
             <select
               id={`${direccion.idLocal}-colonia-sat`}
               value={direccion.coloniaSat}
               onChange={(e) => cambiarColoniaSat(e.target.value)}
-              className={prospectoInputClass}
+              className={prospectoInputClassError(
+                Boolean(
+                  camposInvalidos?.has(
+                    claveCampoDireccion(direccion.idLocal, "coloniaSat"),
+                  ),
+                ),
+              )}
               disabled={cpClave.length !== 5 || loadingColonias}
             >
               <option value="">
@@ -527,16 +585,31 @@ function FormularioDireccion({
 
           <div>
             <label
-              className={prospectoLabelClass}
+              className={prospectoLabelClassError(
+                Boolean(
+                  camposInvalidos?.has(
+                    claveCampoDireccion(direccion.idLocal, "estadoSat"),
+                  ),
+                ),
+              )}
               htmlFor={`${direccion.idLocal}-estado`}
             >
               Estado
+              <span className="ml-0.5 text-red-500" aria-hidden="true">
+                *
+              </span>
             </label>
             <select
               id={`${direccion.idLocal}-estado`}
               value={estadoClave}
               onChange={(e) => cambiarEstado(e.target.value)}
-              className={prospectoInputClass}
+              className={prospectoInputClassError(
+                Boolean(
+                  camposInvalidos?.has(
+                    claveCampoDireccion(direccion.idLocal, "estadoSat"),
+                  ),
+                ),
+              )}
               disabled={loadingEstados}
             >
               <option value="">
@@ -563,22 +636,37 @@ function FormularioDireccion({
 
           <div>
             <label
-              className={prospectoLabelClass}
+              className={prospectoLabelClassError(
+                Boolean(
+                  camposInvalidos?.has(
+                    claveCampoDireccion(direccion.idLocal, "pais"),
+                  ),
+                ),
+              )}
               htmlFor={`${direccion.idLocal}-pais`}
             >
               País
+              <span className="ml-0.5 text-red-500" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id={`${direccion.idLocal}-pais`}
               type="text"
               value={direccion.pais || "MX"}
               readOnly
-              className={`${prospectoInputClass} bg-gray-50 dark:bg-gray-900/40`}
+              className={`${prospectoInputClassError(
+                Boolean(
+                  camposInvalidos?.has(
+                    claveCampoDireccion(direccion.idLocal, "pais"),
+                  ),
+                ),
+              )} bg-gray-50 dark:bg-gray-900/40`}
             />
           </div>
 
           {campo("iva", "IVA", `${direccion.idLocal}-iva`)}
-          {campo("referencia", "Referencia", `${direccion.idLocal}-ref`)}
+          {campo("referencia", "Referencia", `${direccion.idLocal}-ref`, false)}
         </div>
 
         <div>
@@ -588,10 +676,19 @@ function FormularioDireccion({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <label
-                className={prospectoLabelClass}
+                className={prospectoLabelClassError(
+                  Boolean(
+                    camposInvalidos?.has(
+                      claveCampoDireccion(direccion.idLocal, "paisSat"),
+                    ),
+                  ),
+                )}
                 htmlFor={`${direccion.idLocal}-pais-sat`}
               >
                 País SAT
+                <span className="ml-0.5 text-red-500" aria-hidden="true">
+                  *
+                </span>
               </label>
               <select
                 id={`${direccion.idLocal}-pais-sat`}
@@ -602,7 +699,13 @@ function FormularioDireccion({
                     pais: "MX",
                   })
                 }
-                className={prospectoInputClass}
+                className={prospectoInputClassError(
+                  Boolean(
+                    camposInvalidos?.has(
+                      claveCampoDireccion(direccion.idLocal, "paisSat"),
+                    ),
+                  ),
+                )}
               >
                 <option value="MEX">MEX — México</option>
               </select>
@@ -610,16 +713,31 @@ function FormularioDireccion({
 
             <div>
               <label
-                className={prospectoLabelClass}
+                className={prospectoLabelClassError(
+                  Boolean(
+                    camposInvalidos?.has(
+                      claveCampoDireccion(direccion.idLocal, "municipioSat"),
+                    ),
+                  ),
+                )}
                 htmlFor={`${direccion.idLocal}-municipio-sat`}
               >
                 Municipio SAT
+                <span className="ml-0.5 text-red-500" aria-hidden="true">
+                  *
+                </span>
               </label>
               <select
                 id={`${direccion.idLocal}-municipio-sat`}
                 value={municipioClave}
                 onChange={(e) => cambiarMunicipioSat(e.target.value)}
-                className={prospectoInputClass}
+                className={prospectoInputClassError(
+                  Boolean(
+                    camposInvalidos?.has(
+                      claveCampoDireccion(direccion.idLocal, "municipioSat"),
+                    ),
+                  ),
+                )}
                 disabled={!estadoClave || loadingMunLoc}
               >
                 <option value="">
@@ -639,16 +757,31 @@ function FormularioDireccion({
 
             <div>
               <label
-                className={prospectoLabelClass}
+                className={prospectoLabelClassError(
+                  Boolean(
+                    camposInvalidos?.has(
+                      claveCampoDireccion(direccion.idLocal, "localidadSat"),
+                    ),
+                  ),
+                )}
                 htmlFor={`${direccion.idLocal}-localidad-sat`}
               >
                 Localidad SAT
+                <span className="ml-0.5 text-red-500" aria-hidden="true">
+                  *
+                </span>
               </label>
               <select
                 id={`${direccion.idLocal}-localidad-sat`}
                 value={direccion.localidadSat}
                 onChange={(e) => onChange({ localidadSat: e.target.value })}
-                className={prospectoInputClass}
+                className={prospectoInputClassError(
+                  Boolean(
+                    camposInvalidos?.has(
+                      claveCampoDireccion(direccion.idLocal, "localidadSat"),
+                    ),
+                  ),
+                )}
                 disabled={!estadoClave || loadingMunLoc}
               >
                 <option value="">
@@ -669,6 +802,14 @@ function FormularioDireccion({
         </div>
       </div>
     </fieldset>
+      <ModalAlerta
+        abierto={alertaDir != null}
+        titulo={alertaDir?.titulo ?? ""}
+        mensaje={alertaDir?.mensaje ?? ""}
+        variant="error"
+        onCerrar={() => setAlertaDir(null)}
+      />
+    </>
   );
 }
 
@@ -678,6 +819,7 @@ export default function TabDireccionesCliente({
   clientePersistido = false,
   onGuardarDireccion,
   soloLectura = false,
+  camposInvalidos,
 }: TabDireccionesClienteProps) {
   const agregar = (tipo: TipoDireccionCliente) => {
     onChange([...direcciones, direccionVacia(tipo)]);
@@ -700,6 +842,11 @@ export default function TabDireccionesCliente({
 
   return (
     <div className="space-y-4">
+      {camposInvalidos?.has("direcciones") ? (
+        <p className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200">
+          Debe agregar al menos una dirección (solo Referencia es opcional).
+        </p>
+      ) : null}
       {!soloLectura ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2">
@@ -751,6 +898,7 @@ export default function TabDireccionesCliente({
               clientePersistido={clientePersistido}
               onGuardarDireccion={soloLectura ? undefined : onGuardarDireccion}
               soloLectura={soloLectura}
+              camposInvalidos={camposInvalidos}
             />
           ))}
         </div>

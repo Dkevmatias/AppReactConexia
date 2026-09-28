@@ -16,6 +16,8 @@ interface User {
   role: number;
   idPersona: number;
   idUsuario: number;
+  idEmpresa: number;
+  idSucursal: number;
   cardCode: string;
   fullname: string;
   defaultRoute?: string | null;

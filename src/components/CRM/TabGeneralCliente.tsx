@@ -8,7 +8,14 @@ import {
   USOS_CFDI_COMUNES,
   nombreCompletoContacto,
 } from "./clienteAltaUtils";
-import { prospectoInputClass, prospectoLabelClass } from "./prospectoFormUtils";
+import {
+  prospectoInputClass,
+  prospectoInputClassError,
+  prospectoLabelClass,
+  prospectoLabelClassError,
+  esCorreoValido,
+  soloDigitosTelefono,
+} from "./prospectoFormUtils";
 import {
   etiquetaSatItem,
   satCatalogoService,
@@ -25,19 +32,31 @@ type TabGeneralClienteProps = {
   onAbrirContactos: () => void;
   /** Cliente ya en SAP: inputs y acciones deshabilitados. */
   soloLectura?: boolean;
+  camposInvalidos?: Set<string>;
 };
+
+function Asterisco() {
+  return (
+    <span className="ml-0.5 text-red-500" aria-hidden="true">
+      *
+    </span>
+  );
+}
 
 export default function TabGeneralCliente({
   datos,
   onChange,
   onAbrirContactos,
   soloLectura = false,
+  camposInvalidos,
 }: TabGeneralClienteProps) {
   const [usosCfdi, setUsosCfdi] = useState<SatCatalogoItem[]>([]);
   const [metodosPago, setMetodosPago] = useState<SatCatalogoItem[]>([]);
   const [formasPago, setFormasPago] = useState<SatCatalogoItem[]>([]);
   const [loadingFiscal, setLoadingFiscal] = useState(true);
   const [errorFiscal, setErrorFiscal] = useState<string | null>(null);
+
+  const invalido = (clave: string) => Boolean(camposInvalidos?.has(clave));
 
   useEffect(() => {
     let cancelled = false;
@@ -118,8 +137,12 @@ export default function TabGeneralCliente({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-tipo-persona">
+          <label
+            className={prospectoLabelClassError(invalido("tipoPersona"))}
+            htmlFor="cliente-tipo-persona"
+          >
             Tipo de persona
+            <Asterisco />
           </label>
           <select
             id="cliente-tipo-persona"
@@ -129,7 +152,7 @@ export default function TabGeneralCliente({
                 tipoPersona: e.target.value as TipoPersonaCliente | "",
               })
             }
-            className={prospectoInputClass}
+            className={prospectoInputClassError(invalido("tipoPersona"))}
           >
             <option value="">Seleccione tipo</option>
             <option value="FISICA">Física (cPrivate)</option>
@@ -138,14 +161,18 @@ export default function TabGeneralCliente({
         </div>
 
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-uso-cfdi">
-            Uso CFDI (U_B1SYS_MainUsage)
+          <label
+            className={prospectoLabelClassError(invalido("usoCfdi"))}
+            htmlFor="cliente-uso-cfdi"
+          >
+            Uso CFDI
+            <Asterisco />
           </label>
           <select
             id="cliente-uso-cfdi"
             value={datos.usoCfdi}
             onChange={(e) => onChange({ usoCfdi: e.target.value })}
-            className={prospectoInputClass}
+            className={prospectoInputClassError(invalido("usoCfdi"))}
             disabled={loadingFiscal && usosCfdi.length === 0}
           >
             <option value="">
@@ -162,16 +189,20 @@ export default function TabGeneralCliente({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-cardname">
-            Nombre <span className="text-red-500">*</span>
+          <label
+            className={prospectoLabelClassError(invalido("cardName"))}
+            htmlFor="cliente-cardname"
+          >
+            Nombre
+            <Asterisco />
           </label>
           <input
             id="cliente-cardname"
             type="text"
             value={datos.cardName}
             onChange={(e) => onChange({ cardName: e.target.value })}
-            placeholder="CardName / razón social"
-            className={prospectoInputClass}
+            placeholder="Razón social / nombre"
+            className={prospectoInputClassError(invalido("cardName"))}
           />
         </div>
         <div>
@@ -189,8 +220,12 @@ export default function TabGeneralCliente({
         </div>
         <div>
           <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-            <label className={prospectoLabelClass} htmlFor="cliente-rfc">
+            <label
+              className={prospectoLabelClassError(invalido("rfc"))}
+              htmlFor="cliente-rfc"
+            >
               RFC
+              <Asterisco />
             </label>
             <label
               htmlFor="cliente-rfc-generico"
@@ -221,7 +256,7 @@ export default function TabGeneralCliente({
               esRfcGenerico(datos.rfc) ? RFC_GENERICO_NACIONAL : "FederalTaxID"
             }
             readOnly={esRfcGenerico(datos.rfc)}
-            className={`${prospectoInputClass}${
+            className={`${prospectoInputClassError(invalido("rfc"))}${
               esRfcGenerico(datos.rfc) ? " bg-gray-50 dark:bg-gray-900/40" : ""
             }`}
           />
@@ -232,7 +267,13 @@ export default function TabGeneralCliente({
           ) : null}
         </div>
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-email">
+          <label
+            className={prospectoLabelClassError(
+              Boolean(datos.emailAddress.trim()) &&
+                !esCorreoValido(datos.emailAddress),
+            )}
+            htmlFor="cliente-email"
+          >
             Correo
           </label>
           <input
@@ -240,19 +281,39 @@ export default function TabGeneralCliente({
             type="email"
             value={datos.emailAddress}
             onChange={(e) => onChange({ emailAddress: e.target.value })}
-            className={prospectoInputClass}
+            className={prospectoInputClassError(
+              Boolean(datos.emailAddress.trim()) &&
+                !esCorreoValido(datos.emailAddress),
+            )}
+            placeholder="ejemplo@correo.com"
+            autoComplete="email"
           />
+          {datos.emailAddress.trim() && !esCorreoValido(datos.emailAddress) ? (
+            <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+              Capture un correo válido (ej. nombre@dominio.com).
+            </p>
+          ) : null}
         </div>
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-phone1">
+          <label
+            className={prospectoLabelClassError(invalido("phone1"))}
+            htmlFor="cliente-phone1"
+          >
             Teléfono 1
+            <Asterisco />
           </label>
           <input
             id="cliente-phone1"
             type="tel"
+            inputMode="numeric"
+            maxLength={10}
             value={datos.phone1}
-            onChange={(e) => onChange({ phone1: e.target.value })}
-            className={prospectoInputClass}
+            onChange={(e) =>
+              onChange({ phone1: soloDigitosTelefono(e.target.value) })
+            }
+            className={prospectoInputClassError(invalido("phone1"))}
+            placeholder="10 dígitos"
+            title="Solo números, máximo 10 dígitos"
           />
         </div>
         <div>
@@ -262,23 +323,33 @@ export default function TabGeneralCliente({
           <input
             id="cliente-phone2"
             type="tel"
+            inputMode="numeric"
+            maxLength={10}
             value={datos.phone2}
-            onChange={(e) => onChange({ phone2: e.target.value })}
+            onChange={(e) =>
+              onChange({ phone2: soloDigitosTelefono(e.target.value) })
+            }
             className={prospectoInputClass}
+            placeholder="10 dígitos"
+            title="Solo números, máximo 10 dígitos"
           />
         </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-metodo-pago">
+          <label
+            className={prospectoLabelClassError(invalido("metodoPagoCfdi"))}
+            htmlFor="cliente-metodo-pago"
+          >
             Método de pago CFDI
+            <Asterisco />
           </label>
           <select
             id="cliente-metodo-pago"
             value={datos.metodoPagoCfdi}
             onChange={(e) => onChange({ metodoPagoCfdi: e.target.value })}
-            className={prospectoInputClass}
+            className={prospectoInputClassError(invalido("metodoPagoCfdi"))}
             disabled={loadingFiscal && metodosPago.length === 0}
           >
             <option value="">
@@ -292,14 +363,18 @@ export default function TabGeneralCliente({
           </select>
         </div>
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-forma-pago">
+          <label
+            className={prospectoLabelClassError(invalido("formaPagoCfdi"))}
+            htmlFor="cliente-forma-pago"
+          >
             Forma de pago CFDI
+            <Asterisco />
           </label>
           <select
             id="cliente-forma-pago"
             value={datos.formaPagoCfdi}
             onChange={(e) => onChange({ formaPagoCfdi: e.target.value })}
-            className={prospectoInputClass}
+            className={prospectoInputClassError(invalido("formaPagoCfdi"))}
             disabled={loadingFiscal && formasPago.length === 0}
           >
             <option value="">

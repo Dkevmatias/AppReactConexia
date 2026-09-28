@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
+import { useModalAlerta } from "../../hooks/useModalAlerta";
 import {
   crmService,
   ESTATUS_ACTIVO,
@@ -24,6 +25,7 @@ export default function CatalogoEtapas({
 }: {
   embebido?: boolean;
 }) {
+  const { mostrarAdvertencia, mostrarError, AlertaHost } = useModalAlerta();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export default function CatalogoEtapas({
   const guardar = async () => {
     const nombre = form.nombre.trim();
     if (!nombre) {
-      alert("El nombre de la etapa es obligatorio.");
+      mostrarAdvertencia("El nombre de la etapa es obligatorio.", "Dato requerido");
       return;
     }
 
@@ -91,7 +93,7 @@ export default function CatalogoEtapas({
       await cargar();
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "No se pudo guardar.");
+      mostrarError(err instanceof Error ? err.message : "No se pudo guardar.");
     } finally {
       setSaving(false);
     }
@@ -105,7 +107,7 @@ export default function CatalogoEtapas({
       await cargar();
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "No se pudo eliminar.");
+      mostrarError(err instanceof Error ? err.message : "No se pudo eliminar.");
     }
   };
 
@@ -307,6 +309,7 @@ export default function CatalogoEtapas({
           </div>
         </div>
       )}
+      {AlertaHost}
     </div>
   );
 }

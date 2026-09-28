@@ -1,12 +1,17 @@
 import { Lead, LeadPayload } from "../../services/leadsService";
 
-import { EstatusCatalogo, Etapa, EtapaConfiguracion } from "../../services/crmService";
+import {
+  EstatusCatalogo,
+  Etapa,
+  EtapaConfiguracion,
+} from "../../services/crmService";
 
 export const TABS_CREACION_CLIENTE = [
   { id: "general", label: "General" },
   { id: "direcciones", label: "Direcciones" },
   { id: "condicion-pago", label: "Condición Pago" },
   { id: "campos-usuario", label: "Campos de Usuario" },
+  { id: "descuentos", label: "Descuentos" },
 ] as const;
 
 export type TabCreacionClienteId = (typeof TABS_CREACION_CLIENTE)[number]["id"];
@@ -19,10 +24,7 @@ function normalizarNombreCatalogo(nombre: string): string {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
-function buscarEtapaPorNombre(
-  etapas: Etapa[],
-  nombre: string,
-): number | null {
+function buscarEtapaPorNombre(etapas: Etapa[], nombre: string): number | null {
   const target = normalizarNombreCatalogo(nombre);
   const etapa = etapas.find(
     (e) => normalizarNombreCatalogo(e.nombre) === target,
@@ -136,7 +138,7 @@ export function leadToForm(row: Lead): LeadPayload {
     nombre: row.nombre ?? "",
     aPaterno: row.aPaterno ?? "",
     aMaterno: row.aMaterno ?? "",
-    telefono: row.telefono ?? "",
+    telefono: soloDigitosTelefono(row.telefono ?? ""),
     correo: row.correo ?? "",
     observaciones: row.observaciones ?? "",
     unidad: row.unidad ?? "",
@@ -148,7 +150,9 @@ export function leadToForm(row: Lead): LeadPayload {
     idEstatus: row.idEstatus,
     idEtapa: row.idEtapa,
     idGrupo:
-      row.idGrupo != null && Number(row.idGrupo) > 0 ? Number(row.idGrupo) : null,
+      row.idGrupo != null && Number(row.idGrupo) > 0
+        ? Number(row.idGrupo)
+        : null,
     idTemperatura: row.idTemperatura,
     idUsuarioCreacion: row.idUsuarioCreacion,
     idUsuarioAsignado: row.idUsuarioAsignado,
@@ -177,7 +181,7 @@ export function prepararPayload(
     nombre: trim(form.nombre),
     aPaterno: trim(form.aPaterno),
     aMaterno: trim(form.aMaterno),
-    telefono: trim(form.telefono),
+    telefono: soloDigitosTelefono(form.telefono ?? ""),
     correo: trim(form.correo),
     observaciones: trim(form.observaciones),
     unidad: trim(form.unidad),
@@ -196,8 +200,31 @@ export function fechaParaInput(valor: string | null): string {
   return d.toISOString().slice(0, 16);
 }
 
+/** Solo dígitos, máximo 10 (teléfonos de prospecto/cliente). */
+export function soloDigitosTelefono(valor: string, max = 10): string {
+  return (valor ?? "").replace(/\D/g, "").slice(0, max);
+}
+
+/** Correo vacío = válido (opcional); si hay texto, debe tener formato de email. */
+export function esCorreoValido(valor: string | null | undefined): boolean {
+  const t = (valor ?? "").trim();
+  if (!t) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(t);
+}
+
 export const prospectoInputClass =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white";
 
 export const prospectoLabelClass =
   "mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300";
+
+/** Borde/fondo ámbar cuando falta un dato obligatorio tras intentar guardar. */
+export function prospectoInputClassError(invalido: boolean): string {
+  if (!invalido) return prospectoInputClass;
+  return `${prospectoInputClass} border-amber-500 bg-amber-50 ring-1 ring-amber-400 focus:border-amber-500 focus:ring-amber-400 dark:border-amber-500 dark:bg-amber-950/40 dark:focus:border-amber-400`;
+}
+
+export function prospectoLabelClassError(invalido: boolean): string {
+  if (!invalido) return prospectoLabelClass;
+  return `${prospectoLabelClass} text-amber-800 dark:text-amber-300`;
+}

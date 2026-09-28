@@ -153,6 +153,18 @@ const navItems: NavItem[] = [
         icon: <TbReportAnalytics className="w-4 h-4 shrink-0" />,
         pro: false,
       },
+      {
+        name: "Control CEDIS",
+        path: "/operaciones/ControlCedis",
+        icon: <TbTruckDelivery className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Listado de Entregas de Mercancía",
+        path: "/operaciones/ListaEntregasMercancia",
+        icon: <MdViewList className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
     ],
   },
   {
@@ -335,12 +347,22 @@ const AppSidebar: React.FC = () => {
               clave === "operaciones"
             );
           });
-          if (!moduloOperaciones?.activo) return null;
+          const moduloCedis = menu.find((m) => {
+            const clave = (m.clave ?? "").trim().toLowerCase();
+            return (
+              clave === "cedis" ||
+              clave === "cedis.operar" ||
+              clave === "cedis.control"
+            );
+          });
+          if (!moduloOperaciones?.activo && !moduloCedis?.activo) return null;
 
           const operacionesSubs: {
             claves: string[];
             ruta: string;
+            rutasAlt?: string[];
             entry: NonNullable<NavItem["subItems"]>[number];
+            permisosExtra?: typeof menu[number]["permisos"];
           }[] = [
             {
               claves: ["bitacora.ver", "bitacora.operar"],
@@ -371,15 +393,53 @@ const AppSidebar: React.FC = () => {
               ruta: "/operaciones/Reportes",
               entry: item.subItems[4],
             },
+            {
+              claves: [
+                "cedis.operar",
+                "cedis",
+                "cedis.control",
+                "CEDIS.Operar",
+              ],
+              ruta: "/operaciones/ControlCedis",
+              rutasAlt: ["/control-cedis"],
+              entry: item.subItems[5],
+              permisosExtra: moduloCedis?.activo
+                ? moduloCedis.permisos
+                : undefined,
+            },
+            {
+              claves: [
+                "cedis.operar",
+                "cedis",
+                "cedis.control",
+                "CEDIS.Operar",
+              ],
+              ruta: "/operaciones/ListaEntregasMercancia",
+              rutasAlt: ["/control-cedis", "/operaciones/ControlCedis"],
+              entry: item.subItems[6],
+              permisosExtra: moduloCedis?.activo
+                ? moduloCedis.permisos
+                : undefined,
+            },
           ];
 
+          const permisosBase = moduloOperaciones?.activo
+            ? (moduloOperaciones.permisos ?? [])
+            : [];
+
           const subItems = operacionesSubs
-            .filter(({ claves, ruta }) =>
-              permisoActivoPorClaveORuta(moduloOperaciones.permisos, {
-                claves,
-                ruta,
-              }),
-            )
+            .filter(({ claves, ruta, rutasAlt, permisosExtra }) => {
+              const permisos = [...permisosBase, ...(permisosExtra ?? [])];
+              if (permisoActivoPorClaveORuta(permisos, { claves, ruta })) {
+                return true;
+              }
+              return (rutasAlt ?? []).some((rutaAlt) =>
+                permisoActivoPorClaveORuta(permisos, {
+                  claves,
+                  ruta: rutaAlt,
+                }),
+              );
+            })
             .map(({ entry }) => entry)
             .filter(Boolean);
 

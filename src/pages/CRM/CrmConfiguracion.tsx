@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
+import { useModalAlerta } from "../../hooks/useModalAlerta";
 import {
   crmService,
   ESTATUS_ACTIVO,
@@ -72,6 +73,7 @@ function funnelOrdenado(items: EtapaConfiguracion[]): EtapaConfiguracion[] {
 }
 
 export default function CrmConfiguracion() {
+  const { mostrarAdvertencia, mostrarError, AlertaHost } = useModalAlerta();
   const [tab, setTab] = useState<TabId>("negocio");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -237,7 +239,7 @@ export default function CrmConfiguracion() {
       if (modal.kind === "negocio") {
         const nombre = formNegocio.nombre.trim();
         if (!nombre) {
-          alert("El nombre del negocio es obligatorio.");
+          mostrarAdvertencia("El nombre del negocio es obligatorio.", "Dato requerido");
           setSaving(false);
           return;
         }
@@ -253,7 +255,7 @@ export default function CrmConfiguracion() {
       } else if (modal.kind === "servicio") {
         const nombre = formServicio.nombre.trim();
         if (!nombre) {
-          alert("El nombre del tipo de servicio es obligatorio.");
+          mostrarAdvertencia("El nombre del tipo de servicio es obligatorio.", "Dato requerido");
           setSaving(false);
           return;
         }
@@ -265,12 +267,12 @@ export default function CrmConfiguracion() {
         }
       } else if (modal.kind === "funnel") {
         if (!formFunnel.idEtapa) {
-          alert("Seleccione una etapa del catálogo.");
+          mostrarAdvertencia("Seleccione una etapa del catálogo.", "Dato requerido");
           setSaving(false);
           return;
         }
         if (formFunnel.orden < 1) {
-          alert("El orden debe ser mayor a cero.");
+          mostrarAdvertencia("El orden debe ser mayor a cero.", "Dato requerido");
           setSaving(false);
           return;
         }
@@ -286,7 +288,7 @@ export default function CrmConfiguracion() {
       } else {
         const nombre = formFuente.nombre.trim();
         if (!nombre) {
-          alert("El nombre de la fuente es obligatorio.");
+          mostrarAdvertencia("El nombre de la fuente es obligatorio.", "Dato requerido");
           setSaving(false);
           return;
         }
@@ -301,7 +303,7 @@ export default function CrmConfiguracion() {
       await cargar();
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "No se pudo guardar.");
+      mostrarError(err instanceof Error ? err.message : "No se pudo guardar.");
     } finally {
       setSaving(false);
     }
@@ -322,7 +324,7 @@ export default function CrmConfiguracion() {
       await cargar();
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "No se pudo eliminar.");
+      mostrarError(err instanceof Error ? err.message : "No se pudo eliminar.");
     }
   };
 
@@ -730,6 +732,7 @@ export default function CrmConfiguracion() {
           </div>
         </div>
       )}
+      {AlertaHost}
     </div>
   );
 }

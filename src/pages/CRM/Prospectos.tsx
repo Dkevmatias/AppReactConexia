@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
+import { useModalAlerta } from "../../hooks/useModalAlerta";
 import PaginacionTabla from "../../components/common/PaginacionTabla";
 import ModalDetalleRegistro, {
   CampoDetalle,
@@ -31,6 +32,7 @@ const rowClass =
 
 export default function Prospectos() {
   const navigate = useNavigate();
+  const { mostrarError, AlertaHost } = useModalAlerta();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
@@ -112,7 +114,7 @@ export default function Prospectos() {
       await cargar();
     } catch (err) {
       console.error(err);
-      alert(err instanceof Error ? err.message : "No se pudo eliminar.");
+      mostrarError(err instanceof Error ? err.message : "No se pudo eliminar.");
     }
   };
 
@@ -349,6 +351,7 @@ export default function Prospectos() {
           </dl>
         ) : null}
       </ModalDetalleRegistro>
+      {AlertaHost}
     </div>
   );
 }

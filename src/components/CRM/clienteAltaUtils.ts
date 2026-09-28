@@ -25,6 +25,42 @@ export type DireccionClienteForm = {
   referencia: string;
 };
 
+export type DescuentoClienteForm = {
+  idLocal: string;
+  idClienteDescuento?: number | null;
+  idDescuentoDetalle?: number | null;
+  idCliente: number | null;
+  idSucursal: number | null;
+  IdLeadOrigen: number | null;
+  IdUsuarioCreacion: number | null;
+  IdUsuarioActualizacion: number | null;
+  AbsEntry: number | null;
+  Type: string;
+  ObjType: string;
+  /** FirmCode de la marca (SAP). */
+  ObjCode: string;
+  idMarca: number | null;
+  firmName: string;
+  /** Tope máximo de % permitido por marca (API discountLimit). */
+  discountLimit: number;
+  /** Porcentaje capturado en UI (permite decimales, ej. "15.5"). */
+  porcentaje: string;
+  /** Entero a persistir (redondeado desde porcentaje). */
+  DiscRel: string;
+  ValidFor: string;
+  ValidForm: string | null;
+  ValidTo: string | null;
+  DataSource: string;
+  UserSign: number | null;
+  LogInstanc: number | null;
+  UserSign2: number | null;
+  EstatusSync: string;
+  FechaSync: string;
+  ErrorSync: string;
+  FechaCreacion: string | null;
+  FechaActualizacion: string | null;
+};
+
 export type ContactoClienteForm = {
   idLocal: string;
   idContacto?: number | null;
@@ -72,8 +108,10 @@ export type ClienteAltaForm = {
   camposExtra: Record<number, string>;
   contactos: ContactoClienteForm[];
   direcciones: DireccionClienteForm[];
+  descuentos: DescuentoClienteForm[];
 };
 
+/** Se crearon Catalogo*/
 export const USOS_CFDI_COMUNES = [
   { value: "", label: "Seleccione uso CFDI" },
   { value: "G01", label: "G01 — Adquisición de mercancías" },
@@ -157,6 +195,8 @@ export const ESTADOS_MEXICO = [
 export const CONDICION_PAGO_FIJA = { code: 8, nombre: "Contado" } as const;
 export const LISTA_PRECIOS_FIJA = { code: 1, nombre: "General" } as const;
 export const MONEDA_FIJA = "MXN";
+/** Addenda especial fija (no editable en UI). */
+export const ADDENDA_ESP_FIJA = "Cap_31";
 
 export const SI_NO_SAP = [
   { value: "", label: "Seleccione" },
@@ -210,6 +250,431 @@ export function contactoVacio(): ContactoClienteForm {
   };
 }
 
+/** Solo dígitos y un separador decimal (. o ,). Sin letras. */
+export function sanitizarPorcentajeDescuento(valor: string): string {
+  let s = (valor ?? "").replace(/[^\d.,]/g, "");
+  const sepIdx = s.search(/[.,]/);
+  if (sepIdx >= 0) {
+    const sep = s[sepIdx];
+    s =
+      s.slice(0, sepIdx + 1) +
+      s.slice(sepIdx + 1).replace(/[.,]/g, "");
+    // Un solo separador
+    if (sep === ",") {
+      /* keep comma while typing; DiscRel normaliza a . */
+    }
+  }
+  return s;
+}
+
+/**
+ * Convierte % UI a entero DiscRel, respetando tope de marca.
+ * Ej. 15.5 → "16"; si límite 10 y capturan 12 → "10".
+ */
+export function porcentajeADiscRelEntero(
+  porcentaje: string,
+  discountLimit?: number | null,
+): string {
+  const n = Number((porcentaje ?? "").trim().replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return "";
+  let valor = Math.max(0, n);
+  const limite =
+    discountLimit != null && Number.isFinite(discountLimit)
+      ? Number(discountLimit)
+      : null;
+  if (limite != null && limite >= 0) {
+    valor = Math.min(valor, limite);
+  } else {
+    valor = Math.min(valor, 100);
+  }
+  return String(Math.round(valor));
+}
+
+/** Si el número capturado supera el límite, lo recorta al máximo permitido. */
+export function aplicarLimitePorcentaje(
+  porcentaje: string,
+  discountLimit: number | null | undefined,
+): { valor: string; excedio: boolean } {
+  const limpio = sanitizarPorcentajeDescuento(porcentaje);
+  if (!limpio) return { valor: "", excedio: false };
+  const n = Number(limpio.replace(",", "."));
+  if (!Number.isFinite(n)) return { valor: limpio, excedio: false };
+  const limite =
+    discountLimit != null && Number.isFinite(discountLimit)
+      ? Number(discountLimit)
+      : null;
+  if (limite == null || limite < 0) return { valor: limpio, excedio: false };
+  if (n > limite) {
+    // Mantener formato simple del límite
+    const entero = Number.isInteger(limite) ? String(limite) : String(limite);
+    return { valor: entero, excedio: true };
+  }
+  return { valor: limpio, excedio: false };
+}
+
+export function descuentoVacio(opts?: {
+  idMarca?: number | null;
+  firmCode?: number | null;
+  firmName?: string;
+  discountLimit?: number | null;
+  porcentaje?: string;
+}): DescuentoClienteForm {
+  const discountLimit = opts?.discountLimit ?? 0;
+  const porcentaje = opts?.porcentaje ?? "";
+  const firmCode = opts?.firmCode ?? null;
+  return {
+    idLocal: nuevoIdLocal(),
+    idClienteDescuento: null,
+    idDescuentoDetalle: null,
+    idCliente: null,
+    idSucursal: null,
+    IdLeadOrigen: null,
+    IdUsuarioCreacion: null,
+    IdUsuarioActualizacion: null,
+    AbsEntry: null,
+    Type: "A",
+    ObjType: "4",
+    ObjCode: firmCode != null && firmCode > 0 ? String(firmCode) : "",
+    idMarca: opts?.idMarca ?? null,
+    firmName: (opts?.firmName ?? "").trim(),
+    discountLimit,
+    porcentaje,
+    DiscRel: porcentajeADiscRelEntero(porcentaje, discountLimit),
+    ValidFor: "Y",
+    ValidForm: null,
+    ValidTo: null,
+    DataSource: "O",
+    UserSign: null,
+    LogInstanc: null,
+    UserSign2: null,
+    EstatusSync: "",
+    FechaSync: "",
+    ErrorSync: "",
+    FechaCreacion: null,
+    FechaActualizacion: null,
+  };
+}
+
+/**
+ * Asegura un renglón de descuento por cada marca del catálogo,
+ * conservando valores ya capturados.
+ */
+export function sincronizarDescuentosConMarcas(
+  actuales: DescuentoClienteForm[],
+  marcas: Array<{
+    idMarca: number;
+    firmCode: number;
+    firmName: string;
+    discountLimit?: number;
+  }>,
+): DescuentoClienteForm[] {
+  const header = actuales.find((d) => (d.idClienteDescuento ?? 0) > 0) ?? actuales[0];
+  return marcas.map((marca) => {
+    const firmCodeStr = String(marca.firmCode);
+    const discountLimit = marca.discountLimit ?? 0;
+    const prev =
+      actuales.find(
+        (d) =>
+          (d.ObjCode && d.ObjCode === firmCodeStr) ||
+          (d.idMarca != null && d.idMarca === marca.idMarca),
+      ) ?? null;
+    if (prev) {
+      const { valor } = aplicarLimitePorcentaje(
+        prev.porcentaje || prev.DiscRel,
+        discountLimit,
+      );
+      return {
+        ...prev,
+        idMarca: marca.idMarca,
+        firmName: marca.firmName,
+        ObjCode: firmCodeStr,
+        discountLimit,
+        porcentaje: valor,
+        DiscRel: porcentajeADiscRelEntero(valor, discountLimit),
+        idClienteDescuento:
+          prev.idClienteDescuento ?? header?.idClienteDescuento ?? null,
+        AbsEntry: prev.AbsEntry ?? header?.AbsEntry ?? null,
+        EstatusSync: prev.EstatusSync || header?.EstatusSync || "",
+        ErrorSync: prev.ErrorSync || header?.ErrorSync || "",
+      };
+    }
+    const vacio = descuentoVacio({
+      idMarca: marca.idMarca,
+      firmCode: marca.firmCode,
+      firmName: marca.firmName,
+      discountLimit,
+    });
+    return {
+      ...vacio,
+      idClienteDescuento: header?.idClienteDescuento ?? null,
+      AbsEntry: header?.AbsEntry ?? null,
+      EstatusSync: header?.EstatusSync ?? "",
+      ErrorSync: header?.ErrorSync ?? "",
+      FechaSync: header?.FechaSync ?? "",
+    };
+  });
+}
+
+/** Documento local: 1 cabecera (cliente) + N líneas (marca con % > 0). */
+export type ClienteDescuentoWritePayload = {
+  idCliente: number;
+  idSucursal: number;
+  idLeadOrigen: number;
+  idUsuarioCreacion?: number | null;
+  type: string;
+  objType: string;
+  objCode: string;
+  discRel: string;
+  validFor: string;
+  validFrom?: string | null;
+  validTo?: string | null;
+  detalles: {
+    idDescuentoDetalle?: number | null;
+    objType: string;
+    objKey: string;
+    discType: string;
+    discount: number;
+    payFor: number;
+    forFree: number;
+    upTo: number;
+  }[];
+};
+
+export type ClienteDescuentoApi = {
+  idDescuento: number;
+  idCliente: number;
+  cardCode: string | null;
+  absEntry: number;
+  type: string | null;
+  objType: string | null;
+  objCode: string | null;
+  discRel: string | null;
+  validFor: string | null;
+  estatusSync: string | null;
+  fechaSync: string | null;
+  errorSync: string | null;
+  detalles: {
+    idDescuentoDetalle: number;
+    objType: string | null;
+    objKey: string | null;
+    discType: string | null;
+    discount: number;
+    payFor: number;
+    forFree: number;
+    upTo: number;
+  }[];
+};
+
+/**
+ * Arma el payload CRM (no SAP). Cabecera = cliente; detalle = marca.
+ * El JSON de Service Layer se mapeará después con el payload que envíes.
+ */
+export function armarPayloadDescuentoLocal(
+  filas: DescuentoClienteForm[],
+  opts: {
+    idCliente: number;
+    idSucursal?: number | null;
+    idLeadOrigen?: number | null;
+    idUsuario?: number | null;
+  },
+): ClienteDescuentoWritePayload {
+  const header = filas.find((d) => (d.idClienteDescuento ?? 0) > 0) ?? filas[0];
+  const detalles = filas
+    .map((fila) => {
+      const discount = Number(
+        porcentajeADiscRelEntero(fila.porcentaje, fila.discountLimit) || 0,
+      );
+      const objKey = (fila.ObjCode || "").trim();
+      if (!objKey || !Number.isFinite(discount) || discount <= 0) return null;
+      return {
+        idDescuentoDetalle:
+          fila.idDescuentoDetalle && fila.idDescuentoDetalle > 0
+            ? fila.idDescuentoDetalle
+            : null,
+        objType: fila.ObjType || "4",
+        objKey,
+        discType: "D",
+        discount,
+        payFor: 0,
+        forFree: 0,
+        upTo: 0,
+      };
+    })
+    .filter((d): d is NonNullable<typeof d> => d != null);
+
+  return {
+    idCliente: opts.idCliente,
+    idSucursal: opts.idSucursal ?? header?.idSucursal ?? 0,
+    idLeadOrigen: opts.idLeadOrigen ?? header?.IdLeadOrigen ?? 0,
+    idUsuarioCreacion: opts.idUsuario ?? header?.IdUsuarioCreacion ?? null,
+    type: "C",
+    objType: "4",
+    objCode: "",
+    discRel: "A",
+    validFor: header?.ValidFor || "Y",
+    validFrom: header?.ValidForm,
+    validTo: header?.ValidTo,
+    detalles,
+  };
+}
+
+export function aplicarDescuentoApiAFilas(
+  actuales: DescuentoClienteForm[],
+  doc: ClienteDescuentoApi | null,
+): DescuentoClienteForm[] {
+  if (!doc || doc.idDescuento <= 0) return actuales;
+
+  const porMarca = new Map(
+    (doc.detalles ?? [])
+      .filter((d) => (d.objKey ?? "").trim())
+      .map((d) => [(d.objKey ?? "").trim(), d]),
+  );
+
+  const base = actuales.length > 0 ? actuales : [];
+  if (base.length === 0) {
+    return (doc.detalles ?? []).map((d) => {
+      const pct = d.discount > 0 ? String(d.discount) : "";
+      return {
+        ...descuentoVacio({
+          firmCode: Number(d.objKey) || null,
+          porcentaje: pct,
+        }),
+        idClienteDescuento: doc.idDescuento,
+        idDescuentoDetalle: d.idDescuentoDetalle,
+        idCliente: doc.idCliente,
+        AbsEntry: doc.absEntry,
+        Type: doc.type || "C",
+        ObjType: d.objType || "4",
+        ObjCode: (d.objKey ?? "").trim(),
+        DiscRel: pct,
+        ValidFor: doc.validFor || "Y",
+        EstatusSync: doc.estatusSync ?? "",
+        FechaSync: doc.fechaSync ?? "",
+        ErrorSync: doc.errorSync ?? "",
+      };
+    });
+  }
+
+  return base.map((fila) => {
+    const detalle = porMarca.get((fila.ObjCode || "").trim());
+    const pct = detalle && detalle.discount > 0 ? String(detalle.discount) : fila.porcentaje;
+    return {
+      ...fila,
+      idClienteDescuento: doc.idDescuento,
+      idDescuentoDetalle: detalle?.idDescuentoDetalle ?? null,
+      idCliente: doc.idCliente,
+      AbsEntry: doc.absEntry,
+      Type: doc.type || fila.Type,
+      ObjType: detalle?.objType || fila.ObjType,
+      porcentaje: pct,
+      DiscRel: porcentajeADiscRelEntero(pct, fila.discountLimit),
+      ValidFor: doc.validFor || fila.ValidFor,
+      EstatusSync: doc.estatusSync ?? "",
+      FechaSync: doc.fechaSync ?? "",
+      ErrorSync: doc.errorSync ?? "",
+    };
+  });
+}
+
+/** % de descuento como decimal para SAP (ej. 38 → 38.0). */
+function porcentajeADiscountDecimal(
+  porcentaje: string,
+  discountLimit?: number | null,
+): number {
+  const n = Number((porcentaje ?? "").trim().replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  let valor = Math.max(0, n);
+  const limite =
+    discountLimit != null && Number.isFinite(discountLimit)
+      ? Number(discountLimit)
+      : null;
+  if (limite != null && limite >= 0) {
+    valor = Math.min(valor, limite);
+  } else {
+    valor = Math.min(valor, 100);
+  }
+  return Math.round(valor * 10) / 10;
+}
+
+/**
+ * Payload Service Layer EnhancedDiscountGroups (espejo de MapearPayload en API).
+ * Solo para preview/validación antes de enviar; el API arma el mismo shape al POST/PATCH.
+ */
+export function armarPayloadSapDiscountGroup(opts: {
+  cardCode: string;
+  filas: DescuentoClienteForm[];
+}): {
+  Type: string;
+  ObjectCode: string;
+  DiscountRelations: string | null;
+  Active: string;
+  ValidTo: string | null;
+  DiscountGroupLineCollection: Array<{
+    ObjectType: string;
+    ObjectCode: string;
+    Discount: number;
+    DiscountType: string;
+    PaidQuantity: number | null;
+    FreeQuantity: number | null;
+  }>;
+} {
+  const cardCode = (opts.cardCode || "").trim();
+  const header =
+    opts.filas.find((d) => (d.idClienteDescuento ?? 0) > 0) ?? opts.filas[0];
+  const validFor = (header?.ValidFor || "Y").trim().toUpperCase();
+  const active = validFor === "N" || validFor === "NO" || validFor === "0"
+    ? "tNO"
+    : "tYES";
+
+  const lineas = opts.filas
+    .map((fila) => {
+      const objectCode = (fila.ObjCode || "").trim();
+      const discount = porcentajeADiscountDecimal(
+        fila.porcentaje || fila.DiscRel,
+        fila.discountLimit,
+      );
+      if (!objectCode || discount <= 0) return null;
+      return {
+        ObjectType: "dgboManufacturer",
+        ObjectCode: objectCode,
+        Discount: discount,
+        DiscountType: "dt_Percentage",
+        PaidQuantity: null as number | null,
+        FreeQuantity: null as number | null,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null);
+
+  return {
+    Type: "dgt_SpecificBP",
+    ObjectCode: cardCode,
+    DiscountRelations: "dgrDiscountTotals",
+    Active: active,
+    ValidTo: header?.ValidTo || null,
+    DiscountGroupLineCollection: lineas,
+  };
+}
+
+/** Serializa el payload SAP con Discount siempre a 1 decimal (38 → 38.0). */
+export function stringifyPayloadSapDiscountGroup(
+  payload: ReturnType<typeof armarPayloadSapDiscountGroup>,
+): string {
+  const raw = JSON.stringify(
+    {
+      ...payload,
+      DiscountGroupLineCollection: payload.DiscountGroupLineCollection.map(
+        (linea) => ({
+          ...linea,
+          Discount: `__SAP_DISC_${Number(linea.Discount).toFixed(1)}__`,
+        }),
+      ),
+    },
+    null,
+    2,
+  );
+  return raw.replace(/"__SAP_DISC_(-?\d+\.\d)__"/g, "$1");
+}
+
 export function clienteAltaVacio(): ClienteAltaForm {
   return {
     tipoPersona: "",
@@ -233,7 +698,7 @@ export function clienteAltaVacio(): ClienteAltaForm {
     uTipoCliente: "",
     uDiaVisita: "",
     addenda: "",
-    addendaEsp: "",
+    addendaEsp: ADDENDA_ESP_FIJA,
     usaMapEsp: "N",
     envioAutCe: "N",
     ieps: "N",
@@ -243,6 +708,7 @@ export function clienteAltaVacio(): ClienteAltaForm {
     camposExtra: {},
     contactos: [],
     direcciones: [],
+    descuentos: [],
   };
 }
 
@@ -288,9 +754,11 @@ export function contactoFormDesdeApi(raw: unknown): ContactoClienteForm {
   const idContacto = Number(pickRaw(c, "idContacto", "IdContacto"));
   const generoRaw = pickStr(c, "gender", "Gender").toUpperCase();
   const genero: GeneroContacto =
-    generoRaw.startsWith("F") || generoRaw === "GT_FEMALE" ? "F"
-    : generoRaw.startsWith("M") || generoRaw === "GT_MALE" ? "M"
-    : "";
+    generoRaw.startsWith("F") || generoRaw === "GT_FEMALE"
+      ? "F"
+      : generoRaw.startsWith("M") || generoRaw === "GT_MALE"
+        ? "M"
+        : "";
 
   return {
     ...contactoVacio(),
@@ -346,10 +814,10 @@ export function clienteAltaDesdeApi(raw: unknown): ClienteAltaForm {
     uBxpRuta: pickStr(o, "u_BXP_RUTA", "U_BXP_RUTA"),
     uBxpDpp: pickStr(o, "u_BXP_DPP", "U_BXP_DPP"),
     uBxpPorcDpp: pickStr(o, "u_BXP_PorcDPP", "U_BXP_PorcDPP"),
-    uTipoCliente: pickStr(o, "u_TipoCliente", "U_TipoCliente"),
+    uTipoCliente: "",
     uDiaVisita: pickStr(o, "u_DiaVisita", "U_DiaVisita"),
     addenda: pickStr(fiscal, "addenda", "Addenda"),
-    addendaEsp: pickStr(fiscal, "addendaEsp", "AddendaEsp"),
+    addendaEsp: ADDENDA_ESP_FIJA,
     usaMapEsp: pickStr(fiscal, "usaMapEsp", "UsaMapEsp") || "N",
     envioAutCe: pickStr(fiscal, "envioAutCe", "EnvioAutCe") || "N",
     ieps: pickStr(fiscal, "ieps", "Ieps") || "N",
@@ -359,7 +827,9 @@ export function clienteAltaDesdeApi(raw: unknown): ClienteAltaForm {
       .map((m) => pickStr(asRecord(m), "codigoMetodoPago", "CodigoMetodoPago"))
       .filter(Boolean),
     camposExtra,
-    contactos: asArray(pickRaw(o, "contactos", "Contactos")).map(contactoFormDesdeApi),
+    contactos: asArray(pickRaw(o, "contactos", "Contactos")).map(
+      contactoFormDesdeApi,
+    ),
     direcciones: asArray(pickRaw(o, "direcciones", "Direcciones")).map(
       direccionFormDesdeApi,
     ),
@@ -459,9 +929,7 @@ export function etiquetaTipoPersona(tipo: TipoPersonaCliente | ""): string {
   return "—";
 }
 
-export function companyPrivateDesdeTipo(
-  tipo: TipoPersonaCliente | "",
-): string {
+export function companyPrivateDesdeTipo(tipo: TipoPersonaCliente | ""): string {
   return tipo === "MORAL" ? "cCompany" : "cPrivate";
 }
 
@@ -500,7 +968,9 @@ export function estadoMexicoPorValor(valor: string | null | undefined) {
 }
 
 /** Código OCST (ej. CHS). Si no hay coincidencia, recorta a 10 para CRM. */
-export function codigoEstadoSap(valor: string | null | undefined): string | null {
+export function codigoEstadoSap(
+  valor: string | null | undefined,
+): string | null {
   const raw = (valor ?? "").trim();
   if (!raw) return null;
   const match = estadoMexicoPorValor(raw);
@@ -508,7 +978,9 @@ export function codigoEstadoSap(valor: string | null | undefined): string | null
   return raw.slice(0, 10);
 }
 
-export function codigoEstadoSat(valor: string | null | undefined): string | null {
+export function codigoEstadoSat(
+  valor: string | null | undefined,
+): string | null {
   const raw = (valor ?? "").trim();
   if (!raw) return null;
   const match = estadoMexicoPorValor(raw);
@@ -544,14 +1016,141 @@ function numeroONull(v: string | null | undefined): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-export function validarClienteAlta(form: ClienteAltaForm): string | null {
-  if (!form.cardName.trim()) {
-    return "El nombre de negocio (CardName) es obligatorio para crear el cliente.";
+export type ResultadoValidacionClienteAlta = {
+  mensaje: string | null;
+  /** Claves de campo para resaltar en UI (ej. "rfc", "dir:abc:calle"). */
+  campos: string[];
+};
+
+const ETIQUETAS_CAMPO_CLIENTE: Record<string, string> = {
+  tipoPersona: "Tipo de persona",
+  usoCfdi: "Uso de CFDI",
+  cardName: "Nombre",
+  rfc: "RFC",
+  phone1: "Teléfono 1",
+  metodoPagoCfdi: "Método de pago CFDI",
+  formaPagoCfdi: "Forma de pago CFDI",
+  regimenFiscal: "Régimen fiscal",
+  uBxpRuta: "Ruta",
+  uBxpDpp: "Descuento por Pronto Pago",
+  uDiaVisita: "Día de visita",
+  salesPersonCode: "Vendedor SAP",
+  direcciones: "Direcciones",
+};
+
+const CAMPOS_DIRECCION_OBLIGATORIOS: Array<{
+  key: keyof DireccionClienteForm;
+  etiqueta: string;
+}> = [
+  { key: "nombre", etiqueta: "Nombre" },
+  { key: "calle", etiqueta: "Calle" },
+  { key: "numero", etiqueta: "Número" },
+  { key: "cp", etiqueta: "Código postal" },
+  { key: "coloniaSat", etiqueta: "Colonia" },
+  { key: "ciudad", etiqueta: "Ciudad" },
+  { key: "estadoSat", etiqueta: "Estado" },
+  { key: "pais", etiqueta: "País" },
+  { key: "iva", etiqueta: "IVA" },
+  { key: "paisSat", etiqueta: "País SAT" },
+  { key: "municipioSat", etiqueta: "Municipio SAT" },
+  { key: "localidadSat", etiqueta: "Localidad SAT" },
+];
+
+function vacio(v: string | null | undefined): boolean {
+  return !(v ?? "").trim();
+}
+
+export function claveCampoDireccion(idLocal: string, campo: string): string {
+  return `dir:${idLocal}:${campo}`;
+}
+
+/** Campos faltantes según reglas de alta de cliente. */
+export function camposFaltantesClienteAlta(form: ClienteAltaForm): string[] {
+  const faltantes: string[] = [];
+
+  if (vacio(form.tipoPersona)) faltantes.push("tipoPersona");
+  if (vacio(form.usoCfdi)) faltantes.push("usoCfdi");
+  if (vacio(form.cardName)) faltantes.push("cardName");
+  if (vacio(form.rfc)) faltantes.push("rfc");
+  if (vacio(form.phone1)) faltantes.push("phone1");
+  if (vacio(form.metodoPagoCfdi)) faltantes.push("metodoPagoCfdi");
+  if (vacio(form.formaPagoCfdi)) faltantes.push("formaPagoCfdi");
+
+  if (vacio(form.regimenFiscal)) faltantes.push("regimenFiscal");
+  if (vacio(form.uBxpRuta)) faltantes.push("uBxpRuta");
+  if (vacio(form.uBxpDpp)) faltantes.push("uBxpDpp");
+  if (vacio(form.uDiaVisita)) faltantes.push("uDiaVisita");
+  if (vacio(form.salesPersonCode)) faltantes.push("salesPersonCode");
+
+  if (form.direcciones.length === 0) {
+    faltantes.push("direcciones");
+  } else {
+    for (const d of form.direcciones) {
+      for (const { key } of CAMPOS_DIRECCION_OBLIGATORIOS) {
+        const valor =
+          key === "coloniaSat"
+            ? d.coloniaSat || d.colonia
+            : key === "estadoSat"
+              ? d.estadoSat || d.estado
+              : key === "cp"
+                ? d.cp || d.cpSat
+                : String(d[key] ?? "");
+        if (vacio(valor)) {
+          faltantes.push(claveCampoDireccion(d.idLocal, key));
+        }
+      }
+      // CP SAT alineado con CP
+      if (vacio(d.cpSat) && !vacio(d.cp)) {
+        /* cpSat se sincroniza con cp; si cp está, ok */
+      } else if (vacio(d.cpSat) && vacio(d.cp)) {
+        /* ya marcado via cp */
+      }
+    }
   }
+
+  return faltantes;
+}
+
+export function validarClienteAlta(
+  form: ClienteAltaForm,
+): ResultadoValidacionClienteAlta {
   if (form.cardName.trim().length > 100) {
-    return "El nombre de negocio no puede exceder 100 caracteres.";
+    return {
+      mensaje: "El nombre no puede exceder 100 caracteres.",
+      campos: ["cardName"],
+    };
   }
-  return null;
+
+  const campos = camposFaltantesClienteAlta(form);
+  if (campos.length === 0) {
+    return { mensaje: null, campos: [] };
+  }
+
+  const etiquetas = campos
+    .map((c) => {
+      if (c.startsWith("dir:")) {
+        const partes = c.split(":");
+        const campo = partes[2] ?? "";
+        const meta = CAMPOS_DIRECCION_OBLIGATORIOS.find((x) => x.key === campo);
+        return meta ? `Dirección · ${meta.etiqueta}` : "Dirección";
+      }
+      return ETIQUETAS_CAMPO_CLIENTE[c] ?? c;
+    })
+    .filter((v, i, arr) => arr.indexOf(v) === i)
+    .slice(0, 6);
+
+  const extra = campos.length > 6 ? ` y ${campos.length - 6} más` : "";
+  return {
+    mensaje: `Complete los campos obligatorios: ${etiquetas.join(", ")}${extra}.`,
+    campos,
+  };
+}
+
+/** Compatibilidad: mensaje único o null. */
+export function mensajeValidacionClienteAlta(
+  form: ClienteAltaForm,
+): string | null {
+  return validarClienteAlta(form).mensaje;
 }
 
 export type ClienteCreatePayload = {
@@ -704,7 +1303,7 @@ export function armarPayloadClienteCreate(opts: {
     u_BXP_RUTA: trimOrNull(form.uBxpRuta),
     u_BXP_DPP: trimOrNull(form.uBxpDpp),
     u_BXP_PorcDPP: numeroONull(form.uBxpPorcDpp),
-    u_TipoCliente: trimOrNull(form.uTipoCliente),
+    u_TipoCliente: null,
     u_DiaVisita: trimOrNull(form.uDiaVisita),
     estatusSap: "Borrador",
     datosFiscales: {
@@ -713,7 +1312,7 @@ export function armarPayloadClienteCreate(opts: {
       formaPagoCfdi: codigoFormaPagoSap(form.formaPagoCfdi),
       usoCfdi: trimOrNull(form.usoCfdi),
       addenda: trimOrNull(form.addenda),
-      addendaEsp: trimOrNull(form.addendaEsp),
+      addendaEsp: ADDENDA_ESP_FIJA,
       usaMapEsp: trimOrNull(form.usaMapEsp),
       envioAutCe: trimOrNull(form.envioAutCe),
       ieps: trimOrNull(form.ieps),
@@ -801,7 +1400,7 @@ export function armarPayloadClienteUpdate(opts: {
     u_BXP_RUTA: trimOrNull(form.uBxpRuta),
     u_BXP_DPP: trimOrNull(form.uBxpDpp),
     u_BXP_PorcDPP: numeroONull(form.uBxpPorcDpp),
-    u_TipoCliente: trimOrNull(form.uTipoCliente),
+    u_TipoCliente: null,
     u_DiaVisita: trimOrNull(form.uDiaVisita),
   };
 }
@@ -902,9 +1501,7 @@ export function armarPayloadDireccion(
 
 export function direccionFormDesdeApi(raw: unknown): DireccionClienteForm {
   const d = asRecord(raw);
-  const tipo = tipoDireccionDesdeSap(
-    pickStr(d, "addressType", "AddressType"),
-  );
+  const tipo = tipoDireccionDesdeSap(pickStr(d, "addressType", "AddressType"));
   const idDir = Number(pickRaw(d, "idClienteDireccion", "IdClienteDireccion"));
   return {
     ...direccionVacia(tipo),
@@ -1022,7 +1619,7 @@ export function armarPayloadSapBusinessPartner(opts: {
     })),
     U_B1SYS_MainUsage: trimOrNull(form.usoCfdi),
     U_COK1_01ADDENDA: trimOrNull(form.addenda),
-    U_COK1_01ADDENDAESP: trimOrNull(form.addendaEsp),
+    U_COK1_01ADDENDAESP: ADDENDA_ESP_FIJA,
     U_COK1_USMAPESP: form.usaMapEsp || "N",
     U_COK1_01ENVAUTCE: form.envioAutCe || "N",
     U_COK1_01IEPS: form.ieps || "N",
@@ -1034,7 +1631,7 @@ export function armarPayloadSapBusinessPartner(opts: {
     U_BXP_RUTA: trimOrNull(form.uBxpRuta),
     U_BXP_DPP: trimOrNull(form.uBxpDpp),
     U_BXP_PorcDPP: numeroONull(form.uBxpPorcDpp),
-    U_TipoCliente: trimOrNull(form.uTipoCliente),
+    U_TipoCliente: null,
     U_DiaVisita: trimOrNull(form.uDiaVisita),
   };
 }

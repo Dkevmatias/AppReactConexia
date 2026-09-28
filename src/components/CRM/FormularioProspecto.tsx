@@ -16,10 +16,14 @@ import {
   prellenarClienteDesdeLead,
 } from "./clienteAltaUtils";
 import {
+  esCorreoValido,
   esEtapaCliente,
   fechaParaInput,
   prospectoInputClass,
+  prospectoInputClassError,
   prospectoLabelClass,
+  prospectoLabelClassError,
+  soloDigitosTelefono,
 } from "./prospectoFormUtils";
 
 type SeccionProspecto = "cliente" | "seguimientos";
@@ -46,6 +50,9 @@ export type FormularioProspectoProps = {
   onGuardarDireccion?: (
     direccion: ClienteAltaForm["direcciones"][number],
   ) => void | Promise<void>;
+  onGuardarDescuentos?: () => void | Promise<void>;
+  onEnviarDescuentosSap?: () => void | Promise<void>;
+  cardCodeCliente?: string | null;
   actividades?: ActivityTimelineItem[];
   loadingActividades?: boolean;
   idLead?: number | null;
@@ -53,6 +60,8 @@ export type FormularioProspectoProps = {
   onSeguimientoGuardado?: () => void | Promise<void>;
   /** Cliente enviado a SAP: bloquear edición de datos del cliente. */
   clienteSoloLectura?: boolean;
+  /** Claves de campos obligatorios faltantes (tras intento de guardar). */
+  camposInvalidosCliente?: Set<string>;
   /** Texto opcional del aviso de bloqueo SAP. */
   avisoClienteSap?: string | null;
 };
@@ -71,12 +80,16 @@ export default function FormularioProspecto({
   etapaBloqueada = false,
   onGuardarContactos,
   onGuardarDireccion,
+  onGuardarDescuentos,
+  onEnviarDescuentosSap,
+  cardCodeCliente = null,
   actividades = [],
   loadingActividades = false,
   idLead = null,
   idUsuarioCreacion = null,
   onSeguimientoGuardado,
   clienteSoloLectura = false,
+  camposInvalidosCliente,
   avisoClienteSap = null,
 }: FormularioProspectoProps) {
   const [crearClienteActivo, setCrearClienteActivo] = useState(
@@ -209,20 +222,44 @@ export default function FormularioProspecto({
               </label>
               <input
                 type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                pattern="[0-9]{1,10}"
                 value={form.telefono ?? ""}
-                onChange={(e) => onChange("telefono", e.target.value)}
+                onChange={(e) =>
+                  onChange("telefono", soloDigitosTelefono(e.target.value))
+                }
                 className={prospectoInputClass}
                 required
+                placeholder="10 dígitos"
+                title="Solo números, máximo 10 dígitos"
               />
             </div>
             <div>
-              <label className={prospectoLabelClass}>Correo</label>
+              <label
+                className={prospectoLabelClassError(
+                  Boolean((form.correo ?? "").trim()) &&
+                    !esCorreoValido(form.correo),
+                )}
+              >
+                Correo
+              </label>
               <input
                 type="email"
                 value={form.correo ?? ""}
                 onChange={(e) => onChange("correo", e.target.value)}
-                className={prospectoInputClass}
+                className={prospectoInputClassError(
+                  Boolean((form.correo ?? "").trim()) &&
+                    !esCorreoValido(form.correo),
+                )}
+                placeholder="ejemplo@correo.com"
+                autoComplete="email"
               />
+              {(form.correo ?? "").trim() && !esCorreoValido(form.correo) ? (
+                <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">
+                  Capture un correo válido (ej. nombre@dominio.com).
+                </p>
+              ) : null}
             </div>
           </div>
         </section>
@@ -415,7 +452,11 @@ export default function FormularioProspecto({
                     onGuardarContactos={onGuardarContactos}
                     clientePersistido={clienteExistente}
                     onGuardarDireccion={onGuardarDireccion}
+                    onGuardarDescuentos={onGuardarDescuentos}
+                    onEnviarDescuentosSap={onEnviarDescuentosSap}
+                    cardCode={cardCodeCliente}
                     soloLectura={clienteSoloLectura}
+                    camposInvalidos={camposInvalidosCliente}
                   />
                 </div>
               ) : (

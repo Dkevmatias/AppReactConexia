@@ -8,7 +8,14 @@ import {
   type EnviarCorreoContacto,
   type GeneroContacto,
 } from "./clienteAltaUtils";
-import { prospectoInputClass, prospectoLabelClass } from "./prospectoFormUtils";
+import {
+  esCorreoValido,
+  prospectoInputClass,
+  prospectoInputClassError,
+  prospectoLabelClass,
+  prospectoLabelClassError,
+  soloDigitosTelefono,
+} from "./prospectoFormUtils";
 
 type ModalContactosClienteProps = {
   abierto: boolean;
@@ -78,8 +85,14 @@ export default function ModalContactosCliente({
         setError("Cada contacto debe tener al menos el nombre.");
         return;
       }
-      if (c.telefono1.trim().length > 20 || c.telefono2.trim().length > 20) {
-        setError("El teléfono no puede exceder 20 caracteres.");
+      if (c.telefono1.trim().length > 10 || c.telefono2.trim().length > 10) {
+        setError("El teléfono no puede exceder 10 dígitos.");
+        return;
+      }
+      if (c.email.trim() && !esCorreoValido(c.email)) {
+        setError(
+          `El correo del contacto "${c.nombre.trim() || "sin nombre"}" no es válido.`,
+        );
         return;
       }
       if (c.titulo.trim().length > 20) {
@@ -240,37 +253,57 @@ export default function ModalContactosCliente({
                   <label className={prospectoLabelClass}>Teléfono 1</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     value={contacto.telefono1}
                     onChange={(e) =>
                       actualizar(contacto.idLocal, {
-                        telefono1: e.target.value,
+                        telefono1: soloDigitosTelefono(e.target.value),
                       })
                     }
                     className={prospectoInputClass}
+                    placeholder="10 dígitos"
+                    title="Solo números, máximo 10 dígitos"
                   />
                 </div>
                 <div>
                   <label className={prospectoLabelClass}>Teléfono 2</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     value={contacto.telefono2}
                     onChange={(e) =>
                       actualizar(contacto.idLocal, {
-                        telefono2: e.target.value,
+                        telefono2: soloDigitosTelefono(e.target.value),
                       })
                     }
                     className={prospectoInputClass}
+                    placeholder="10 dígitos"
+                    title="Solo números, máximo 10 dígitos"
                   />
                 </div>
                 <div>
-                  <label className={prospectoLabelClass}>Email</label>
+                  <label
+                    className={prospectoLabelClassError(
+                      Boolean(contacto.email.trim()) &&
+                        !esCorreoValido(contacto.email),
+                    )}
+                  >
+                    Email
+                  </label>
                   <input
                     type="email"
                     value={contacto.email}
                     onChange={(e) =>
                       actualizar(contacto.idLocal, { email: e.target.value })
                     }
-                    className={prospectoInputClass}
+                    className={prospectoInputClassError(
+                      Boolean(contacto.email.trim()) &&
+                        !esCorreoValido(contacto.email),
+                    )}
+                    placeholder="ejemplo@correo.com"
+                    autoComplete="email"
                   />
                 </div>
                 <div>

@@ -8,6 +8,8 @@ import {
 export interface User {
   idPersona: number;
   idUsuario: number;
+  idEmpresa: number;
+  idSucursal: number;
   role: number;
   cardCode: string;
   fullname: string;
@@ -64,6 +66,8 @@ function normalizeUser(raw: unknown): User | undefined {
     "idUser",
     "IdUser",
   );
+  const idEmpresa = pickNumber(src, "idEmpresa", "IdEmpresa");
+  const idSucursal = pickNumber(src, "idSucursal", "IdSucursal");
   const role = pickNumber(src, "role", "Role", "idRol", "IdRol");
   const cardCode = pickString(src, "cardCode", "CardCode") ?? "";
   const fullname =
@@ -81,6 +85,8 @@ function normalizeUser(raw: unknown): User | undefined {
   return {
     idPersona,
     idUsuario,
+    idEmpresa,
+    idSucursal,
     role,
     cardCode,
     fullname,
@@ -96,13 +102,15 @@ export function mergeSessionUser(
   return {
     role: incoming.role || previous?.role || 0,
     idPersona:
-      incoming.idPersona > 0
-        ? incoming.idPersona
-        : (previous?.idPersona ?? 0),
+      incoming.idPersona > 0 ? incoming.idPersona : (previous?.idPersona ?? 0),
     idUsuario:
-      incoming.idUsuario > 0
-        ? incoming.idUsuario
-        : (previous?.idUsuario ?? 0),
+      incoming.idUsuario > 0 ? incoming.idUsuario : (previous?.idUsuario ?? 0),
+    idEmpresa:
+      incoming.idEmpresa > 0 ? incoming.idEmpresa : (previous?.idEmpresa ?? 0),
+    idSucursal:
+      incoming.idSucursal > 0
+        ? incoming.idSucursal
+        : (previous?.idSucursal ?? 0),
     cardCode: incoming.cardCode || previous?.cardCode || "",
     fullname: incoming.fullname || previous?.fullname || "",
     defaultRoute: incoming.defaultRoute ?? previous?.defaultRoute ?? null,
@@ -146,10 +154,7 @@ export const checkAuthService = async (): Promise<CheckAuthResponse> => {
   });
   const data = res.data ?? {};
   // Acepta user en raíz o envelope completo.
-  const user =
-    normalizeUser(data.user) ??
-    normalizeUser(data) ??
-    undefined;
+  const user = normalizeUser(data.user) ?? normalizeUser(data) ?? undefined;
   return user ? { ...data, user } : data;
 };
 

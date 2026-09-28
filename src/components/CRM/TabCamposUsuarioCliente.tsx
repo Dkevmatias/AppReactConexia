@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
 import {
+  ADDENDA_ESP_FIJA,
   ClienteAltaForm,
   DIAS_VISITA_SAP,
 } from "./clienteAltaUtils";
-import { prospectoInputClass, prospectoLabelClass } from "./prospectoFormUtils";
+import {
+  prospectoInputClass,
+  prospectoInputClassError,
+  prospectoLabelClass,
+  prospectoLabelClassError,
+} from "./prospectoFormUtils";
 import {
   etiquetaSatItem,
   satCatalogoService,
@@ -14,7 +20,16 @@ type Props = {
   datos: ClienteAltaForm;
   onChange: (parcial: Partial<ClienteAltaForm>) => void;
   soloLectura?: boolean;
+  camposInvalidos?: Set<string>;
 };
+
+function Asterisco() {
+  return (
+    <span className="ml-0.5 text-red-500" aria-hidden="true">
+      *
+    </span>
+  );
+}
 
 function porcentajeDesdeDpp(dpp: string): string {
   const v = dpp.trim().toLowerCase();
@@ -27,10 +42,12 @@ export default function TabCamposUsuarioCliente({
   datos,
   onChange,
   soloLectura = false,
+  camposInvalidos,
 }: Props) {
   const [regimenes, setRegimenes] = useState<SatCatalogoItem[]>([]);
   const [loadingRegimen, setLoadingRegimen] = useState(true);
   const [errorRegimen, setErrorRegimen] = useState<string | null>(null);
+  const invalido = (clave: string) => Boolean(camposInvalidos?.has(clave));
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +75,22 @@ export default function TabCamposUsuarioCliente({
       cancelled = true;
     };
   }, []);
+
+  // Asegura Addenda especial fija
+  useEffect(() => {
+    if (soloLectura) return;
+    if (datos.addendaEsp === ADDENDA_ESP_FIJA) return;
+    onChange({ addendaEsp: ADDENDA_ESP_FIJA });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datos.addendaEsp, soloLectura]);
+
+  // Tipo cliente siempre vacío en UI (se envía null)
+  useEffect(() => {
+    if (soloLectura) return;
+    if (!datos.uTipoCliente) return;
+    onChange({ uTipoCliente: "" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datos.uTipoCliente, soloLectura]);
 
   // Si DPP ya viene cargado, asegura el porcentaje fijo
   useEffect(() => {
@@ -88,14 +121,18 @@ export default function TabCamposUsuarioCliente({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-regimen">
-            Régimen fiscal (U_COK1_01REGFIS)
+          <label
+            className={prospectoLabelClassError(invalido("regimenFiscal"))}
+            htmlFor="cliente-regimen"
+          >
+            Régimen fiscal
+            <Asterisco />
           </label>
           <select
             id="cliente-regimen"
             value={datos.regimenFiscal}
             onChange={(e) => onChange({ regimenFiscal: e.target.value })}
-            className={prospectoInputClass}
+            className={prospectoInputClassError(invalido("regimenFiscal"))}
             disabled={loadingRegimen && regimenes.length === 0}
           >
             <option value="">
@@ -113,21 +150,28 @@ export default function TabCamposUsuarioCliente({
 
         <div>
           <label className={prospectoLabelClass} htmlFor="cliente-addenda-esp">
-            Addenda especial (U_COK1_01ADDENDAESP)
+            Addenda especial
           </label>
           <input
             id="cliente-addenda-esp"
             type="text"
-            value={datos.addendaEsp}
-            onChange={(e) => onChange({ addendaEsp: e.target.value })}
-            placeholder="Ej. CaP_31"
-            className={prospectoInputClass}
+            value={ADDENDA_ESP_FIJA}
+            readOnly
+            className={`${prospectoInputClass} bg-gray-50 dark:bg-gray-900/40`}
+            title="Valor fijo no editable"
           />
+          <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+            Fijo: {ADDENDA_ESP_FIJA} (no editable)
+          </p>
         </div>
 
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-ruta">
-            Ruta (U_BXP_RUTA)
+          <label
+            className={prospectoLabelClassError(invalido("uBxpRuta"))}
+            htmlFor="cliente-ruta"
+          >
+            Ruta
+            <Asterisco />
           </label>
           <input
             id="cliente-ruta"
@@ -135,19 +179,23 @@ export default function TabCamposUsuarioCliente({
             value={datos.uBxpRuta}
             onChange={(e) => onChange({ uBxpRuta: e.target.value })}
             placeholder="Ej. CODIAL14F"
-            className={prospectoInputClass}
+            className={prospectoInputClassError(invalido("uBxpRuta"))}
           />
         </div>
 
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-dpp">
-            DPP (U_BXP_DPP)
+          <label
+            className={prospectoLabelClassError(invalido("uBxpDpp"))}
+            htmlFor="cliente-dpp"
+          >
+            Descuento por Pronto Pago
+            <Asterisco />
           </label>
           <select
             id="cliente-dpp"
             value={datos.uBxpDpp}
             onChange={(e) => cambiarDpp(e.target.value)}
-            className={prospectoInputClass}
+            className={prospectoInputClassError(invalido("uBxpDpp"))}
           >
             <option value="">Seleccione</option>
             <option value="Si">Sí</option>
@@ -157,7 +205,7 @@ export default function TabCamposUsuarioCliente({
 
         <div>
           <label className={prospectoLabelClass} htmlFor="cliente-porc-dpp">
-            Porcentaje DPP (U_BXP_PorcDPP)
+            Porcentaje DPP
           </label>
           <input
             id="cliente-porc-dpp"
@@ -181,27 +229,35 @@ export default function TabCamposUsuarioCliente({
 
         <div>
           <label className={prospectoLabelClass} htmlFor="cliente-tipo">
-            Tipo cliente (U_TipoCliente)
+            Tipo cliente
           </label>
           <input
             id="cliente-tipo"
             type="text"
-            value={datos.uTipoCliente}
-            onChange={(e) => onChange({ uTipoCliente: e.target.value })}
-            placeholder="Ej. S"
-            className={prospectoInputClass}
+            value=""
+            readOnly
+            placeholder="Null (no aplicable)"
+            className={`${prospectoInputClass} bg-gray-50 dark:bg-gray-900/40`}
+            title="Se envía null a SAP; no editable"
           />
+          <p className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+            Se envía null (no editable)
+          </p>
         </div>
 
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-visita">
-            Día visita (U_DiaVisita)
+          <label
+            className={prospectoLabelClassError(invalido("uDiaVisita"))}
+            htmlFor="cliente-visita"
+          >
+            Día de visita
+            <Asterisco />
           </label>
           <select
             id="cliente-visita"
             value={datos.uDiaVisita}
             onChange={(e) => onChange({ uDiaVisita: e.target.value })}
-            className={prospectoInputClass}
+            className={prospectoInputClassError(invalido("uDiaVisita"))}
           >
             <option value="">Seleccione día</option>
             {DIAS_VISITA_SAP.map((d) => (
@@ -213,8 +269,12 @@ export default function TabCamposUsuarioCliente({
         </div>
 
         <div>
-          <label className={prospectoLabelClass} htmlFor="cliente-slp">
-            Vendedor SAP (SalesPersonCode)
+          <label
+            className={prospectoLabelClassError(invalido("salesPersonCode"))}
+            htmlFor="cliente-slp"
+          >
+            Vendedor SAP
+            <Asterisco />
           </label>
           <input
             id="cliente-slp"
@@ -223,7 +283,7 @@ export default function TabCamposUsuarioCliente({
             value={datos.salesPersonCode}
             onChange={(e) => onChange({ salesPersonCode: e.target.value })}
             placeholder="SlpCode"
-            className={prospectoInputClass}
+            className={prospectoInputClassError(invalido("salesPersonCode"))}
           />
         </div>
       </div>

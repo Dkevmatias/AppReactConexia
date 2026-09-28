@@ -4,6 +4,8 @@ import type {
   ClienteUpdatePayload,
   ContactoCreatePayload,
   DireccionCreatePayload,
+  ClienteDescuentoApi,
+  ClienteDescuentoWritePayload,
 } from "../components/CRM/clienteAltaUtils";
 
 function errorDesdeRespuesta(data: unknown, fallback: string): string {
@@ -186,6 +188,16 @@ function esDuplicadoCliente(
 }
 
 export type ClienteDuplicado = ClienteResumen & { campos: string[] };
+
+export type ClienteDescuentoEnvioSap = {
+  success: boolean;
+  accion: string;
+  idDescuento: number;
+  absEntry: number;
+  cardCode: string | null;
+  estatusSync: string;
+  mensaje: string | null;
+};
 
 export const clienteService = {
   getPorLeadOrigen: async (idLeadOrigen: number): Promise<ClienteResumen | null> => {
@@ -465,4 +477,92 @@ export const clienteService = {
     const response = await api.put<unknown>(`/api/ClienteDireccion/${id}`, payload);
     assertOk(response, "No se pudo actualizar la dirección.");
   },
+
+  getDescuentos: async (idCliente: number): Promise<ClienteDescuentoApi[]> => {
+    const response = await api.get<unknown>(
+      `/api/ClienteDescuentos/cliente/${idCliente}`,
+    );
+    return normalizeArray(
+      assertOk(response, "No se pudieron cargar los descuentos."),
+    )
+      .map(normalizeDescuentoApi)
+      .filter((d) => d.idDescuento > 0);
+  },
+
+  upsertDescuentos: async (
+    idCliente: number,
+    payload: ClienteDescuentoWritePayload,
+  ): Promise<ClienteDescuentoApi> => {
+    const response = await api.put<unknown>(
+      `/api/ClienteDescuentos/cliente/${idCliente}`,
+      payload,
+    );
+    return normalizeDescuentoApi(
+      assertOk(response, "No se pudieron guardar los descuentos."),
+    );
+  },
+
+  enviarDescuentosASap: async (
+    idDescuento: number,
+  ): Promise<ClienteDescuentoEnvioSap> => {
+    const response = await api.post<unknown>(
+      `/api/ClienteDescuentos/${idDescuento}/enviar-sap`,
+      {},
+      { timeout: 120000 },
+    );
+    const data = assertOk(response, "No se pudo enviar el descuento a SAP.");
+    const o = (data && typeof data === "object" ? data : {}) as Record<
+      string,
+      unknown
+    >;
+    return {
+      success: Boolean(o.success ?? o.Success),
+      accion: pickString(o, "accion", "Accion") ?? "",
+      idDescuento: pickNumber(o, "idDescuento", "IdDescuento") ?? idDescuento,
+      absEntry: pickNumber(o, "absEntry", "AbsEntry") ?? 0,
+      cardCode: pickString(o, "cardCode", "CardCode"),
+      estatusSync: pickString(o, "estatusSync", "EstatusSync") ?? "",
+      mensaje:
+        pickString(o, "mensaje", "Mensaje") ??
+        pickString(o, "message", "Message"),
+    };
+  },
 };
+
+function normalizeDescuentoApi(raw: unknown): ClienteDescuentoApi {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  return {
+    idDescuento: pickNumber(o, "idDescuento", "IdDescuento") ?? 0,
+    idCliente: pickNumber(o, "idCliente", "IdCliente") ?? 0,
+    cardCode: pickString(o, "cardCode", "CardCode"),
+    absEntry: pickNumber(o, "absEntry", "AbsEntry") ?? 0,
+    type: pickString(o, "type", "Type"),
+    objType: pickString(o, "objType", "ObjType"),
+    objCode: pickString(o, "objCode", "ObjCode"),
+    discRel: pickString(o, "discRel", "DiscRel"),
+    validFor: pickString(o, "validFor", "ValidFor"),
+    estatusSync: pickString(o, "estatusSync", "EstatusSync"),
+    fechaSync: pickString(o, "fechaSync", "FechaSync"),
+    errorSync: pickString(o, "errorSync", "ErrorSync"),
+    detalles: normalizeArray(o.detalles ?? o.Detalles).map((item) => {
+      const d = (item && typeof item === "object" ? item : {}) as Record<
+        string,
+        unknown
+      >;
+      return {
+        idDescuentoDetalle:
+          pickNumber(d, "idDescuentoDetalle", "IdDescuentoDetalle") ?? 0,
+        objType: pickString(d, "objType", "ObjType"),
+        objKey: pickString(d, "objKey", "ObjKey"),
+        discType: pickString(d, "discType", "DiscType"),
+        discount: pickNumber(d, "discount", "Discount") ?? 0,
+        payFor: pickNumber(d, "payFor", "PayFor") ?? 0,
+        forFree: pickNumber(d, "forFree", "ForFree") ?? 0,
+        upTo: pickNumber(d, "upTo", "UpTo") ?? 0,
+      };
+    }),
+  };
+}

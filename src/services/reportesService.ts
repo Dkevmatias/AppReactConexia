@@ -209,6 +209,7 @@ export interface Marca {
   idMarca: number;
   firmName: string;
   firmCode: number;
+  discountLimit: number;
 }
 
 const formatDate = (date: Date) => date.toISOString().split("T")[0];
@@ -638,9 +639,38 @@ export const getReportesService = {
     return normalizeVendedoresPrizmaArray(response.data);
   },
 
-  getMarcas: async () => {
-    const response = await api.get<Marca[]>(`/api/Marcas/GetMarcas`);
-    return response.data;
+  getMarcas: async (): Promise<Marca[]> => {
+    const response = await api.get<unknown>(`/api/Marcas/GetMarcas`);
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        `No se pudieron cargar las marcas (HTTP ${response.status}).`,
+      );
+    }
+    const list = unwrapList(response.data);
+    return list
+      .map((item) => {
+        const o = (item && typeof item === "object" ? item : {}) as Record<
+          string,
+          unknown
+        >;
+        return {
+          idMarca: pickNumber(o, "idMarca", "IdMarca") ?? 0,
+          firmName:
+            pickString(o, "firmName", "FirmName", "nombre", "Nombre") ?? "",
+          firmCode: pickNumber(o, "firmCode", "FirmCode") ?? 0,
+          discountLimit: pickNumber(o, "discountLimit", "DiscountLimit") ?? 0,
+        } satisfies Marca;
+      })
+      .filter(
+        (m) =>
+          m.idMarca > 0 ||
+          m.firmCode > 0 ||
+          !!m.firmName.trim() ||
+          m.discountLimit > 0,
+      )
+      .sort((a, b) =>
+        a.firmName.localeCompare(b.firmName, "es", { sensitivity: "base" }),
+      );
   },
 
   /**
