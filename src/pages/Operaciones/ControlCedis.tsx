@@ -567,6 +567,13 @@ const ControlCedis = () => {
       setOperadorError("No hay renglones para imprimir.");
       return;
     }
+    const lineasEnviadas = resultados.filter((row) => Number(row.enviado) > 0);
+    if (!lineasEnviadas.length) {
+      setOperadorError(
+        "No hay artículos con cantidad enviada mayor a 0 para imprimir.",
+      );
+      return;
+    }
 
     setGenerandoPdf(true);
     try {
@@ -590,7 +597,7 @@ const ControlCedis = () => {
         fecha: fechaPdf,
         cliente: first.cliente || clienteConsulta || "",
         operador,
-        lineas: resultados.map((row) => ({
+        lineas: lineasEnviadas.map((row) => ({
           itemCode: row.itemCode,
           codigoProveedor: row.codigoProveedor,
           descripcion: row.descripcion,

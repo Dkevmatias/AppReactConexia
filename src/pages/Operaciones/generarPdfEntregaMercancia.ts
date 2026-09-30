@@ -169,6 +169,8 @@ export async function generarPdfEntregaMercancia(
 
   y += 2;
 
+  const lineasEnviadas = datos.lineas.filter((l) => Number(l.enviada) > 0);
+
   autoTable(doc, {
     startY: y,
     head: [
@@ -181,7 +183,7 @@ export async function generarPdfEntregaMercancia(
         "Enviada",
       ],
     ],
-    body: datos.lineas.map((l) => [
+    body: lineasEnviadas.map((l) => [
       l.itemCode || "—",
       l.codigoProveedor || "—",
       l.descripcion || "—",
