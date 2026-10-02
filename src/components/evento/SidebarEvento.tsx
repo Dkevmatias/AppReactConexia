@@ -17,7 +17,7 @@ export default function SidebarEvento({ puntos }: Props) {
   const carouselImages: CarouselImage[] = [
     {
       id: 1,
-      src: "/images/publicidad/recompensaschromite.jpeg",
+      src: "/images/publicidad/recompensaskwx.pngs",
       alt: "Aniversario 50 años",
     },
   ];

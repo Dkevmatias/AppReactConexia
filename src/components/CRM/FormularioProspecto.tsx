@@ -11,10 +11,7 @@ import { LeadPayload } from "../../services/leadsService";
 import type { ActivityTimelineItem } from "../../services/activityTimelineService";
 import TabsCreacionCliente from "./TabsCreacionCliente";
 import TabSeguimientosLead from "./TabSeguimientosLead";
-import {
-  ClienteAltaForm,
-  prellenarClienteDesdeLead,
-} from "./clienteAltaUtils";
+import { ClienteAltaForm, prellenarClienteDesdeLead } from "./clienteAltaUtils";
 import {
   esCorreoValido,
   esEtapaCliente,
@@ -97,6 +94,8 @@ export default function FormularioProspecto({
   );
   const [modalCrearCliente, setModalCrearCliente] = useState(false);
   const [idEtapaPendiente, setIdEtapaPendiente] = useState("");
+  const [usarCodialub, setUsarCodialub] = useState(false);
+  const [usarCodial, setUsarCodial] = useState(false);
   const [seccionActiva, setSeccionActiva] =
     useState<SeccionProspecto>("seguimientos");
 
@@ -439,11 +438,33 @@ export default function FormularioProspecto({
                       </p>
                     ) : (
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Se guarda en el CRM. Después podrá previsualizar el JSON
-                        hacia SAP.
+                        Elegir la empresa antes de dar de Alta al Cliente
                       </p>
                     )}
+                    <div className="flex gap-6">
+                      <label className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={usarCodialub}
+                          onChange={(e) => {
+                            setUsarCodialub(e.target.checked);
+                          }}
+                        />
+                        Codialub
+                      </label>
+                      <label className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={usarCodial}
+                          onChange={(e) => {
+                            setUsarCodial(e.target.checked);
+                          }}
+                        />
+                        Codial
+                      </label>
+                    </div>
                   </div>
+
                   <TabsCreacionCliente
                     visible
                     embebido
