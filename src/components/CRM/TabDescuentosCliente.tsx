@@ -18,6 +18,8 @@ type TabDescuentosClienteProps = {
   onGuardarDescuentos?: () => void | Promise<void>;
   onEnviarDescuentosSap?: () => void | Promise<void>;
   cardCode?: string | null;
+  /** Codialub = 1, Codial = 2. Filtra marcas por idEmpresa. */
+  idEmpresa?: number | null;
   soloLectura?: boolean;
   camposInvalidos?: Set<string>;
 };
@@ -35,6 +37,7 @@ export default function TabDescuentosCliente({
   onGuardarDescuentos,
   onEnviarDescuentosSap,
   cardCode = null,
+  idEmpresa = null,
   soloLectura = false,
 }: TabDescuentosClienteProps) {
   const [marcas, setMarcas] = useState<Marca[]>([]);
@@ -47,6 +50,8 @@ export default function TabDescuentosCliente({
     null,
   );
   const syncHechoRef = useRef(false);
+  const empresaSeleccionada =
+    idEmpresa != null && idEmpresa > 0 ? idEmpresa : null;
 
   const meta = descuentos.find((d) => (d.idClienteDescuento ?? 0) > 0);
   const idDescuento = meta?.idClienteDescuento ?? 0;
@@ -90,20 +95,31 @@ export default function TabDescuentosCliente({
     };
   }, []);
 
+  useEffect(() => {
+    syncHechoRef.current = false;
+  }, [empresaSeleccionada]);
+
+  const marcasDeEmpresa = useMemo(() => {
+    if (!empresaSeleccionada) return [];
+    return marcas.filter((m) => m.idEmpresa === empresaSeleccionada);
+  }, [marcas, empresaSeleccionada]);
+
   const filas = useMemo(() => {
+    if (!empresaSeleccionada) return [];
     const lista =
-      marcas.length === 0
-        ? descuentos
-        : sincronizarDescuentosConMarcas(descuentos, marcas);
+      marcasDeEmpresa.length === 0
+        ? []
+        : sincronizarDescuentosConMarcas(descuentos, marcasDeEmpresa);
     return [...lista].sort((a, b) =>
       (a.firmName || "").localeCompare(b.firmName || "", "es", {
         sensitivity: "base",
       }),
     );
-  }, [marcas, descuentos]);
+  }, [marcasDeEmpresa, descuentos, empresaSeleccionada]);
 
   useEffect(() => {
-    if (soloLectura || marcas.length === 0) return;
+    if (soloLectura || !empresaSeleccionada || marcasDeEmpresa.length === 0)
+      return;
     if (filas.length === 0) return;
 
     const mismoContenido =
@@ -128,7 +144,7 @@ export default function TabDescuentosCliente({
     onChange(filas);
     syncHechoRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filas, soloLectura, marcas.length]);
+  }, [filas, soloLectura, marcasDeEmpresa.length, empresaSeleccionada]);
 
   const actualizarPorcentaje = (idLocal: string, valor: string) => {
     const base =
@@ -233,6 +249,11 @@ export default function TabDescuentosCliente({
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             Se guarda en el CRM (1 grupo del cliente + una línea por marca con
             %). El envío a SAP usa ese documento ya persistido.
+            {empresaSeleccionada === 1
+              ? " Marcas de Codialub (empresa 1)."
+              : empresaSeleccionada === 2
+                ? " Marcas de Codial (empresa 2)."
+                : ""}
           </p>
           <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
             {guardadoEnCrm ? (
@@ -315,9 +336,13 @@ export default function TabDescuentosCliente({
         <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
           Cargando marcas…
         </p>
+      ) : !empresaSeleccionada ? (
+        <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 py-10 text-center text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+          Seleccione Codialub o Codial para listar las marcas de esa empresa.
+        </p>
       ) : filas.length === 0 ? (
         <p className="rounded-lg border border-dashed border-gray-300 py-10 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-          No hay marcas disponibles en el catálogo.
+          No hay marcas con idEmpresa {empresaSeleccionada} en el catálogo.
         </p>
       ) : (
         <div className="columns-1 gap-3 sm:columns-2 lg:columns-4">

@@ -210,6 +210,7 @@ export interface Marca {
   firmName: string;
   firmCode: number;
   discountLimit: number;
+  idEmpresa: number;
 }
 
 const formatDate = (date: Date) => date.toISOString().split("T")[0];
@@ -659,6 +660,7 @@ export const getReportesService = {
             pickString(o, "firmName", "FirmName", "nombre", "Nombre") ?? "",
           firmCode: pickNumber(o, "firmCode", "FirmCode") ?? 0,
           discountLimit: pickNumber(o, "discountLimit", "DiscountLimit") ?? 0,
+          idEmpresa: pickNumber(o, "idEmpresa", "IdEmpresa") ?? 0,
         } satisfies Marca;
       })
       .filter(

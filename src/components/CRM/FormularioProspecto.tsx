@@ -21,6 +21,8 @@ import {
   prospectoLabelClass,
   prospectoLabelClassError,
   soloDigitosTelefono,
+  ID_EMPRESA_CODIAL,
+  ID_EMPRESA_CODIALUB,
 } from "./prospectoFormUtils";
 
 type SeccionProspecto = "cliente" | "seguimientos";
@@ -94,8 +96,6 @@ export default function FormularioProspecto({
   );
   const [modalCrearCliente, setModalCrearCliente] = useState(false);
   const [idEtapaPendiente, setIdEtapaPendiente] = useState("");
-  const [usarCodialub, setUsarCodialub] = useState(false);
-  const [usarCodial, setUsarCodial] = useState(false);
   const [seccionActiva, setSeccionActiva] =
     useState<SeccionProspecto>("seguimientos");
 
@@ -125,6 +125,15 @@ export default function FormularioProspecto({
 
   const setIdSelect = (key: keyof LeadPayload, value: string) => {
     onChange(key, value ? Number(value) : null);
+  };
+
+  const usarCodialub = form.idEmpresa === ID_EMPRESA_CODIALUB;
+  const usarCodial = form.idEmpresa === ID_EMPRESA_CODIAL;
+
+  const seleccionarEmpresa = (idEmpresa: number, marcado: boolean) => {
+    const siguiente = marcado ? idEmpresa : null;
+    onChange("idEmpresa", siguiente);
+    onClienteAltaChange({ descuentos: [] });
   };
 
   const handleEtapaChange = (value: string) => {
@@ -446,8 +455,12 @@ export default function FormularioProspecto({
                         <input
                           type="checkbox"
                           checked={usarCodialub}
+                          disabled={clienteSoloLectura}
                           onChange={(e) => {
-                            setUsarCodialub(e.target.checked);
+                            seleccionarEmpresa(
+                              ID_EMPRESA_CODIALUB,
+                              e.target.checked,
+                            );
                           }}
                         />
                         Codialub
@@ -456,8 +469,12 @@ export default function FormularioProspecto({
                         <input
                           type="checkbox"
                           checked={usarCodial}
+                          disabled={clienteSoloLectura}
                           onChange={(e) => {
-                            setUsarCodial(e.target.checked);
+                            seleccionarEmpresa(
+                              ID_EMPRESA_CODIAL,
+                              e.target.checked,
+                            );
                           }}
                         />
                         Codial
@@ -476,6 +493,7 @@ export default function FormularioProspecto({
                     onGuardarDescuentos={onGuardarDescuentos}
                     onEnviarDescuentosSap={onEnviarDescuentosSap}
                     cardCode={cardCodeCliente}
+                    idEmpresa={form.idEmpresa}
                     soloLectura={clienteSoloLectura}
                     camposInvalidos={camposInvalidosCliente}
                   />

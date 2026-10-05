@@ -17,6 +17,11 @@ import {
   incidenciaService,
 } from "../../services/incidenciaService";
 import { DocODistribucionDetalle } from "../../services/oDistribucionService";
+import {
+  bitacoraCobranzaService,
+  Sucursal,
+} from "../../services/bitacoraCobranzaService";
+import { useListadoOperacionesPermisos } from "../../hooks/useListadoOperacionesPermisos";
 
 const btnPrimaryClass =
   "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 touch-manipulation";
@@ -42,9 +47,7 @@ type FilaIncidenciaManager = {
   estatus: string;
 };
 
-function formatearFechaIncidencia(
-  valor: string | null | undefined,
-): string {
+function formatearFechaIncidencia(valor: string | null | undefined): string {
   if (!valor) return "—";
   const d = new Date(valor);
   if (Number.isNaN(d.getTime())) return formatearFecha(valor);
@@ -116,9 +119,12 @@ function documentoStubDesdeIncidencia(
 
 export default function ManagerComprobacionRuta() {
   const { user } = useAuth();
+  const { menuLoading, puedeVerSucursalIncidencia } =
+    useListadoOperacionesPermisos();
   const [contextoOperativo, setContextoOperativo] =
     useState<ContextoOperativoPersona | null>(null);
   const [incidencias, setIncidencias] = useState<IncidenciaCompleta[]>([]);
+  const [sucursal, setSucursal] = useState<Sucursal[]>([]);
   const [loadingContexto, setLoadingContexto] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +133,7 @@ export default function ManagerComprobacionRuta() {
     useState<ContextoIncidenciaDistribucion | null>(null);
   const [filtroFolioOd, setFiltroFolioOd] = useState("");
   const [filtroOrdenEntrega, setFiltroOrdenEntrega] = useState("");
+  const [filtroSucursal, setFiltroSucursal] = useState<number | "">("");
 
   const filas = useMemo(() => aFilas(incidencias), [incidencias]);
 
@@ -147,6 +154,11 @@ export default function ManagerComprobacionRuta() {
 
   const hayFiltrosActivos =
     filtroFolioOd.trim().length > 0 || filtroOrdenEntrega.trim().length > 0;
+
+  const sucursalSeleccionada = useMemo(() => {
+    if (!filtroSucursal) return null;
+    return sucursal.find((s) => s.idSucursal === filtroSucursal) ?? null;
+  }, [sucursal, filtroSucursal]);
 
   const limpiarFiltros = useCallback(() => {
     setFiltroFolioOd("");
@@ -184,21 +196,67 @@ export default function ManagerComprobacionRuta() {
   }, [user?.idPersona]);
 
   const cargarIncidencias = useCallback(async () => {
-    const idSucursal = contextoOperativo?.idSucursal ?? 0;
-    if (!idSucursal || idSucursal <= 0) {
-      setIncidencias([]);
-      setError(
-        loadingContexto
-          ? null
-          : "No se encontró la sucursal del usuario para consultar incidencias.",
-      );
-      return;
+    const idSucursalUsuario = contextoOperativo?.idSucursal ?? 0;
+    const idSucursalConsulta =
+      puedeVerSucursalIncidencia && filtroSucursal
+        ? Number(filtroSucursal)
+        : idSucursalUsuario;
+
+    if (!puedeVerSucursalIncidencia) {
+      if (!idSucursalConsulta || idSucursalConsulta <= 0) {
+        setIncidencias([]);
+        setError(
+          loadingContexto
+            ? null
+            : "No se encontró la sucursal del usuario para consultar incidencias.",
+        );
+        return;
+      }
     }
 
     setLoading(true);
     setError(null);
     try {
-      const lista = await incidenciaService.getBySucursal(idSucursal, true);
+      const sucursalesData = puedeVerSucursalIncidencia
+        ? await bitacoraCobranzaService.getSucursales()
+        : [];
+      setSucursal(sucursalesData ?? []);
+
+      if (puedeVerSucursalIncidencia && !filtroSucursal) {
+        const ids = (sucursalesData ?? [])
+          .map((s) => s.idSucursal)
+          .filter((id) => id > 0);
+        if (ids.length === 0) {
+          setIncidencias([]);
+          return;
+        }
+        const listas = await Promise.all(
+          ids.map(async (id) => {
+            try {
+              return await incidenciaService.getBySucursal(id, true);
+            } catch (err) {
+              console.error(
+                `No se pudieron cargar incidencias de sucursal ${id}`,
+                err,
+              );
+              return [] as IncidenciaCompleta[];
+            }
+          }),
+        );
+        setIncidencias(listas.flat());
+        return;
+      }
+
+      if (!idSucursalConsulta || idSucursalConsulta <= 0) {
+        setIncidencias([]);
+        setError("Seleccione una sucursal para consultar incidencias.");
+        return;
+      }
+
+      const lista = await incidenciaService.getBySucursal(
+        idSucursalConsulta,
+        true,
+      );
       setIncidencias(lista);
     } catch (err) {
       console.error(err);
@@ -211,12 +269,17 @@ export default function ManagerComprobacionRuta() {
     } finally {
       setLoading(false);
     }
-  }, [contextoOperativo?.idSucursal, loadingContexto]);
+  }, [
+    contextoOperativo?.idSucursal,
+    loadingContexto,
+    puedeVerSucursalIncidencia,
+    filtroSucursal,
+  ]);
 
   useEffect(() => {
-    if (loadingContexto) return;
+    if (loadingContexto || menuLoading) return;
     void cargarIncidencias();
-  }, [loadingContexto, cargarIncidencias]);
+  }, [loadingContexto, menuLoading, cargarIncidencias]);
 
   const abrirVerIncidencia = useCallback(
     (idIncidencia: number) => {
@@ -259,11 +322,15 @@ export default function ManagerComprobacionRuta() {
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Incidencias activas de la sucursal
-            {contextoOperativo?.sucursal
-              ? ` · ${contextoOperativo.sucursal}`
-              : contextoOperativo?.idSucursal
-                ? ` · #${contextoOperativo.idSucursal}`
-                : ""}
+            {puedeVerSucursalIncidencia
+              ? sucursalSeleccionada
+                ? ` · ${sucursalSeleccionada.nombre}`
+                : " · todas"
+              : contextoOperativo?.sucursal
+                ? ` · ${contextoOperativo.sucursal}`
+                : contextoOperativo?.idSucursal
+                  ? ` · #${contextoOperativo.idSucursal}`
+                  : ""}
             .
           </p>
         </div>
@@ -320,6 +387,31 @@ export default function ManagerComprobacionRuta() {
             autoComplete="off"
           />
         </div>
+        {!menuLoading && puedeVerSucursalIncidencia ? (
+          <div className="lg:col-span-1">
+            <label className={labelClass} htmlFor="filtro-sucursal-incidencia">
+              Sucursal
+            </label>
+            <select
+              id="filtro-sucursal-incidencia"
+              className={inputClass}
+              value={filtroSucursal}
+              onChange={(e) => {
+                setFiltroSucursal(
+                  e.target.value ? Number(e.target.value) : "",
+                );
+              }}
+            >
+              <option value="">Todas</option>
+              {sucursal.map((s) => (
+                <option key={s.idSucursal} value={s.idSucursal}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
         <div className="lg:col-span-2 lg:flex lg:justify-end">
           <button
             type="button"

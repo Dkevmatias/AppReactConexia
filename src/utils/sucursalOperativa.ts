@@ -1,4 +1,4 @@
-/** Config de sucursal operativa (Por surtir / reportes). */
+/** Config de sucursal operativa (fallback si aún no hay catálogo de almacenes). */
 export type SucursalOperativaConfig = {
   nombre: string;
   almacenes: string[];

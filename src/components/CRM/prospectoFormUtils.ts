@@ -16,6 +16,10 @@ export const TABS_CREACION_CLIENTE = [
 
 export type TabCreacionClienteId = (typeof TABS_CREACION_CLIENTE)[number]["id"];
 
+/** Empresa / base: Codialub → 1, Codial → 2. */
+export const ID_EMPRESA_CODIALUB = 1;
+export const ID_EMPRESA_CODIAL = 2;
+
 function normalizarNombreCatalogo(nombre: string): string {
   return nombre
     .trim()

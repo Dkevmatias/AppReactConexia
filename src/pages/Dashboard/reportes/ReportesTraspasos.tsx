@@ -16,6 +16,15 @@ import {
   type TransferStatusItem,
 } from "../../../services/reportesService";
 import { formatNumber } from "../../../utils/format";
+import { SUCURSAL_POR_ID } from "../../../utils/sucursalOperativa";
+import {
+  almacenService,
+  etiquetaGrupoSucursal,
+  parAlmacenesDeSucursal,
+  paresAlmacenesPorSucursal,
+  type Almacen,
+  type ParAlmacenesSucursal,
+} from "../../../services/almacenService";
 
 /** Almacenes de la sucursal del usuario (origen / destino). */
 type AlmacenesSucursal = {
@@ -23,7 +32,7 @@ type AlmacenesSucursal = {
   destino: string;
 };
 
-const ALMACENES_POR_SUCURSAL: Record<number, AlmacenesSucursal> = {
+const ALMACENES_POR_SUCURSAL_FALLBACK: Record<number, AlmacenesSucursal> = {
   1: { origen: "AM1TX01", destino: "AM1TX03" },
   2: { origen: "AM2AR01", destino: "AM2AR03" },
   3: { origen: "AM3TA01", destino: "AM3TA03" },
@@ -31,15 +40,57 @@ const ALMACENES_POR_SUCURSAL: Record<number, AlmacenesSucursal> = {
   5: { origen: "AM5CO01", destino: "AM5CO03" },
 };
 
+function parToAlmacenes(
+  par: ParAlmacenesSucursal | null,
+): AlmacenesSucursal | null {
+  if (!par) return null;
+  if (!par.origen && !par.destino) return null;
+  return { origen: par.origen, destino: par.destino };
+}
+
+function almacenesDeSucursalFallback(
+  idSucursal: number | null | undefined,
+): AlmacenesSucursal | null {
+  if (idSucursal == null || idSucursal <= 0) return null;
+  return ALMACENES_POR_SUCURSAL_FALLBACK[idSucursal] ?? null;
+}
+
 function sameAlmacen(a: string, b: string): boolean {
   return a.trim().toUpperCase() === b.trim().toUpperCase();
 }
 
-function almacenesDeSucursal(
-  idSucursal: number | null | undefined,
-): AlmacenesSucursal | null {
-  if (idSucursal == null || idSucursal <= 0) return null;
-  return ALMACENES_POR_SUCURSAL[idSucursal] ?? null;
+function esAlmacenDePar(
+  code: string,
+  mis: AlmacenesSucursal | null,
+): boolean {
+  if (!mis) return false;
+  return sameAlmacen(code, mis.origen) || sameAlmacen(code, mis.destino);
+}
+
+function parseFiltroAlmacenLado(
+  filtro: string,
+): { lado: "origen" | "destino"; code: string } | null {
+  if (filtro.startsWith("origen:")) {
+    const code = filtro.slice("origen:".length).trim();
+    return code ? { lado: "origen", code } : null;
+  }
+  if (filtro.startsWith("destino:")) {
+    const code = filtro.slice("destino:".length).trim();
+    return code ? { lado: "destino", code } : null;
+  }
+  return null;
+}
+
+function paresAlmacenesFallback(): ParAlmacenesSucursal[] {
+  return Object.entries(ALMACENES_POR_SUCURSAL_FALLBACK).map(([id, par]) => {
+    const idSucursal = Number(id);
+    return {
+      idSucursal,
+      etiqueta: SUCURSAL_POR_ID[idSucursal]?.nombre ?? `Sucursal ${idSucursal}`,
+      origen: par.origen,
+      destino: par.destino,
+    };
+  });
 }
 
 type RolMiSucursal = "origen" | "destino" | "ambos" | "ninguno";
@@ -228,7 +279,7 @@ export default function ReportesTraspasos() {
   const [docNum, setDocNum] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
-  /** Código de almacén, o __rol_origen / __rol_destino (siempre dentro de la sucursal). */
+  /** Vacío = mi sucursal; __rol_origen/__rol_destino; o origen:/destino: del catálogo. */
   const [filtroAlmacen, setFiltroAlmacen] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -239,11 +290,31 @@ export default function ReportesTraspasos() {
     null,
   );
   const [contextoListo, setContextoListo] = useState(false);
+  const [almacenesCatalogo, setAlmacenesCatalogo] = useState<Almacen[]>([]);
+  const [catalogoListo, setCatalogoListo] = useState(false);
 
-  const misAlmacenes = useMemo(
-    () => almacenesDeSucursal(contexto?.idSucursal),
-    [contexto?.idSucursal],
-  );
+  const paresPorSucursal = useMemo(() => {
+    const desdeApi = paresAlmacenesPorSucursal(almacenesCatalogo);
+    if (desdeApi.length > 0) return desdeApi;
+    if (!catalogoListo) return [];
+    return paresAlmacenesFallback();
+  }, [almacenesCatalogo, catalogoListo]);
+
+  const misAlmacenes = useMemo(() => {
+    const desdeApi = parToAlmacenes(
+      parAlmacenesDeSucursal(almacenesCatalogo, contexto?.idSucursal),
+    );
+    if (desdeApi) return desdeApi;
+    return almacenesDeSucursalFallback(contexto?.idSucursal);
+  }, [almacenesCatalogo, contexto?.idSucursal]);
+
+  const etiquetaMiSucursal = useMemo(() => {
+    const deCatalogo = etiquetaGrupoSucursal(
+      almacenesCatalogo,
+      contexto?.idSucursal,
+    );
+    return contexto?.sucursal?.trim() || deCatalogo || "";
+  }, [almacenesCatalogo, contexto?.idSucursal, contexto?.sucursal]);
 
   /** Solo traspasos de la sucursal del usuario (idSucursal → almacenes). */
   const rowsSucursal = useMemo(() => {
@@ -276,6 +347,25 @@ export default function ReportesTraspasos() {
       cancelled = true;
     };
   }, [user?.idPersona]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAlmacenes = async () => {
+      try {
+        const lista = await almacenService.getAlmacenes(true);
+        if (!cancelled) setAlmacenesCatalogo(lista);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setAlmacenesCatalogo([]);
+      } finally {
+        if (!cancelled) setCatalogoListo(true);
+      }
+    };
+    void loadAlmacenes();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const cargar = async () => {
     setLoading(true);
@@ -321,23 +411,27 @@ export default function ReportesTraspasos() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const filtroLado = useMemo(
+    () => parseFiltroAlmacenLado(filtroAlmacen),
+    [filtroAlmacen],
+  );
+
+  const deOtraSucursal = Boolean(
+    filtroLado && !esAlmacenDePar(filtroLado.code, misAlmacenes),
+  );
+
+  const rowsBase = deOtraSucursal ? rows : rowsSucursal;
+
   const statuses = useMemo(() => {
-    const set = new Set(
-      rowsSucursal.map((r) => r.status.trim()).filter(Boolean),
-    );
+    const set = new Set(rowsBase.map((r) => r.status.trim()).filter(Boolean));
     return [...set].sort((a, b) =>
       a.localeCompare(b, "es", { sensitivity: "base" }),
     );
-  }, [rowsSucursal]);
-
-  const almacenesOpciones = useMemo(() => {
-    if (!misAlmacenes) return [];
-    return [misAlmacenes.origen, misAlmacenes.destino];
-  }, [misAlmacenes]);
+  }, [rowsBase]);
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    return rowsSucursal.filter((r) => {
+    return rowsBase.filter((r) => {
       if (filtroStatus && r.status !== filtroStatus) return false;
 
       const rol = rolLinea(r, misAlmacenes);
@@ -345,6 +439,12 @@ export default function ReportesTraspasos() {
         if (rol !== "origen" && rol !== "ambos") return false;
       } else if (filtroAlmacen === "__rol_destino") {
         if (rol !== "destino" && rol !== "ambos") return false;
+      } else if (filtroLado) {
+        if (filtroLado.lado === "origen") {
+          if (!sameAlmacen(r.origen, filtroLado.code)) return false;
+        } else if (!sameAlmacen(r.destino, filtroLado.code)) {
+          return false;
+        }
       } else if (filtroAlmacen) {
         const code = filtroAlmacen.toUpperCase();
         if (!sameAlmacen(r.origen, code) && !sameAlmacen(r.destino, code)) {
@@ -366,7 +466,14 @@ export default function ReportesTraspasos() {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [rowsSucursal, busqueda, filtroStatus, filtroAlmacen, misAlmacenes]);
+  }, [
+    rowsBase,
+    busqueda,
+    filtroStatus,
+    filtroAlmacen,
+    filtroLado,
+    misAlmacenes,
+  ]);
 
   const grupos = useMemo(
     () => agruparPorDocNum(filtrados, misAlmacenes),
@@ -467,8 +574,10 @@ export default function ReportesTraspasos() {
           </p>
           {misAlmacenes ? (
             <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-              Sucursal filtrada (
-              {contexto?.sucursal || `id ${contexto?.idSucursal}`}):{" "}
+              {etiquetaMiSucursal ||
+                contexto?.sucursal ||
+                `Sucursal ${contexto?.idSucursal ?? ""}`}
+              {": "}
               <span className="font-medium text-blue-700 dark:text-blue-300">
                 Origen {misAlmacenes.origen}
               </span>
@@ -477,7 +586,7 @@ export default function ReportesTraspasos() {
                 Destino {misAlmacenes.destino}
               </span>
             </p>
-          ) : contextoListo ? (
+          ) : contextoListo && catalogoListo ? (
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
               No se pudo resolver tu idSucursal. No hay almacenes para filtrar.
             </p>
@@ -620,7 +729,7 @@ export default function ReportesTraspasos() {
             />
           </div>
         </div>
-        <div className="w-full sm:w-56">
+        <div className="w-full sm:w-64">
           <label
             htmlFor="traspasos-almacen"
             className="mb-1 block text-xs text-gray-500"
@@ -642,13 +751,22 @@ export default function ReportesTraspasos() {
                 <option value="__rol_destino">
                   Soy destino ({misAlmacenes.destino})
                 </option>
-                {almacenesOpciones.map((a) => (
-                  <option key={a} value={a}>
-                    Almacén {a}
-                  </option>
-                ))}
               </>
             ) : null}
+            {paresPorSucursal.map((par) => (
+              <optgroup key={par.idSucursal} label={`${par.etiqueta} `}>
+                {par.origen ? (
+                  <option value={`origen:${par.origen}`}>
+                    Origen {par.origen}
+                  </option>
+                ) : null}
+                {par.destino ? (
+                  <option value={`destino:${par.destino}`}>
+                    Destino {par.destino}
+                  </option>
+                ) : null}
+              </optgroup>
+            ))}
           </select>
         </div>
         <div className="w-full sm:w-44">
@@ -680,7 +798,7 @@ export default function ReportesTraspasos() {
         </div>
       ) : null}
 
-      {loading || !contextoListo ? (
+      {loading || !contextoListo || !catalogoListo ? (
         <div className="flex h-64 items-center justify-center">
           <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600" />
         </div>
@@ -690,7 +808,9 @@ export default function ReportesTraspasos() {
         </p>
       ) : !consultado ? null : grupos.length === 0 ? (
         <p className="py-10 text-center text-gray-500 dark:text-gray-400">
-          No hay traspasos de tu sucursal en el rango seleccionado
+          {deOtraSucursal
+            ? "No hay traspasos para el almacén seleccionado en el rango"
+            : "No hay traspasos de tu sucursal en el rango seleccionado"}
           {docNum.trim() ? ` para DocNum ${docNum.trim()}` : ""}.
         </p>
       ) : (

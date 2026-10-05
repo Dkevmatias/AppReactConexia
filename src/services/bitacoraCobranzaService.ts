@@ -24,6 +24,11 @@ export interface BitacoraCobranza {
   idSalesRoutes?: number[];
 }
 
+export interface Sucursal {
+  idSucursal: number;
+  idEmpresa: number;
+  nombre: string;
+}
 export interface BitacoraCobranzaPayload {
   idSucursal: number;
   idEmpresa: number;
@@ -75,8 +80,7 @@ export function buildBitacoraUpdatePayload(
           ? [encabezado.idRuta]
           : [];
   const idRuta =
-    options.idRuta ??
-    (idRutas[0] > 0 ? idRutas[0] : encabezado.idRuta);
+    options.idRuta ?? (idRutas[0] > 0 ? idRutas[0] : encabezado.idRuta);
 
   return {
     idSucursal: encabezado.idSucursal,
@@ -94,11 +98,11 @@ export function buildBitacoraUpdatePayload(
     prizma:
       options.prizma !== undefined
         ? options.prizma
-        : encabezado.prizma ?? false,
+        : (encabezado.prizma ?? false),
     idSalesRoute:
       options.idSalesRoute !== undefined
         ? options.idSalesRoute
-        : encabezado.idSalesRoute ?? null,
+        : (encabezado.idSalesRoute ?? null),
   };
 }
 
@@ -165,8 +169,7 @@ export function leerPreferenciasRutaPrizmaBitacora(idBitacora: number): {
   const parsed = raw != null ? Number(raw) : NaN;
   return {
     prizma,
-    idRutas:
-      Number.isFinite(parsed) && parsed > 0 ? [Math.trunc(parsed)] : [],
+    idRutas: Number.isFinite(parsed) && parsed > 0 ? [Math.trunc(parsed)] : [],
   };
 }
 
@@ -1176,6 +1179,24 @@ export const bitacoraCobranzaService = {
       assertOk(response, "No se pudieron cargar las bitácoras del usuario."),
       normalizeBitacora,
     );
+  },
+
+  getSucursales: async (): Promise<Sucursal[]> => {
+    const response = await api.get<unknown>("/api/Sucursal");
+    return normalizeArray(
+      assertOk(response, "No se pudieron cargar las sucursales."),
+      (raw) => {
+        const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+          string,
+          unknown
+        >;
+        return {
+          idSucursal: pickNumber(o, "idSucursal", "IdSucursal") ?? 0,
+          idEmpresa: pickNumber(o, "idEmpresa", "IdEmpresa") ?? 0,
+          nombre: pickString(o, "nombre", "Nombre") ?? "",
+        };
+      },
+    ).filter((s) => s.idSucursal > 0);
   },
 
   getBitacoraPorId: async (id: number): Promise<BitacoraCobranza> => {

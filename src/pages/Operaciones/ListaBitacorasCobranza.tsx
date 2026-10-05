@@ -8,13 +8,14 @@ import {
   BitacoraCobranza,
   claseBadgeEstatusBitacora,
   etiquetaEstatusBitacora,
+  Sucursal,
 } from "../../services/bitacoraCobranzaService";
 import { rutasService, Ruta } from "../../services/rutasService";
 import {
   getReportesService,
-  Vendedor,
   Vendedores,
 } from "../../services/reportesService";
+import { useListadoOperacionesPermisos } from "../../hooks/useListadoOperacionesPermisos";
 
 const inputClass =
   "rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white";
@@ -35,13 +36,17 @@ function formatearFecha(valor: string | number | null | undefined): string {
 
 export default function ListaBitacorasCobranza() {
   const { user } = useAuth();
+  const { menuLoading, puedeVerSucursalCobranza } =
+    useListadoOperacionesPermisos();
   const [bitacoras, setBitacoras] = useState<BitacoraCobranza[]>([]);
   const [vendedores, setVendedores] = useState<Vendedores[]>([]);
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [rutas, setRutas] = useState<Ruta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filtroVendedor, setFiltroVendedor] = useState<number | "">("");
   const [filtroRuta, setFiltroRuta] = useState<number | "">("");
+  const [filtroSucursal, setFiltroSucursal] = useState<number | "">("");
 
   const mapaVendedores = useMemo(() => {
     const m = new Map<number, string>();
@@ -70,11 +75,20 @@ export default function ListaBitacorasCobranza() {
     setLoading(true);
     setError(null);
     try {
-      const [listaBase, vendedoresData, rutasData] = await Promise.all([
-        bitacoraCobranzaService.getBitacorasPorUsuario(user.idPersona, true),
-        getReportesService.getVendedoresPrizma(),
-        rutasService.getRutas(),
-      ]);
+      const [listaBase, vendedoresData, sucursalesData, rutasData] =
+        await Promise.all([
+          puedeVerSucursalCobranza
+            ? bitacoraCobranzaService.getBitacoras()
+            : bitacoraCobranzaService.getBitacorasPorUsuario(
+                user.idPersona,
+                true,
+              ),
+          getReportesService.getVendedoresPrizma(),
+          puedeVerSucursalCobranza
+            ? bitacoraCobranzaService.getSucursales()
+            : Promise.resolve([] as Sucursal[]),
+          rutasService.getRutas(),
+        ]);
 
       let lista = listaBase;
       if (filtroVendedor) {
@@ -83,10 +97,14 @@ export default function ListaBitacorasCobranza() {
       if (filtroRuta) {
         lista = lista.filter((b) => b.idRuta === filtroRuta);
       }
+      if (puedeVerSucursalCobranza && filtroSucursal) {
+        lista = lista.filter((b) => b.idSucursal === filtroSucursal);
+      }
 
       setBitacoras(lista);
       setVendedores(vendedoresData ?? []);
       setRutas(rutasData ?? []);
+      setSucursales(sucursalesData ?? []);
     } catch (err) {
       console.error(err);
       setError(
@@ -97,11 +115,18 @@ export default function ListaBitacorasCobranza() {
     } finally {
       setLoading(false);
     }
-  }, [user?.idPersona, filtroVendedor, filtroRuta]);
+  }, [
+    user?.idPersona,
+    filtroVendedor,
+    filtroRuta,
+    filtroSucursal,
+    puedeVerSucursalCobranza,
+  ]);
 
   useEffect(() => {
+    if (menuLoading) return;
     void cargar();
-  }, [cargar]);
+  }, [cargar, menuLoading]);
 
   const eliminar = async (row: BitacoraCobranza) => {
     const folioLabel =
@@ -131,8 +156,9 @@ export default function ListaBitacorasCobranza() {
             Lista de Bitácoras de Cobranza
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Solo sus bitácoras creadas. Filtre por vendedor o ruta dentro de su
-            listado.
+            {puedeVerSucursalCobranza
+              ? "Filtre por vendedor, ruta o sucursal."
+              : "Solo sus bitácoras creadas. Filtre por vendedor o ruta dentro de su listado."}
           </p>
         </div>
         <Link
@@ -181,6 +207,30 @@ export default function ListaBitacorasCobranza() {
             ))}
           </select>
         </div>
+        {!menuLoading && puedeVerSucursalCobranza ? (
+          <div>
+            <label className={labelClass} htmlFor="filtro-sucursal-cobranza">
+              Sucursal
+            </label>
+            <select
+              id="filtro-sucursal-cobranza"
+              className={inputClass}
+              value={filtroSucursal}
+              onChange={(e) => {
+                setFiltroSucursal(
+                  e.target.value ? Number(e.target.value) : "",
+                );
+              }}
+            >
+              <option value="">Todas</option>
+              {sucursales.map((s) => (
+                <option key={s.idSucursal} value={s.idSucursal}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={() => void cargar()}

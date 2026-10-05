@@ -301,7 +301,7 @@ export default function ProspectoFormPage() {
     const contexto = user?.idPersona
       ? await getContextoOperativoPersona(user.idPersona)
       : null;
-    const idEmpresa = form.idEmpresa || contexto?.idEmpresa || 0;
+    const idEmpresa = form.idEmpresa && form.idEmpresa > 0 ? form.idEmpresa : 0;
     const idsNuevos = new Set(
       contactos
         .map((c) => c.idContacto)
@@ -561,10 +561,10 @@ export default function ProspectoFormPage() {
     const contexto = user?.idPersona
       ? await getContextoOperativoPersona(user.idPersona)
       : null;
-    const idEmpresa = form.idEmpresa || contexto?.idEmpresa || 0;
+    const idEmpresa = form.idEmpresa && form.idEmpresa > 0 ? form.idEmpresa : 0;
     if (!idEmpresa) {
       throw new Error(
-        "No se pudo determinar la empresa para crear el cliente. Revise el contexto operativo.",
+        "Seleccione Codialub o Codial para indicar en qué base se guardará el cliente.",
       );
     }
 

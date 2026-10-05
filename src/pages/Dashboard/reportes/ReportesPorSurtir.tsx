@@ -24,6 +24,13 @@ import {
   configSucursalPorId,
   etiquetaSucursalAlmacen,
 } from "../../../utils/sucursalOperativa";
+import {
+  almacenService,
+  agruparAlmacenesPorSucursal,
+  etiquetaGrupoSucursal,
+  origenesDeSucursal,
+  type Almacen,
+} from "../../../services/almacenService";
 
 type FiltroAtraso = "" | "0-7" | "8-14" | "15+" | "8+";
 type FiltroExistencia = "" | "sin-cero" | "solo-cero";
@@ -265,6 +272,8 @@ export default function ReportesPorSurtir() {
     null,
   );
   const [contextoListo, setContextoListo] = useState(false);
+  const [almacenesCatalogo, setAlmacenesCatalogo] = useState<Almacen[]>([]);
+  const [catalogoListo, setCatalogoListo] = useState(false);
   const [existenciasCtx, setExistenciasCtx] =
     useState<ContextoExistenciasArticulo | null>(null);
 
@@ -285,12 +294,40 @@ export default function ReportesPorSurtir() {
     [contexto?.idSucursal],
   );
 
-  /** Códigos de almacén que van en `?sucursal=` (el API pagina el global). */
+  const gruposAlmacen = useMemo(
+    () => agruparAlmacenesPorSucursal(almacenesCatalogo),
+    [almacenesCatalogo],
+  );
+
+  const origenesMiSucursal = useMemo(() => {
+    const desdeApi = origenesDeSucursal(
+      almacenesCatalogo,
+      contexto?.idSucursal,
+    );
+    if (desdeApi.length > 0) return desdeApi;
+    return cfgSucursal ? [...cfgSucursal.almacenes] : [];
+  }, [almacenesCatalogo, contexto?.idSucursal, cfgSucursal]);
+
+  const etiquetaMiSucursal = useMemo(() => {
+    const deCatalogo = etiquetaGrupoSucursal(
+      almacenesCatalogo,
+      contexto?.idSucursal,
+    );
+    return (
+      contexto?.sucursal?.trim() || deCatalogo || cfgSucursal?.nombre || ""
+    );
+  }, [
+    almacenesCatalogo,
+    contexto?.idSucursal,
+    contexto?.sucursal,
+    cfgSucursal?.nombre,
+  ]);
+
+  /** Códigos `origen` que van en `?sucursal=` (la vista pagina por almacén SAP). */
   const almacenesConsulta = useMemo(() => {
-    if (!cfgSucursal) return [];
     if (filtroAlmacen.trim()) return [filtroAlmacen.trim()];
-    return [...cfgSucursal.almacenes];
-  }, [cfgSucursal, filtroAlmacen]);
+    return [...origenesMiSucursal];
+  }, [filtroAlmacen, origenesMiSucursal]);
 
   useEffect(() => {
     let cancelled = false;
@@ -318,13 +355,32 @@ export default function ReportesPorSurtir() {
     };
   }, [user?.idPersona]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadAlmacenes = async () => {
+      try {
+        const lista = await almacenService.getAlmacenes(true);
+        if (!cancelled) setAlmacenesCatalogo(lista);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setAlmacenesCatalogo([]);
+      } finally {
+        if (!cancelled) setCatalogoListo(true);
+      }
+    };
+    void loadAlmacenes();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const cargar = async () => {
-    if (!contextoListo) return;
-    if (!cfgSucursal || almacenesConsulta.length === 0) {
+    if (!contextoListo || !catalogoListo) return;
+    if (almacenesConsulta.length === 0) {
       setRows([]);
       setLoading(false);
       setError(
-        contextoListo && !cfgSucursal
+        contextoListo && catalogoListo
           ? "No se pudo resolver el almacén de tu sucursal."
           : null,
       );
@@ -356,12 +412,7 @@ export default function ReportesPorSurtir() {
   useEffect(() => {
     void cargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- recarga al cambiar almacén/sucursal
-  }, [contextoListo, cfgSucursal?.nombre, almacenesConsulta.join("|")]);
-
-  const almacenes = useMemo(() => {
-    if (cfgSucursal) return [...cfgSucursal.almacenes];
-    return uniqueSorted(rows.map((r) => r.almacen));
-  }, [cfgSucursal, rows]);
+  }, [contextoListo, catalogoListo, almacenesConsulta.join("|")]);
 
   const rutas = useMemo(() => uniqueSorted(rows.map((r) => r.ruta)), [rows]);
 
@@ -552,14 +603,14 @@ export default function ReportesPorSurtir() {
               15+ días
             </span>
           </p>
-          {cfgSucursal ? (
+          {almacenesConsulta.length > 0 ? (
             <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-              {contexto?.sucursal || cfgSucursal.nombre} · consultando{" "}
+              {etiquetaMiSucursal || "Sucursal"} · consultando{" "}
               <span className="font-medium text-gray-900 dark:text-white">
                 {almacenesConsulta.join(", ")}
               </span>
             </p>
-          ) : contextoListo ? (
+          ) : contextoListo && catalogoListo ? (
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
               No se pudo resolver tu idSucursal. No hay partidas para filtrar.
             </p>
@@ -652,7 +703,7 @@ export default function ReportesPorSurtir() {
             />
           </div>
         </div>
-        <div className="w-full sm:w-44">
+        <div className="w-full sm:w-64">
           <label
             htmlFor="por-surtir-almacen"
             className="mb-1 block text-xs text-gray-500"
@@ -666,13 +717,23 @@ export default function ReportesPorSurtir() {
             className="w-full min-h-[40px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="">Todos de mi sucursal</option>
-            {almacenes.map((a) => (
-              <option key={a} value={a}>
-                {cfgSucursal
-                  ? etiquetaSucursalAlmacen(cfgSucursal.nombre, a)
-                  : a}
-              </option>
-            ))}
+            {gruposAlmacen.length > 0
+              ? gruposAlmacen.map((grupo) => (
+                  <optgroup key={grupo.idSucursal} label={`${grupo.etiqueta} `}>
+                    {grupo.almacenes.map((a) => (
+                      <option key={a.idAlmacen || a.origen} value={a.origen}>
+                        {a.origen}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              : origenesMiSucursal.map((a) => (
+                  <option key={a} value={a}>
+                    {etiquetaMiSucursal
+                      ? etiquetaSucursalAlmacen(etiquetaMiSucursal, a)
+                      : a}
+                  </option>
+                ))}
           </select>
         </div>
         <div className="w-full sm:w-40">

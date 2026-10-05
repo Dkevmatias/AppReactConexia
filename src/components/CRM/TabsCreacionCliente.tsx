@@ -25,6 +25,8 @@ type TabsCreacionClienteProps = {
   onGuardarDescuentos?: () => void | Promise<void>;
   onEnviarDescuentosSap?: () => void | Promise<void>;
   cardCode?: string | null;
+  /** Empresa seleccionada (Codialub=1, Codial=2) para filtrar marcas de descuento. */
+  idEmpresa?: number | null;
   /** Si true, no renderiza el encabezado/borde externo (para usar dentro de otra tab). */
   embebido?: boolean;
   /** Cliente enviado a SAP: formularios en solo lectura. */
@@ -43,6 +45,7 @@ export default function TabsCreacionCliente({
   onGuardarDescuentos,
   onEnviarDescuentosSap,
   cardCode = null,
+  idEmpresa = null,
   embebido = false,
   soloLectura = false,
   camposInvalidos,
@@ -95,6 +98,7 @@ export default function TabsCreacionCliente({
             onGuardarDescuentos={onGuardarDescuentos}
             onEnviarDescuentosSap={onEnviarDescuentosSap}
             cardCode={cardCode}
+            idEmpresa={idEmpresa}
             soloLectura={false}
             camposInvalidos={camposInvalidos}
           />
