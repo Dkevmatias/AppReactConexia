@@ -126,6 +126,10 @@ function pickNumber(
   for (const key of keys) {
     const v = o[key];
     if (typeof v === "number" && !Number.isNaN(v)) return v;
+    if (typeof v === "string" && v.trim()) {
+      const parsed = Number(v);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
   }
   return null;
 }
@@ -202,6 +206,7 @@ export interface IncidenciaResumen {
   fechaCierre: string | null;
   cardCode: string | null;
   cardName: string | null;
+  idSucursal: number;
 }
 
 function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
@@ -272,6 +277,7 @@ function normalizeIncidenciaResumen(raw: unknown): IncidenciaResumen | null {
     fechaCierre: pickString(o, "fechaCierre", "FechaCierre"),
     cardCode: pickString(o, "cardCode", "CardCode"),
     cardName: pickString(o, "cardName", "CardName"),
+    idSucursal: pickNumber(o, "idSucursal", "IdSucursal") ?? 0,
   };
 }
 
@@ -575,7 +581,7 @@ export const incidenciaService = {
     idSucursal: number,
     soloActivos = true,
   ): Promise<IncidenciaCompleta[]> => {
-    if (!idSucursal || idSucursal <= 0) {
+    if (idSucursal < 0) {
       throw new Error("La sucursal no es válida para consultar incidencias.");
     }
     const qs = new URLSearchParams();

@@ -5,6 +5,7 @@ import {
   TipoMetricaCumplimiento,
   Vendedor,
 } from "../../services/reportesService";
+import BasicDatePicker from "../ui/datepicker/datepicker";
 
 interface ReportesFiltersProps {
   fechaInicio: string;
@@ -113,22 +114,20 @@ export default function ReportesFilters({
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Fecha Inicio
           </label>
-          <input
-            type="date"
+          <BasicDatePicker
+            compact={false}
             value={tempFechaInicio}
-            onChange={(e) => setTempFechaInicio(e.target.value)}
-            className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+            onChange={setTempFechaInicio}
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Fecha Fin
           </label>
-          <input
-            type="date"
+          <BasicDatePicker
+            compact={false}
             value={tempFechaFin}
-            onChange={(e) => setTempFechaFin(e.target.value)}
-            className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+            onChange={setTempFechaFin}
           />
         </div>
         <div>

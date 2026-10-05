@@ -11,11 +11,14 @@ export type BasicDatePickerProps = {
   label?: string;
   className?: string;
   disabled?: boolean;
+  /** Compacto para celdas; `false` alinea el campo con filtros de reportes. */
+  compact?: boolean;
 };
 
 /**
  * Usa el `LocalizationProvider` + `AdapterDayjs` definidos una sola vez en `main.tsx`
  * (ver https://mui.com/x/react-date-pickers/quickstart/#installation ).
+ * Solo fecha (sin hora).
  */
 export default function BasicDatePicker({
   value,
@@ -25,12 +28,14 @@ export default function BasicDatePicker({
   label,
   className,
   disabled = false,
+  compact = true,
 }: BasicDatePickerProps) {
   const emit = (v: Dayjs | null) => v?.format("YYYY-MM-DD") ?? "";
 
   return (
     <DatePicker
       label={label}
+      format="DD/MM/YYYY"
       className={className}
       disabled={disabled}
       value={value ? dayjs(value) : null}
@@ -48,13 +53,23 @@ export default function BasicDatePicker({
             if (e.key === "Enter") e.preventDefault();
           },
           slotProps: {
-            htmlInput: { placeholder: "Fecha" },
+            htmlInput: { placeholder: "DD/MM/AAAA" },
           },
-          sx: {
-            minWidth: 132,
-            "& .MuiInputBase-root": { fontSize: "0.75rem" },
-            "& .MuiInputBase-input": { py: 0.5 },
-          },
+          sx: compact
+            ? {
+                minWidth: 132,
+                "& .MuiInputBase-root": { fontSize: "0.75rem" },
+                "& .MuiInputBase-input": { py: 0.5 },
+              }
+            : {
+                minWidth: 168,
+                "& .MuiInputBase-root": {
+                  fontSize: "0.875rem",
+                  height: 40,
+                  backgroundColor: "transparent",
+                },
+                "& .MuiInputBase-input": { py: 1 },
+              },
         },
       }}
     />

@@ -195,12 +195,27 @@ export default function ManagerComprobacionRuta() {
     };
   }, [user?.idPersona]);
 
+  const cargarSucursales = useCallback(async () => {
+    if (!puedeVerSucursalIncidencia) {
+      setSucursal([]);
+      return;
+    }
+    try {
+      const sucursalesData = await bitacoraCobranzaService.getSucursales();
+      setSucursal(sucursalesData ?? []);
+    } catch (err) {
+      console.error(err);
+      setSucursal([]);
+    }
+  }, [puedeVerSucursalIncidencia]);
+
   const cargarIncidencias = useCallback(async () => {
     const idSucursalUsuario = contextoOperativo?.idSucursal ?? 0;
-    const idSucursalConsulta =
-      puedeVerSucursalIncidencia && filtroSucursal
+    const idSucursalConsulta = puedeVerSucursalIncidencia
+      ? filtroSucursal
         ? Number(filtroSucursal)
-        : idSucursalUsuario;
+        : 0
+      : idSucursalUsuario;
 
     if (!puedeVerSucursalIncidencia) {
       if (!idSucursalConsulta || idSucursalConsulta <= 0) {
@@ -217,47 +232,15 @@ export default function ManagerComprobacionRuta() {
     setLoading(true);
     setError(null);
     try {
-      const sucursalesData = puedeVerSucursalIncidencia
-        ? await bitacoraCobranzaService.getSucursales()
-        : [];
-      setSucursal(sucursalesData ?? []);
-
-      if (puedeVerSucursalIncidencia && !filtroSucursal) {
-        const ids = (sucursalesData ?? [])
-          .map((s) => s.idSucursal)
-          .filter((id) => id > 0);
-        if (ids.length === 0) {
-          setIncidencias([]);
-          return;
-        }
-        const listas = await Promise.all(
-          ids.map(async (id) => {
-            try {
-              return await incidenciaService.getBySucursal(id, true);
-            } catch (err) {
-              console.error(
-                `No se pudieron cargar incidencias de sucursal ${id}`,
-                err,
-              );
-              return [] as IncidenciaCompleta[];
-            }
-          }),
-        );
-        setIncidencias(listas.flat());
-        return;
-      }
-
-      if (!idSucursalConsulta || idSucursalConsulta <= 0) {
-        setIncidencias([]);
-        setError("Seleccione una sucursal para consultar incidencias.");
-        return;
-      }
-
       const lista = await incidenciaService.getBySucursal(
         idSucursalConsulta,
         true,
       );
-      setIncidencias(lista);
+      const filtrada =
+        puedeVerSucursalIncidencia && filtroSucursal
+          ? lista.filter((item) => item.idSucursal === Number(filtroSucursal))
+          : lista;
+      setIncidencias(filtrada);
     } catch (err) {
       console.error(err);
       setIncidencias([]);
@@ -275,6 +258,11 @@ export default function ManagerComprobacionRuta() {
     puedeVerSucursalIncidencia,
     filtroSucursal,
   ]);
+
+  useEffect(() => {
+    if (menuLoading) return;
+    void cargarSucursales();
+  }, [menuLoading, cargarSucursales]);
 
   useEffect(() => {
     if (loadingContexto || menuLoading) return;

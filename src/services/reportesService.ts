@@ -213,7 +213,13 @@ export interface Marca {
   idEmpresa: number;
 }
 
-const formatDate = (date: Date) => date.toISOString().split("T")[0];
+/** Fecha local `YYYY-MM-DD` (evita el desfase UTC de `toISOString`). */
+const formatDate = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
 
 function pickNumber(
   o: Record<string, unknown>,
@@ -609,10 +615,10 @@ export const getReportesService = {
     return response.data;
   },
 
+  /** Rango KPI: primer día del mes en curso → hoy. */
   getFechasDefault: () => {
     const fin = new Date();
-    const inicio = new Date();
-    inicio.setDate(inicio.getDate() - 30);
+    const inicio = new Date(fin.getFullYear(), fin.getMonth(), 1);
     return {
       fechaInicio: formatDate(inicio),
       fechaFin: formatDate(fin),
