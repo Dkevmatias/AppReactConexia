@@ -24,6 +24,24 @@ function terminoBusqueda(ctx: ContextoExistenciasArticulo | null): string {
   return (ctx.articulo || ctx.codigoProv || "").trim();
 }
 
+function sameCode(a: string | undefined, b: string | undefined): boolean {
+  return (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+}
+
+function esMismoArticulo(
+  fila: Articulo,
+  ctx: ContextoExistenciasArticulo,
+): boolean {
+  const codigo = terminoBusqueda(ctx);
+  if (!codigo) return false;
+  return (
+    sameCode(fila.articulo, codigo) ||
+    sameCode(fila.codigoProveedor, codigo) ||
+    sameCode(fila.articulo, ctx.articulo) ||
+    sameCode(fila.codigoProveedor, ctx.codigoProv)
+  );
+}
+
 export default function ModalExistenciasArticulo({
   abierto,
   contexto,
@@ -33,14 +51,16 @@ export default function ModalExistenciasArticulo({
   const [error, setError] = useState<string | null>(null);
   const [resultados, setResultados] = useState<Articulo[]>([]);
 
-  const cargar = useCallback(async (termino: string) => {
+  const cargar = useCallback(async (ctx: ContextoExistenciasArticulo) => {
+    const termino = terminoBusqueda(ctx);
     setLoading(true);
     setError(null);
     setResultados([]);
     try {
-      const data = await articuloService.buscarArticulos(termino);
-      setResultados(data);
-      if (data.length === 0) {
+      const data = await articuloService.buscarArticulos(termino, true);
+      const propios = data.filter((fila) => esMismoArticulo(fila, ctx));
+      setResultados(propios);
+      if (propios.length === 0) {
         setError("No se encontraron existencias para este artículo.");
       }
     } catch (err) {
@@ -63,7 +83,7 @@ export default function ModalExistenciasArticulo({
       setResultados([]);
       return;
     }
-    void cargar(termino);
+    void cargar(contexto);
   }, [abierto, contexto, cargar]);
 
   useEffect(() => {
@@ -174,11 +194,11 @@ export default function ModalExistenciasArticulo({
                       <p className="truncate font-medium text-gray-900 dark:text-white">
                         {fila.almacen || "—"}
                       </p>
-                      {fila.sociedad ? (
-                        <p className="truncate text-[11px] text-gray-500 dark:text-gray-400">
-                          {fila.sociedad}
-                        </p>
-                      ) : null}
+                      <p className="truncate font-mono text-[11px] text-gray-500 dark:text-gray-400">
+                        {[fila.articulo, fila.sociedad]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
                     </div>
                     <span
                       className={`shrink-0 tabular-nums font-semibold ${

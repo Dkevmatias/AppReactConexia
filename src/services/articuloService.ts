@@ -12,10 +12,15 @@ export interface Articulo {
 }
 
 export const articuloService = {
-  buscarArticulos: async (termino: string): Promise<Articulo[]> => {
+  buscarArticulos: async (
+    termino: string,
+    exacto = false,
+  ): Promise<Articulo[]> => {
     try {
+      const qs = new URLSearchParams({ codigo: termino });
+      if (exacto) qs.set("exacto", "true");
       const response = await api.get(
-        `/api/Inventario/BuscarArticulosCodialub?codigo=${encodeURIComponent(termino)}`,
+        `/api/Inventario/BuscarArticulosCodialub?${qs.toString()}`,
       );
       const data = response.data;
       if (Array.isArray(data)) {
