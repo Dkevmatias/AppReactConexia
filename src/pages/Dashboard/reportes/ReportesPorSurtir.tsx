@@ -12,7 +12,6 @@ import ModalExistenciasArticulo, {
 } from "../../../components/reportes/ModalExistenciasArticulo";
 import TablaScroll from "../../../components/reportes/TablaScroll";
 import { useAuth } from "../../../hooks/useAuth";
-import { useReportesBiPermisos } from "../../../hooks/useReportesBiPermisos";
 import {
   coincideVendedorSesion,
   useVendedorSesion,
@@ -257,11 +256,19 @@ function agruparPorClienteYFolio(items: PorSurtirGlobalItem[]): GrupoCliente[] {
   return grupos;
 }
 
-export default function ReportesPorSurtir() {
+type ReportesPorSurtirProps = {
+  /**
+   * Solo Reportes BI: el vendedor ve y filtra únicamente su propio combo.
+   * Operaciones no lo pasa (jefatura ve todos los vendedores).
+   */
+  restringirAVendedor?: boolean;
+};
+
+export default function ReportesPorSurtir({
+  restringirAVendedor = false,
+}: ReportesPorSurtirProps) {
   const { user } = useAuth();
-  const { menuLoading, tieneAccesoCompleto } = useReportesBiPermisos();
   const vendedorSesion = useVendedorSesion();
-  const restringirAVendedor = !menuLoading && !tieneAccesoCompleto;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<PorSurtirGlobalItem[]>([]);

@@ -33,7 +33,11 @@ export default function ReportesOperaciones() {
         onTabChange={setActiveTab}
       />
 
-      {activeTab === "traspasos" ? <ReportesTraspasos /> : <ReportesPorSurtir />}
+      {activeTab === "traspasos" ? (
+        <ReportesTraspasos />
+      ) : (
+        <ReportesPorSurtir />
+      )}
     </div>
   );
 }

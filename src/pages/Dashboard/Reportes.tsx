@@ -173,7 +173,12 @@ export default function Reportes() {
           <ReportePlataforma key={`plataforma-${filterKey}`} {...tabProps} />
         );
       case "por-surtir":
-        return <ReportesPorSurtir key={`por-surtir-${filterKey}`} />;
+        return (
+          <ReportesPorSurtir
+            key={`por-surtir-${filterKey}`}
+            restringirAVendedor={restringirAVendedor}
+          />
+        );
       case "tendencia-compra":
         return (
           <ReportesTendenciaCompraCliente
