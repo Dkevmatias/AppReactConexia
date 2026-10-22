@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Download, Loader2, RefreshCw } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import {
   ModalIncidenciaDistribucion,
@@ -22,6 +22,7 @@ import {
   Sucursal,
 } from "../../services/bitacoraCobranzaService";
 import { useListadoOperacionesPermisos } from "../../hooks/useListadoOperacionesPermisos";
+import { empresaVisibleEnCombo } from "../../utils/sucursalOperativa";
 
 const btnPrimaryClass =
   "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 touch-manipulation";
@@ -34,6 +35,23 @@ const labelClass =
 
 const btnSecondaryClass =
   "inline-flex min-h-[44px] items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600 touch-manipulation";
+
+const btnExcelClass =
+  "inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 touch-manipulation";
+
+function xmlExcelEscape(value: string | number | null | undefined): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function celdaExcel(valor: string | number | null | undefined): string {
+  const texto = String(valor ?? "").trim() || "";
+  const tipo = texto !== "" && /^-?\d+(\.\d+)?$/.test(texto) ? "Number" : "String";
+  return `<Cell><Data ss:Type="${tipo}">${xmlExcelEscape(texto)}</Data></Cell>`;
+}
 
 type FilaIncidenciaManager = {
   key: string;
@@ -202,7 +220,11 @@ export default function ManagerComprobacionRuta() {
     }
     try {
       const sucursalesData = await bitacoraCobranzaService.getSucursales();
-      setSucursal(sucursalesData ?? []);
+      setSucursal(
+        (sucursalesData ?? []).filter((s) =>
+          empresaVisibleEnCombo(s.idEmpresa),
+        ),
+      );
     } catch (err) {
       console.error(err);
       setSucursal([]);
@@ -296,6 +318,92 @@ export default function ManagerComprobacionRuta() {
     setContextoIncidencia(null);
   }, []);
 
+  const exportarExcel = useCallback(() => {
+    if (filasFiltradas.length === 0) return;
+
+    const nombreSucursalPorId = new Map(
+      sucursal.map((s) => [s.idSucursal, s.nombre]),
+    );
+    const incidenciaPorId = new Map(
+      incidencias.map((item) => [item.idIncidencia, item]),
+    );
+    const sucursalFallback =
+      sucursalSeleccionada?.nombre ||
+      contextoOperativo?.sucursal?.trim() ||
+      "";
+
+    const encabezados = [
+      "Id incidencia",
+      "Folio OD",
+      "Orden entrega",
+      "Tipo incidencia",
+      "Cliente",
+      "CardCode",
+      "Sucursal",
+      "Fecha creación",
+      "Usuario creación",
+      "Fecha cierre",
+      "Estatus",
+      "Observaciones",
+      "Solución",
+    ];
+
+    const filasXml = filasFiltradas.map((fila) => {
+      const origen = incidenciaPorId.get(fila.idIncidencia);
+      const nombreSucursal =
+        (origen?.idSucursal
+          ? nombreSucursalPorId.get(origen.idSucursal)
+          : undefined) || sucursalFallback;
+      const valores: Array<string | number> = [
+        fila.idIncidencia,
+        fila.idODistribucion || "",
+        fila.idOrdenEntrega || "",
+        fila.nombreTipoIncidencia,
+        origen?.cardName?.trim() || "",
+        origen?.cardCode?.trim() || "",
+        nombreSucursal,
+        fila.fechaCreacion === "—" ? "" : fila.fechaCreacion,
+        fila.nombreUsuarioCreacion === "—" ? "" : fila.nombreUsuarioCreacion,
+        fila.fechaCierre === "—" ? "" : fila.fechaCierre,
+        fila.estatus,
+        origen?.observaciones?.trim() || "",
+        origen?.solucion?.trim() || "",
+      ];
+      return `<Row>${valores.map(celdaExcel).join("")}</Row>`;
+    });
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Worksheet ss:Name="Incidencias">
+  <Table>
+   <Row>${encabezados.map(celdaExcel).join("")}</Row>
+   ${filasXml.join("\n   ")}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+    const blob = new Blob([xml], {
+      type: "application/vnd.ms-excel;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const sucursalArchivo = (sucursalFallback || "todas")
+      .trim()
+      .replace(/\s+/g, "_");
+    a.download = `incidencias_${sucursalArchivo}_${new Date().toISOString().slice(0, 10)}.xls`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [
+    filasFiltradas,
+    incidencias,
+    sucursal,
+    sucursalSeleccionada,
+    contextoOperativo?.sucursal,
+  ]);
+
   return (
     <>
       <PageMeta
@@ -323,19 +431,30 @@ export default function ManagerComprobacionRuta() {
           </p>
         </div>
 
-        <button
-          type="button"
-          className={btnPrimaryClass}
-          onClick={() => void cargarIncidencias()}
-          disabled={loading || loadingContexto}
-        >
-          {loading || loadingContexto ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
-          Actualizar
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={btnPrimaryClass}
+            onClick={() => void cargarIncidencias()}
+            disabled={loading || loadingContexto}
+          >
+            {loading || loadingContexto ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            Actualizar
+          </button>
+          <button
+            type="button"
+            className={btnExcelClass}
+            onClick={exportarExcel}
+            disabled={loading || loadingContexto || filasFiltradas.length === 0}
+          >
+            <Download className="h-4 w-4" />
+            Excel
+          </button>
+        </div>
       </div>
 
       {error ? (

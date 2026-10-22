@@ -10,7 +10,13 @@ import {
 import ModalExistenciasArticulo, {
   type ContextoExistenciasArticulo,
 } from "../../../components/reportes/ModalExistenciasArticulo";
+import TablaScroll from "../../../components/reportes/TablaScroll";
 import { useAuth } from "../../../hooks/useAuth";
+import { useReportesBiPermisos } from "../../../hooks/useReportesBiPermisos";
+import {
+  coincideVendedorSesion,
+  useVendedorSesion,
+} from "../../../hooks/useVendedorSesion";
 import {
   getContextoOperativoPersona,
   type ContextoOperativoPersona,
@@ -23,6 +29,7 @@ import { formatCurrency, formatNumber } from "../../../utils/format";
 import {
   configSucursalPorId,
   etiquetaSucursalAlmacen,
+  empresaVisibleEnCombo,
 } from "../../../utils/sucursalOperativa";
 import {
   almacenService,
@@ -252,6 +259,9 @@ function agruparPorClienteYFolio(items: PorSurtirGlobalItem[]): GrupoCliente[] {
 
 export default function ReportesPorSurtir() {
   const { user } = useAuth();
+  const { menuLoading, tieneAccesoCompleto } = useReportesBiPermisos();
+  const vendedorSesion = useVendedorSesion();
+  const restringirAVendedor = !menuLoading && !tieneAccesoCompleto;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<PorSurtirGlobalItem[]>([]);
@@ -295,7 +305,10 @@ export default function ReportesPorSurtir() {
   );
 
   const gruposAlmacen = useMemo(
-    () => agruparAlmacenesPorSucursal(almacenesCatalogo),
+    () =>
+      agruparAlmacenesPorSucursal(
+        almacenesCatalogo.filter((a) => empresaVisibleEnCombo(a.idEmpresa)),
+      ),
     [almacenesCatalogo],
   );
 
@@ -416,16 +429,44 @@ export default function ReportesPorSurtir() {
 
   const rutas = useMemo(() => uniqueSorted(rows.map((r) => r.ruta)), [rows]);
 
-  const vendedores = useMemo(
-    () => uniqueSorted(rows.map((r) => r.vendedor)),
-    [rows],
-  );
+  const vendedores = useMemo(() => {
+    const todos = uniqueSorted(rows.map((r) => r.vendedor));
+    if (!restringirAVendedor) return todos;
+    const propios = todos.filter((v) =>
+      coincideVendedorSesion(v, vendedorSesion),
+    );
+    if (propios.length > 0) return propios;
+    const clave = vendedorSesion.username || vendedorSesion.nombre;
+    return clave ? [clave] : [];
+  }, [
+    rows,
+    restringirAVendedor,
+    vendedorSesion.username,
+    vendedorSesion.nombre,
+  ]);
+
+  useEffect(() => {
+    if (!restringirAVendedor || !vendedorSesion.listo) return;
+    const valor = vendedores[0] || vendedorSesion.username || vendedorSesion.nombre;
+    if (valor && filtroVendedor !== valor) setFiltroVendedor(valor);
+  }, [
+    restringirAVendedor,
+    vendedorSesion.listo,
+    vendedorSesion.username,
+    vendedorSesion.nombre,
+    vendedores,
+    filtroVendedor,
+  ]);
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     return rows.filter((r) => {
       if (filtroRuta && r.ruta !== filtroRuta) return false;
-      if (filtroVendedor && r.vendedor !== filtroVendedor) return false;
+      if (restringirAVendedor) {
+        if (!coincideVendedorSesion(r.vendedor, vendedorSesion)) return false;
+      } else if (filtroVendedor && r.vendedor !== filtroVendedor) {
+        return false;
+      }
       if (filtroExistencia === "sin-cero" && (r.existencia ?? 0) <= 0) {
         return false;
       }
@@ -463,6 +504,8 @@ export default function ReportesPorSurtir() {
     filtroVendedor,
     filtroExistencia,
     filtroAtraso,
+    restringirAVendedor,
+    vendedorSesion,
   ]);
 
   const grupos = useMemo(() => agruparPorClienteYFolio(filtrados), [filtrados]);
@@ -579,7 +622,7 @@ export default function ReportesPorSurtir() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -768,9 +811,10 @@ export default function ReportesPorSurtir() {
             id="por-surtir-vendedor"
             value={filtroVendedor}
             onChange={(e) => setFiltroVendedor(e.target.value)}
-            className="w-full min-h-[40px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            disabled={restringirAVendedor}
+            className="w-full min-h-[40px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white disabled:cursor-not-allowed disabled:opacity-80"
           >
-            <option value="">Todos</option>
+            {restringirAVendedor ? null : <option value="">Todos</option>}
             {vendedores.map((v) => (
               <option key={v} value={v}>
                 {v}
@@ -852,32 +896,54 @@ export default function ReportesPorSurtir() {
                 <button
                   type="button"
                   onClick={() => toggleCliente(cliente.key)}
-                  className="flex w-full items-start gap-3 px-3 py-3 text-left hover:bg-black/5 dark:hover:bg-white/5 sm:items-center"
+                  className="flex w-full flex-col px-3 py-3 text-left hover:bg-black/5 dark:hover:bg-white/5"
                   aria-expanded={abierto}
                 >
-                  <span className="mt-0.5 shrink-0 text-gray-500 sm:mt-0">
-                    {abierto ? (
-                      <ChevronDown className="h-5 w-5" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5" />
-                    )}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {cliente.nombreCliente || "—"}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {cliente.codCliente || "Sin código"} ·{" "}
-                      {cliente.folios.length} folio
-                      {cliente.folios.length === 1 ? "" : "s"} ·{" "}
-                      {cliente.partidas} partida
-                      {cliente.partidas === 1 ? "" : "s"}
-                      {cliente.diasAtrasoMax > 0
-                        ? ` · atraso máx. ${etiquetaAtraso(cliente.diasAtrasoMax)}`
-                        : ""}
-                    </p>
+                  <div className="flex w-full items-start gap-3 sm:items-center">
+                    <span className="mt-0.5 shrink-0 text-gray-500 sm:mt-0">
+                      {abierto ? (
+                        <ChevronDown className="h-5 w-5" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5" />
+                      )}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold break-words text-gray-900 dark:text-white">
+                        {cliente.nombreCliente || "—"}
+                      </p>
+                      <p className="text-xs break-words text-gray-500 dark:text-gray-400">
+                        {cliente.codCliente || "Sin código"} ·{" "}
+                        {cliente.folios.length} folio
+                        {cliente.folios.length === 1 ? "" : "s"} ·{" "}
+                        {cliente.partidas} partida
+                        {cliente.partidas === 1 ? "" : "s"}
+                        {cliente.diasAtrasoMax > 0
+                          ? ` · atraso máx. ${etiquetaAtraso(cliente.diasAtrasoMax)}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="hidden shrink-0 grid-cols-3 gap-4 text-right text-xs sm:grid md:text-sm">
+                      <div>
+                        <p className="text-gray-500">Cant. pdte.</p>
+                        <p className="font-semibold tabular-nums text-gray-900 dark:text-white">
+                          {formatNumber(cliente.cantidadPdnte)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">ULKP</p>
+                        <p className="font-semibold tabular-nums text-gray-900 dark:text-white">
+                          {formatNumber(cliente.ulkpPdnte)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Importe</p>
+                        <p className="font-semibold tabular-nums text-gray-900 dark:text-white">
+                          {formatCurrency(cliente.importePdnte)}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="hidden shrink-0 grid-cols-3 gap-4 text-right text-xs sm:grid md:text-sm">
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[11px] sm:hidden">
                     <div>
                       <p className="text-gray-500">Cant. pdte.</p>
                       <p className="font-semibold tabular-nums text-gray-900 dark:text-white">
@@ -922,7 +988,7 @@ export default function ReportesPorSurtir() {
                               )}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                              <p className="text-sm font-semibold break-words text-gray-900 dark:text-white">
                                 Folio {folio.folio || "—"}
                                 <span className="ml-2 font-normal text-gray-500">
                                   · {formatFechaCorta(folio.fecha)}
@@ -938,13 +1004,13 @@ export default function ReportesPorSurtir() {
                                 >
                                   {etiquetaAtraso(folio.diasAtraso)}
                                 </span>
-                                {folio.comentarios ? (
-                                  <span className="ml-2 font-bold text-gray-900 dark:text-white">
-                                    · Comentarios: {folio.comentarios}
-                                  </span>
-                                ) : null}
                               </p>
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                              {folio.comentarios ? (
+                                <p className="mt-0.5 text-[11px] font-medium break-words text-gray-800 dark:text-gray-200">
+                                  Comentarios: {folio.comentarios}
+                                </p>
+                              ) : null}
+                              <p className="text-[11px] break-words text-gray-500 dark:text-gray-400">
                                 {folio.documento || "—"} ·{" "}
                                 {etiquetaSucursalAlmacen(
                                   folio.sucursal,
@@ -953,6 +1019,10 @@ export default function ReportesPorSurtir() {
                                 · Ruta {folio.ruta || "—"} · Vend.{" "}
                                 {folio.vendedor || "—"} ·{" "}
                                 {folio.articulos.length} art.
+                              </p>
+                              <p className="mt-1 text-xs tabular-nums font-medium text-gray-900 sm:hidden dark:text-white">
+                                {formatCurrency(folio.importePdnte)} ·{" "}
+                                {formatNumber(folio.cantidadPdnte)} pdte.
                               </p>
                             </div>
                             <div className="hidden shrink-0 text-right text-xs sm:block">
@@ -966,8 +1036,94 @@ export default function ReportesPorSurtir() {
                           </button>
 
                           {folioAbierto ? (
-                            <div className="overflow-x-auto border-t border-black/5 dark:border-white/10">
-                              <table className="min-w-full text-xs sm:text-sm">
+                            <div className="border-t border-black/5 dark:border-white/10">
+                              <div className="divide-y divide-black/5 md:hidden dark:divide-white/10">
+                                {folio.articulos.map((r, idx) => (
+                                  <div
+                                    key={`${r.articulo}-${r.almacen}-m-${idx}`}
+                                    className="flex items-start gap-2 px-3 py-3"
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-mono text-xs font-semibold text-gray-900 dark:text-white">
+                                        {r.articulo || "—"}
+                                      </p>
+                                      <p className="text-sm break-words text-gray-800 dark:text-gray-100">
+                                        {r.descripcion || "—"}
+                                      </p>
+                                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                        {[r.marca, r.codigoProv]
+                                          .filter(Boolean)
+                                          .join(" · ") || "—"}
+                                      </p>
+                                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                                        <p>
+                                          <span className="text-gray-500">
+                                            Tot.{" "}
+                                          </span>
+                                          <span className="tabular-nums font-medium">
+                                            {formatNumber(r.cantidadTotal)}
+                                          </span>
+                                        </p>
+                                        <p>
+                                          <span className="text-gray-500">
+                                            Pdte.{" "}
+                                          </span>
+                                          <span className="tabular-nums font-medium">
+                                            {formatNumber(r.cantidadPdnte)}
+                                          </span>
+                                        </p>
+                                        <p>
+                                          <span className="text-gray-500">
+                                            Exist.{" "}
+                                          </span>
+                                          <span
+                                            className={`tabular-nums ${
+                                              (r.existencia ?? 0) <= 0
+                                                ? "font-semibold text-red-700 dark:text-red-300"
+                                                : ""
+                                            }`}
+                                          >
+                                            {formatNumber(r.existencia)}
+                                          </span>
+                                        </p>
+                                        <p>
+                                          <span className="text-gray-500">
+                                            ULKP{" "}
+                                          </span>
+                                          <span className="tabular-nums">
+                                            {formatNumber(r.ulkpsPartPdte)}
+                                          </span>
+                                        </p>
+                                        <p className="col-span-2">
+                                          <span className="text-gray-500">
+                                            Importe{" "}
+                                          </span>
+                                          <span className="tabular-nums font-medium">
+                                            {formatCurrency(r.importePartPdte)}
+                                          </span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        abrirExistenciasArticulo(r)
+                                      }
+                                      disabled={
+                                        !r.articulo?.trim() &&
+                                        !r.codigoProv?.trim()
+                                      }
+                                      title="Ver existencias por almacén"
+                                      className="inline-flex min-h-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-lg border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-900/50"
+                                      aria-label={`Ver existencias de ${r.articulo || r.codigoProv}`}
+                                    >
+                                      <Warehouse className="h-4 w-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                              <TablaScroll className="hidden md:block">
+                              <table className="min-w-[56rem] w-full text-xs sm:text-sm">
                                 <thead className="bg-black/[0.03] dark:bg-black/30">
                                   <tr className="text-left text-gray-600 dark:text-gray-200">
                                     <th className="whitespace-nowrap px-3 py-2">
@@ -1076,6 +1232,7 @@ export default function ReportesPorSurtir() {
                                   ))}
                                 </tbody>
                               </table>
+                              </TablaScroll>
                             </div>
                           ) : null}
                         </div>

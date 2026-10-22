@@ -182,6 +182,32 @@ export interface ComparativoMensual {
   Crecimiento: number;
 }
 
+/** Punto de GET /api/Reportes/TendenciaCompraCliente */
+export interface TendenciaCompraSerieMensual {
+  anio: number;
+  mes: number;
+  lineTotal: number;
+  quantity: number;
+  documentos: number;
+}
+
+/** Respuesta de GET /api/Reportes/TendenciaCompraCliente */
+export interface TendenciaCompraCliente {
+  cardCode: string;
+  fechaInicio: string;
+  fechaFin: string;
+  ventaPeriodo: number;
+  ventaPeriodoAnterior: number;
+  variacionVsAnteriorPct: number;
+  ventaMismoPeriodoAnioAnterior: number;
+  variacionVsAnioAnteriorPct: number;
+  ticketPromedio: number;
+  documentos: number;
+  pendienteMensual: number;
+  etiqueta: string;
+  serieMensual: TendenciaCompraSerieMensual[];
+}
+
 export interface Vendedor {
   idUsuario: number;
   nombre: string;
@@ -198,6 +224,10 @@ export interface Vendedores {
   idVendedor: number;
   nombre: string;
   slpName: string;
+  /** SlpCode SAP Codialub. */
+  salesPersonCode: number;
+  /** SlpCode SAP Codial. */
+  salesPersonCode2: number;
   idUsuarioPrizma: number;
   idUsuarioPrizma2: number;
   idEmpresa: number;
@@ -253,9 +283,17 @@ function normalizeVendedor(raw: unknown): Vendedor {
     string,
     unknown
   >;
-  const username = pickString(o, "username", "Username", "userName") ?? "";
+  const username =
+    pickString(o, "username", "Username", "userName", "UserName") ?? "";
   const slpName =
-    pickString(o, "slpName", "SlpName", "slpCode", "SlpCode") ?? username;
+    pickString(
+      o,
+      "slpName",
+      "SlpName",
+      "slPName",
+      "slpCode",
+      "SlpCode",
+    ) ?? username;
 
   return {
     idUsuario: pickNumber(o, "idUsuario", "IdUsuario") ?? 0,
@@ -269,15 +307,41 @@ function normalizeVendedor(raw: unknown): Vendedor {
   };
 }
 
+function toUnknownArray(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (!raw || typeof raw !== "object") return [];
+  const o = raw as Record<string, unknown>;
+  for (const key of [
+    "data",
+    "Data",
+    "items",
+    "Items",
+    "result",
+    "Result",
+    "value",
+    "Value",
+    "$values",
+    "lista",
+    "Lista",
+    "vendedores",
+    "Vendedores",
+    "usuarios",
+    "Usuarios",
+  ]) {
+    const v = o[key];
+    if (Array.isArray(v)) return v;
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      const nested = toUnknownArray(v);
+      if (nested.length > 0) return nested;
+    }
+  }
+  return [];
+}
+
 function normalizeVendedoresArray(raw: unknown): Vendedor[] {
-  const list = Array.isArray(raw)
-    ? raw
-    : raw &&
-        typeof raw === "object" &&
-        Array.isArray((raw as { data?: unknown }).data)
-      ? (raw as { data: unknown[] }).data
-      : [];
-  return list.map(normalizeVendedor).filter((v) => v.idUsuario > 0);
+  return toUnknownArray(raw)
+    .map(normalizeVendedor)
+    .filter((v) => v.idUsuario > 0);
 }
 
 function normalizeVendedorPrizma(raw: unknown): Vendedores {
@@ -288,7 +352,11 @@ function normalizeVendedorPrizma(raw: unknown): Vendedores {
   return {
     idVendedor: pickNumber(o, "idVendedor", "IdVendedor") ?? 0,
     nombre: pickString(o, "nombre", "Nombre") ?? "",
-    slpName: pickString(o, "slpName", "SlpName") ?? "",
+    slpName: pickString(o, "slpName", "SlpName", "slPName") ?? "",
+    salesPersonCode:
+      pickNumber(o, "salesPersonCode", "SalesPersonCode") ?? 0,
+    salesPersonCode2:
+      pickNumber(o, "salesPersonCode2", "SalesPersonCode2") ?? 0,
     idUsuarioPrizma: pickNumber(o, "idUsuarioPrizma", "IdUsuarioPrizma") ?? 0,
     idUsuarioPrizma2:
       pickNumber(o, "idUsuarioPrizma2", "IdUsuarioPrizma2") ?? 0,
@@ -298,15 +366,109 @@ function normalizeVendedorPrizma(raw: unknown): Vendedores {
   };
 }
 
+function unwrapObjectPayload(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  for (const key of ["data", "Data", "result", "Result", "value", "Value"]) {
+    const nested = o[key];
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      return nested as Record<string, unknown>;
+    }
+  }
+  return o;
+}
+
+function normalizeTendenciaSerieMensual(
+  raw: unknown,
+): TendenciaCompraSerieMensual | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const anio = pickNumber(o, "anio", "Anio", "año", "Año") ?? 0;
+  const mes = pickNumber(o, "mes", "Mes") ?? 0;
+  if (anio <= 0 && mes <= 0) return null;
+  return {
+    anio,
+    mes,
+    lineTotal: pickNumber(o, "lineTotal", "LineTotal") ?? 0,
+    quantity: pickNumber(o, "quantity", "Quantity", "cantidad", "Cantidad") ?? 0,
+    documentos: pickNumber(o, "documentos", "Documentos") ?? 0,
+  };
+}
+
+function normalizeTendenciaCompraCliente(
+  raw: unknown,
+): TendenciaCompraCliente | null {
+  const o = unwrapObjectPayload(raw);
+  if (!o) return null;
+  const cardCode = pickString(o, "cardCode", "CardCode") ?? "";
+  const serieRaw =
+    o.serieMensual ?? o.SerieMensual ?? o.serie ?? o.Serie ?? [];
+  const serieMensual = (Array.isArray(serieRaw) ? serieRaw : [])
+    .map(normalizeTendenciaSerieMensual)
+    .filter((r): r is TendenciaCompraSerieMensual => r !== null);
+  return {
+    cardCode,
+    fechaInicio: pickString(o, "fechaInicio", "FechaInicio") ?? "",
+    fechaFin: pickString(o, "fechaFin", "FechaFin") ?? "",
+    ventaPeriodo: pickNumber(o, "ventaPeriodo", "VentaPeriodo") ?? 0,
+    ventaPeriodoAnterior:
+      pickNumber(o, "ventaPeriodoAnterior", "VentaPeriodoAnterior") ?? 0,
+    variacionVsAnteriorPct:
+      pickNumber(o, "variacionVsAnteriorPct", "VariacionVsAnteriorPct") ?? 0,
+    ventaMismoPeriodoAnioAnterior:
+      pickNumber(
+        o,
+        "ventaMismoPeriodoAnioAnterior",
+        "VentaMismoPeriodoAnioAnterior",
+      ) ?? 0,
+    variacionVsAnioAnteriorPct:
+      pickNumber(
+        o,
+        "variacionVsAnioAnteriorPct",
+        "VariacionVsAnioAnteriorPct",
+      ) ?? 0,
+    ticketPromedio: pickNumber(o, "ticketPromedio", "TicketPromedio") ?? 0,
+    documentos: pickNumber(o, "documentos", "Documentos") ?? 0,
+    pendienteMensual:
+      pickNumber(o, "pendienteMensual", "PendienteMensual") ?? 0,
+    etiqueta: pickString(o, "etiqueta", "Etiqueta") ?? "",
+    serieMensual,
+  };
+}
+
+function unwrapVendedorPayload(data: unknown): unknown {
+  if (data == null || typeof data !== "object" || Array.isArray(data)) {
+    return data;
+  }
+  const o = data as Record<string, unknown>;
+  for (const key of ["data", "Data", "result", "Result", "value", "Value"]) {
+    const nested = o[key];
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      return nested;
+    }
+  }
+  return data;
+}
+
+async function fetchVendedorPorSlpName(
+  slpName: string,
+): Promise<Vendedores | null> {
+  const clave = slpName.trim();
+  if (!clave) return null;
+  const response = await api.get<unknown>(
+    `/api/Vendedores/slpname/${encodeURIComponent(clave)}`,
+  );
+  if (response.status < 200 || response.status >= 300) return null;
+  const data = unwrapVendedorPayload(response.data);
+  if (data == null || typeof data !== "object") return null;
+  const vendedor = normalizeVendedorPrizma(data);
+  return vendedor.idVendedor > 0 || vendedor.slpName ? vendedor : null;
+}
+
 function normalizeVendedoresPrizmaArray(raw: unknown): Vendedores[] {
-  const list = Array.isArray(raw)
-    ? raw
-    : raw &&
-        typeof raw === "object" &&
-        Array.isArray((raw as { data?: unknown }).data)
-      ? (raw as { data: unknown[] }).data
-      : [];
-  return list
+  return toUnknownArray(raw)
     .map(normalizeVendedorPrizma)
     .filter((v) => v.idVendedor > 0)
     .sort((a, b) =>
@@ -420,6 +582,64 @@ const appendFechas = (
   if (fechaInicio) params.append("fechaInicio", fechaInicio);
   if (fechaFin) params.append("fechaFin", fechaFin);
 };
+
+function fechaIsoDia(value?: string | null): string {
+  const m = (value ?? "").trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : "";
+}
+
+function payloadErrorTendencia(data: unknown): string | null {
+  const o = unwrapObjectPayload(data);
+  if (!o) {
+    if (typeof data === "string" && /error al obtener tendencia/i.test(data)) {
+      return data.trim();
+    }
+    return null;
+  }
+  const ok = o.success ?? o.isSuccess ?? o.ok ?? o.exito ?? o.Exito;
+  const mensaje = mensajeErrorReporte(o, "");
+  const tieneDatos =
+    Boolean(pickString(o, "cardCode", "CardCode")) ||
+    o.serieMensual != null ||
+    o.SerieMensual != null ||
+    o.ventaPeriodo != null ||
+    o.VentaPeriodo != null;
+  if (ok === false || (mensaje && /error al obtener tendencia/i.test(mensaje))) {
+    return mensaje || "Error al obtener tendencia de compra del cliente.";
+  }
+  if (!tieneDatos && mensaje && /error/i.test(mensaje)) return mensaje;
+  return null;
+}
+
+function mensajeErrorReporte(data: unknown, fallback: string): string {
+  if (typeof data === "string" && data.trim()) {
+    const texto = data.trim();
+    if (texto.startsWith("<")) return fallback;
+    return texto.slice(0, 400);
+  }
+  if (!data || typeof data !== "object") return fallback;
+  const o = data as Record<string, unknown>;
+  for (const key of [
+    "detalle",
+    "Detalle",
+    "detail",
+    "Detail",
+    "mensaje",
+    "Mensaje",
+    "message",
+    "Message",
+    "exceptionMessage",
+    "ExceptionMessage",
+    "title",
+    "Title",
+  ]) {
+    const v = o[key];
+    if (typeof v === "string" && v.trim() && !v.trim().startsWith("<")) {
+      return v.trim().slice(0, 400);
+    }
+  }
+  return fallback;
+}
 
 export const getReportesService = {
   getDashboard: async (fechaInicio?: string, fechaFin?: string) => {
@@ -636,6 +856,12 @@ export const getReportesService = {
     return normalizeVendedoresPrizmaArray(response.data);
   },
 
+  /**
+   * SlpCode SAP del vendedor por username/slpName (Usuarios.username).
+   * GET /api/Vendedores/slpname/{slpName}
+   */
+  getVendedorPorSlpName: fetchVendedorPorSlpName,
+
   /** Vendedores de reparto: GET /api/Vendedores/reparto?soloActivos=true */
   getVendedoresReparto: async (soloActivos = true): Promise<Vendedores[]> => {
     const qs = new URLSearchParams();
@@ -753,6 +979,76 @@ export const getReportesService = {
       throw new Error(`No se pudo cargar Traspasos (HTTP ${response.status}).`);
     }
     return normalizeTransferStatusList(response.data);
+  },
+
+  /**
+   * Tendencia de compra de un cliente.
+   * GET /api/Reportes/TendenciaCompraCliente?cardCode=&fechaInicio=&fechaFin=&idEmpresa=
+   */
+  getTendenciaCompraCliente: async (opts: {
+    cardCode: string;
+    fechaInicio: string;
+    fechaFin: string;
+    idEmpresa: number;
+  }): Promise<TendenciaCompraCliente> => {
+    const cardCode = opts.cardCode.trim();
+    const fechaInicio = fechaIsoDia(opts.fechaInicio);
+    const fechaFin = fechaIsoDia(opts.fechaFin);
+    const idEmpresa = Number(opts.idEmpresa);
+    if (!cardCode) {
+      throw new Error("Indique el CardCode del cliente.");
+    }
+    if (!idEmpresa || idEmpresa <= 0) {
+      throw new Error("Indique la empresa (idEmpresa).");
+    }
+    if (!fechaInicio || !fechaFin) {
+      throw new Error("Indique fecha inicio y fecha fin.");
+    }
+
+    const qs = new URLSearchParams();
+    qs.set("cardCode", cardCode);
+    qs.set("fechaInicio", fechaInicio);
+    qs.set("fechaFin", fechaFin);
+    qs.set("idEmpresa", String(idEmpresa));
+    const path = `/api/Reportes/TendenciaCompraCliente?${qs.toString()}`;
+
+    const response = await api.get<unknown>(path, {
+      timeout: 60_000,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": false,
+      },
+    });
+
+    if (response.status >= 200 && response.status < 300) {
+      const data = normalizeTendenciaCompraCliente(response.data);
+      if (data && (data.cardCode || data.serieMensual.length > 0)) {
+        return data;
+      }
+      const errorPayload = payloadErrorTendencia(response.data);
+      if (errorPayload) throw new Error(errorPayload);
+      if (data) return data;
+      throw new Error("La respuesta de tendencia de compra no es válida.");
+    }
+
+    throw new Error(
+      payloadErrorTendencia(response.data) ||
+        mensajeErrorReporte(
+          response.data,
+          `No se pudo cargar la tendencia de compra (HTTP ${response.status}).`,
+        ),
+    );
+  },
+
+  /** Rango tendencia: 90 días atrás → hoy (mismo tramo que el ejemplo de Swagger). */
+  getFechasTendenciaDefault: () => {
+    const fin = new Date();
+    const inicio = new Date(fin);
+    inicio.setDate(inicio.getDate() - 90);
+    return {
+      fechaInicio: formatDate(inicio),
+      fechaFin: formatDate(fin),
+    };
   },
 
   /** Rango por defecto: 1er día del mes pasado → hoy (GETDATE). */

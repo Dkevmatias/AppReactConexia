@@ -1,3 +1,8 @@
+import {
+  ID_EMPRESA_CODIALUB,
+  idEmpresaDescuentoDesdeDoc,
+} from "./prospectoFormUtils";
+
 export type TipoPersonaCliente = "FISICA" | "MORAL";
 export type TipoDireccionCliente = "FISCAL" | "ENTREGA";
 export type GeneroContacto = "M" | "F" | "";
@@ -59,6 +64,8 @@ export type DescuentoClienteForm = {
   ErrorSync: string;
   FechaCreacion: string | null;
   FechaActualizacion: string | null;
+  /** Codialub = 1, Codial = 2. Independiente de la empresa del cliente. */
+  idEmpresa?: number | null;
 };
 
 export type ContactoClienteForm = {
@@ -256,9 +263,7 @@ export function sanitizarPorcentajeDescuento(valor: string): string {
   const sepIdx = s.search(/[.,]/);
   if (sepIdx >= 0) {
     const sep = s[sepIdx];
-    s =
-      s.slice(0, sepIdx + 1) +
-      s.slice(sepIdx + 1).replace(/[.,]/g, "");
+    s = s.slice(0, sepIdx + 1) + s.slice(sepIdx + 1).replace(/[.,]/g, "");
     // Un solo separador
     if (sep === ",") {
       /* keep comma while typing; DiscRel normaliza a . */
@@ -318,6 +323,7 @@ export function descuentoVacio(opts?: {
   firmName?: string;
   discountLimit?: number | null;
   porcentaje?: string;
+  idEmpresa?: number | null;
 }): DescuentoClienteForm {
   const discountLimit = opts?.discountLimit ?? 0;
   const porcentaje = opts?.porcentaje ?? "";
@@ -352,7 +358,20 @@ export function descuentoVacio(opts?: {
     ErrorSync: "",
     FechaCreacion: null,
     FechaActualizacion: null,
+    idEmpresa: opts?.idEmpresa ?? null,
   };
+}
+
+/** Codialub=1 / Codial=2. Filas sin idEmpresa se tratan como Codialub. */
+export function esDescuentoDeEmpresa(
+  idEmpresaFila: number | null | undefined,
+  idEmpresaCheck: number | null | undefined,
+): boolean {
+  if (idEmpresaCheck == null || idEmpresaCheck <= 0) return true;
+  const check = Number(idEmpresaCheck);
+  const fila = Number(idEmpresaFila);
+  if (Number.isFinite(fila) && fila > 0) return fila === check;
+  return check === ID_EMPRESA_CODIALUB;
 }
 
 /**
@@ -367,15 +386,21 @@ export function sincronizarDescuentosConMarcas(
     firmName: string;
     discountLimit?: number;
   }>,
+  idEmpresa?: number | null,
 ): DescuentoClienteForm[] {
-  const header = actuales.find((d) => (d.idClienteDescuento ?? 0) > 0) ?? actuales[0];
+  const deEmpresa =
+    idEmpresa != null && idEmpresa > 0
+      ? actuales.filter((d) => esDescuentoDeEmpresa(d.idEmpresa, idEmpresa))
+      : actuales;
+  const header =
+    deEmpresa.find((d) => (d.idClienteDescuento ?? 0) > 0) ?? deEmpresa[0];
   return marcas.map((marca) => {
     const firmCodeStr = String(marca.firmCode);
     const discountLimit = marca.discountLimit ?? 0;
     const prev =
-      actuales.find(
+      deEmpresa.find(
         (d) =>
-          (d.ObjCode && d.ObjCode === firmCodeStr) ||
+          (d.ObjCode && claveObjMarca(d.ObjCode) === firmCodeStr) ||
           (d.idMarca != null && d.idMarca === marca.idMarca),
       ) ?? null;
     if (prev) {
@@ -396,6 +421,7 @@ export function sincronizarDescuentosConMarcas(
         AbsEntry: prev.AbsEntry ?? header?.AbsEntry ?? null,
         EstatusSync: prev.EstatusSync || header?.EstatusSync || "",
         ErrorSync: prev.ErrorSync || header?.ErrorSync || "",
+        idEmpresa: idEmpresa ?? prev.idEmpresa ?? null,
       };
     }
     const vacio = descuentoVacio({
@@ -403,6 +429,7 @@ export function sincronizarDescuentosConMarcas(
       firmCode: marca.firmCode,
       firmName: marca.firmName,
       discountLimit,
+      idEmpresa,
     });
     return {
       ...vacio,
@@ -411,6 +438,7 @@ export function sincronizarDescuentosConMarcas(
       EstatusSync: header?.EstatusSync ?? "",
       ErrorSync: header?.ErrorSync ?? "",
       FechaSync: header?.FechaSync ?? "",
+      idEmpresa: idEmpresa ?? null,
     };
   });
 }
@@ -418,6 +446,9 @@ export function sincronizarDescuentosConMarcas(
 /** Documento local: 1 cabecera (cliente) + N líneas (marca con % > 0). */
 export type ClienteDescuentoWritePayload = {
   idCliente: number;
+  idEmpresa?: number | null;
+  /** PascalCase para el bind de ASP.NET si el DTO no acepta camelCase. */
+  IdEmpresa?: number | null;
   idSucursal: number;
   idLeadOrigen: number;
   idUsuarioCreacion?: number | null;
@@ -430,6 +461,8 @@ export type ClienteDescuentoWritePayload = {
   validTo?: string | null;
   detalles: {
     idDescuentoDetalle?: number | null;
+    idEmpresa: number;
+    IdEmpresa: number;
     objType: string;
     objKey: string;
     discType: string;
@@ -443,6 +476,7 @@ export type ClienteDescuentoWritePayload = {
 export type ClienteDescuentoApi = {
   idDescuento: number;
   idCliente: number;
+  idEmpresa?: number | null;
   cardCode: string | null;
   absEntry: number;
   type: string | null;
@@ -455,6 +489,7 @@ export type ClienteDescuentoApi = {
   errorSync: string | null;
   detalles: {
     idDescuentoDetalle: number;
+    idEmpresa?: number | null;
     objType: string | null;
     objKey: string | null;
     discType: string | null;
@@ -465,6 +500,11 @@ export type ClienteDescuentoApi = {
   }[];
 };
 
+export type MarcaEmpresaRef = {
+  firmCode: number;
+  idEmpresa: number;
+};
+
 /**
  * Arma el payload CRM (no SAP). Cabecera = cliente; detalle = marca.
  * El JSON de Service Layer se mapeará después con el payload que envíes.
@@ -473,25 +513,38 @@ export function armarPayloadDescuentoLocal(
   filas: DescuentoClienteForm[],
   opts: {
     idCliente: number;
+    idEmpresa?: number | null;
     idSucursal?: number | null;
     idLeadOrigen?: number | null;
     idUsuario?: number | null;
   },
 ): ClienteDescuentoWritePayload {
-  const header = filas.find((d) => (d.idClienteDescuento ?? 0) > 0) ?? filas[0];
-  const detalles = filas
+  const idEmpresaCheck =
+    opts.idEmpresa != null && opts.idEmpresa > 0 ? opts.idEmpresa : null;
+  /** Líneas de la sociedad del check (Codialub=1, Codial=2). */
+  const deEmpresa = idEmpresaCheck
+    ? filas.filter((d) => esDescuentoDeEmpresa(d.idEmpresa, idEmpresaCheck))
+    : filas;
+  const header =
+    deEmpresa.find((d) => (d.idClienteDescuento ?? 0) > 0) ??
+    filas.find((d) => (d.idClienteDescuento ?? 0) > 0) ??
+    deEmpresa[0];
+  const detalles = deEmpresa
     .map((fila) => {
       const discount = Number(
         porcentajeADiscRelEntero(fila.porcentaje, fila.discountLimit) || 0,
       );
-      const objKey = (fila.ObjCode || "").trim();
+      const objKey = claveObjMarca(fila.ObjCode);
       if (!objKey || !Number.isFinite(discount) || discount <= 0) return null;
+      if (!idEmpresaCheck) return null;
       return {
         idDescuentoDetalle:
           fila.idDescuentoDetalle && fila.idDescuentoDetalle > 0
             ? fila.idDescuentoDetalle
             : null,
-        objType: fila.ObjType || "4",
+        idEmpresa: idEmpresaCheck,
+        IdEmpresa: idEmpresaCheck,
+        objType: String(fila.ObjType || "4"),
         objKey,
         discType: "D",
         discount,
@@ -504,6 +557,8 @@ export function armarPayloadDescuentoLocal(
 
   return {
     idCliente: opts.idCliente,
+    idEmpresa: idEmpresaCheck,
+    IdEmpresa: idEmpresaCheck,
     idSucursal: opts.idSucursal ?? header?.idSucursal ?? 0,
     idLeadOrigen: opts.idLeadOrigen ?? header?.IdLeadOrigen ?? 0,
     idUsuarioCreacion: opts.idUsuario ?? header?.IdUsuarioCreacion ?? null,
@@ -518,62 +573,415 @@ export function armarPayloadDescuentoLocal(
   };
 }
 
+const CLAVES_DETALLES_DESCUENTO = [
+  "detalles",
+  "Detalles",
+  "detalle",
+  "Detalle",
+  "clienteDescuentoDetalles",
+  "ClienteDescuentoDetalles",
+  "clienteDescuentoDetalle",
+  "ClienteDescuentoDetalle",
+  "descuentoDetalles",
+  "DescuentoDetalles",
+] as const;
+
+function rawDetallesDescuento(o: Record<string, unknown>): unknown {
+  return pickRaw(o, ...CLAVES_DETALLES_DESCUENTO);
+}
+
+function detalleDescuentoDesdeRaw(item: unknown): ClienteDescuentoApi["detalles"][number] {
+  const d = asRecord(item);
+  const objKey = pickStr(
+    d,
+    "objKey",
+    "ObjKey",
+    "objCode",
+    "ObjCode",
+    "firmCode",
+    "FirmCode",
+  );
+  const discount =
+    pickNum(d, "discount", "Discount", "porcentaje", "Porcentaje") ??
+    pickNum(d, "discRel", "DiscRel") ??
+    0;
+  return {
+    idDescuentoDetalle:
+      pickNum(d, "idDescuentoDetalle", "IdDescuentoDetalle") ?? 0,
+    idEmpresa: pickNum(d, "idEmpresa", "IdEmpresa", "id_empresa"),
+    objType: pickStr(d, "objType", "ObjType") || null,
+    objKey: objKey || null,
+    discType: pickStr(d, "discType", "DiscType") || null,
+    discount,
+    payFor: pickNum(d, "payFor", "PayFor") ?? 0,
+    forFree: pickNum(d, "forFree", "ForFree") ?? 0,
+    upTo: pickNum(d, "upTo", "UpTo") ?? 0,
+  };
+}
+
+function esLineaDetalleDescuento(raw: unknown): boolean {
+  const o = asRecord(raw);
+  if (Object.keys(o).length === 0) return false;
+  if (rawDetallesDescuento(o) != null) return false;
+  const objKey = pickStr(
+    o,
+    "objKey",
+    "ObjKey",
+    "objCode",
+    "ObjCode",
+    "firmCode",
+    "FirmCode",
+  );
+  const idDet = pickNum(o, "idDescuentoDetalle", "IdDescuentoDetalle");
+  return objKey.length > 0 || (idDet != null && idDet > 0);
+}
+
+function agruparLineasDetalleDescuento(lineas: unknown[]): unknown[] {
+  const grupos = new Map<
+    number,
+    { idDescuento: number; idEmpresa: number | null; detalles: unknown[] }
+  >();
+  for (const item of lineas) {
+    const o = asRecord(item);
+    const idDescuento =
+      pickNum(
+        o,
+        "idDescuento",
+        "IdDescuento",
+        "idClienteDescuento",
+        "IdClienteDescuento",
+      ) ?? 0;
+    const prev = grupos.get(idDescuento) ?? {
+      idDescuento,
+      idEmpresa: pickNum(o, "idEmpresa", "IdEmpresa"),
+      detalles: [] as unknown[],
+    };
+    prev.detalles.push(item);
+    if (prev.idEmpresa == null || prev.idEmpresa <= 0) {
+      prev.idEmpresa = pickNum(o, "idEmpresa", "IdEmpresa");
+    }
+    grupos.set(idDescuento, prev);
+  }
+  return [...grupos.values()].map((g) => ({
+    idDescuento: g.idDescuento,
+    IdDescuento: g.idDescuento,
+    idEmpresa: g.idEmpresa,
+    detalles: g.detalles,
+  }));
+}
+
+/** Arrays, wrappers .NET (`$values`, `data`) o un objeto suelto. */
+export function comoListaApi(raw: unknown): unknown[] {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw !== "object") return [];
+  const o = raw as Record<string, unknown>;
+  const nested =
+    o.data ??
+    o.Data ??
+    o.items ??
+    o.Items ??
+    o.value ??
+    o.Value ??
+    o.$values ??
+    o.descuentos ??
+    o.Descuentos ??
+    o.result ??
+    o.Result;
+  if (Array.isArray(nested)) return nested;
+  if (nested && typeof nested === "object") return comoListaApi(nested);
+  return [raw];
+}
+
+/** GET puede devolver un array, un wrapper .NET o un solo documento. */
+export function extraerDocumentosDescuentoApi(raw: unknown): unknown[] {
+  const lista = comoListaApi(raw).filter((x) => x != null);
+  if (lista.length > 0 && lista.every(esLineaDetalleDescuento)) {
+    return agruparLineasDetalleDescuento(lista);
+  }
+  if (lista.length !== 1) return lista;
+  const unico = lista[0];
+  if (!unico || typeof unico !== "object") return lista;
+  const o = unico as Record<string, unknown>;
+  const inner = o.descuentos ?? o.Descuentos;
+  if (inner != null && inner !== unico) {
+    return extraerDocumentosDescuentoApi(inner);
+  }
+  if (
+    o.idDescuento != null ||
+    o.IdDescuento != null ||
+    o.idClienteDescuento != null ||
+    o.IdClienteDescuento != null ||
+    rawDetallesDescuento(o) != null
+  ) {
+    return [unico];
+  }
+  return lista;
+}
+
+export function descuentoApiDesdeRaw(raw: unknown): ClienteDescuentoApi {
+  const o = asRecord(raw);
+  let detalles = comoListaApi(rawDetallesDescuento(o)).map(
+    detalleDescuentoDesdeRaw,
+  );
+  if (detalles.length === 0 && esLineaDetalleDescuento(o)) {
+    detalles = [detalleDescuentoDesdeRaw(o)];
+  }
+  const cardCode = pickStr(o, "cardCode", "CardCode") || null;
+  const idEmpresaCampo = pickNum(o, "idEmpresa", "IdEmpresa", "id_empresa");
+  return {
+    idDescuento:
+      pickNum(
+        o,
+        "idDescuento",
+        "IdDescuento",
+        "idClienteDescuento",
+        "IdClienteDescuento",
+      ) ?? 0,
+    idCliente: pickNum(o, "idCliente", "IdCliente") ?? 0,
+    idEmpresa: idEmpresaDescuentoDesdeDoc({
+      idEmpresa:
+        idEmpresaCampo ??
+        detalles.find((d) => d.idEmpresa != null && d.idEmpresa > 0)
+          ?.idEmpresa,
+      cardCode,
+    }),
+    cardCode,
+    absEntry: pickNum(o, "absEntry", "AbsEntry") ?? 0,
+    type: pickStr(o, "type", "Type") || null,
+    objType: pickStr(o, "objType", "ObjType") || null,
+    objCode: pickStr(o, "objCode", "ObjCode") || null,
+    discRel: pickStr(o, "discRel", "DiscRel") || null,
+    validFor: pickStr(o, "validFor", "ValidFor") || null,
+    estatusSync: pickStr(o, "estatusSync", "EstatusSync") || null,
+    fechaSync: pickStr(o, "fechaSync", "FechaSync") || null,
+    errorSync: pickStr(o, "errorSync", "ErrorSync") || null,
+    detalles,
+  };
+}
+
+export function fusionarDocumentosDescuento(
+  docs: ClienteDescuentoApi[],
+): ClienteDescuentoApi[] {
+  const map = new Map<string, ClienteDescuentoApi>();
+  for (const doc of docs) {
+    if (!doc || doc.idDescuento <= 0) continue;
+    const idEmpresa = idEmpresaDescuentoDesdeDoc(doc);
+    const stamped = { ...doc, idEmpresa };
+    const key = `${stamped.idDescuento}:${idEmpresa ?? 0}`;
+    const prev = map.get(key);
+    if (!prev || stamped.detalles.length > prev.detalles.length) {
+      map.set(key, stamped);
+    }
+  }
+  for (const key of [...map.keys()]) {
+    if (!key.endsWith(":0")) continue;
+    const id = key.slice(0, key.lastIndexOf(":"));
+    const hayEspecifica = [...map.keys()].some(
+      (k) => k.startsWith(`${id}:`) && k !== key,
+    );
+    if (hayEspecifica) map.delete(key);
+  }
+  return [...map.values()];
+}
+
+export function claveObjMarca(
+  code: string | number | null | undefined,
+): string {
+  const s = String(code ?? "").trim();
+  if (!s) return "";
+  const n = Number(s.replace(",", "."));
+  if (Number.isFinite(n) && n > 0) return String(Math.trunc(n));
+  return s;
+}
+
+export function idEmpresaDesdeMarcasCatalogo(
+  objKey: string | number | null | undefined,
+  marcas: MarcaEmpresaRef[] | undefined,
+): number | null {
+  if (!marcas?.length) return null;
+  const clave = claveObjMarca(objKey);
+  if (!clave) return null;
+  const marca = marcas.find((m) => claveObjMarca(m.firmCode) === clave);
+  return marca && marca.idEmpresa > 0 ? marca.idEmpresa : null;
+}
+
+/** Parte un documento mixto en uno por sociedad, usando el idEmpresa del detalle o de la marca. */
+export function partirDocumentosPorEmpresaDetalle(
+  docs: ClienteDescuentoApi[],
+  marcas?: MarcaEmpresaRef[],
+): ClienteDescuentoApi[] {
+  const partidos: ClienteDescuentoApi[] = [];
+  for (const doc of docs) {
+    if (!doc || doc.idDescuento <= 0) continue;
+    const grupos = new Map<number, ClienteDescuentoApi["detalles"]>();
+    for (const det of doc.detalles ?? []) {
+      const emp =
+        (det.idEmpresa != null && det.idEmpresa > 0 ? det.idEmpresa : null) ??
+        idEmpresaDescuentoDesdeDoc(doc) ??
+        idEmpresaDesdeMarcasCatalogo(det.objKey, marcas) ??
+        1;
+      const lista = grupos.get(emp) ?? [];
+      lista.push({ ...det, idEmpresa: emp });
+      grupos.set(emp, lista);
+    }
+    if (grupos.size === 0) {
+      partidos.push({
+        ...doc,
+        idEmpresa: idEmpresaDescuentoDesdeDoc(doc) ?? doc.idEmpresa,
+      });
+      continue;
+    }
+    const headerEmp = idEmpresaDescuentoDesdeDoc(doc);
+    for (const [idEmpresa, detalles] of grupos) {
+      const esCabecera = headerEmp == null || headerEmp === idEmpresa;
+      partidos.push({
+        ...doc,
+        idEmpresa,
+        detalles,
+        estatusSync: esCabecera ? doc.estatusSync : "",
+        absEntry: esCabecera ? doc.absEntry : 0,
+      });
+    }
+  }
+  return fusionarDocumentosDescuento(partidos);
+}
+
+export function mergeDocumentosDescuentoAFilas(
+  docs: ClienteDescuentoApi[],
+  actuales: DescuentoClienteForm[] = [],
+  idEmpresaSiFalta?: number | null,
+  marcas?: MarcaEmpresaRef[],
+): DescuentoClienteForm[] {
+  const normalizados = partirDocumentosPorEmpresaDetalle(docs, marcas).map(
+    (doc) => {
+      const inferida = idEmpresaDescuentoDesdeDoc(doc);
+      return {
+        ...doc,
+        idEmpresa:
+          inferida != null && inferida > 0
+            ? inferida
+            : docs.length === 1 && idEmpresaSiFalta
+              ? idEmpresaSiFalta
+              : doc.idEmpresa,
+      };
+    },
+  );
+  const empresasEnDocs = new Set(
+    normalizados
+      .map((d) => d.idEmpresa)
+      .filter((id): id is number => id != null && id > 0),
+  );
+  const otras = actuales.filter(
+    (d) =>
+      d.idEmpresa != null &&
+      d.idEmpresa > 0 &&
+      !empresasEnDocs.has(d.idEmpresa),
+  );
+  return normalizados.reduce(
+    (acc, doc) =>
+      aplicarDescuentoApiAFilas(
+        acc,
+        doc,
+        doc.idEmpresa != null && doc.idEmpresa > 0
+          ? doc.idEmpresa
+          : idEmpresaSiFalta,
+      ),
+    otras,
+  );
+}
+
 export function aplicarDescuentoApiAFilas(
   actuales: DescuentoClienteForm[],
   doc: ClienteDescuentoApi | null,
+  idEmpresaFallback?: number | null,
 ): DescuentoClienteForm[] {
   if (!doc || doc.idDescuento <= 0) return actuales;
 
+  const idEmpresaDoc =
+    idEmpresaFallback != null && idEmpresaFallback > 0
+      ? idEmpresaFallback
+      : doc.idEmpresa != null && doc.idEmpresa > 0
+        ? doc.idEmpresa
+        : 1;
   const porMarca = new Map(
     (doc.detalles ?? [])
-      .filter((d) => (d.objKey ?? "").trim())
-      .map((d) => [(d.objKey ?? "").trim(), d]),
+      .map((d) => [claveObjMarca(d.objKey), d] as const)
+      .filter(([k]) => k.length > 0),
   );
 
-  const base = actuales.length > 0 ? actuales : [];
+  const filaDesdeDetalle = (
+    d: ClienteDescuentoApi["detalles"][number],
+  ): DescuentoClienteForm => {
+    const pct = d.discount > 0 ? String(d.discount) : "";
+    const idEmpresaFila =
+      d.idEmpresa != null && d.idEmpresa > 0 ? d.idEmpresa : idEmpresaDoc;
+    return {
+      ...descuentoVacio({
+        firmCode: Number(claveObjMarca(d.objKey)) || null,
+        porcentaje: pct,
+        idEmpresa: idEmpresaFila,
+      }),
+      idClienteDescuento: doc.idDescuento,
+      idDescuentoDetalle: d.idDescuentoDetalle,
+      idCliente: doc.idCliente,
+      AbsEntry: doc.absEntry,
+      Type: doc.type || "C",
+      ObjType: d.objType || "4",
+      ObjCode: claveObjMarca(d.objKey),
+      DiscRel: pct,
+      ValidFor: doc.validFor || "Y",
+      EstatusSync: doc.estatusSync ?? "",
+      FechaSync: doc.fechaSync ?? "",
+      ErrorSync: doc.errorSync ?? "",
+      idEmpresa: idEmpresaFila,
+    };
+  };
+
+  const perteneceAEmpresa = (d: DescuentoClienteForm) =>
+    esDescuentoDeEmpresa(d.idEmpresa, idEmpresaDoc);
+  const otras = actuales.filter((d) => !perteneceAEmpresa(d));
+  const deEmpresa = actuales.filter(perteneceAEmpresa);
+  const base = deEmpresa.length > 0 ? deEmpresa : [];
   if (base.length === 0) {
-    return (doc.detalles ?? []).map((d) => {
-      const pct = d.discount > 0 ? String(d.discount) : "";
-      return {
-        ...descuentoVacio({
-          firmCode: Number(d.objKey) || null,
-          porcentaje: pct,
-        }),
-        idClienteDescuento: doc.idDescuento,
-        idDescuentoDetalle: d.idDescuentoDetalle,
-        idCliente: doc.idCliente,
-        AbsEntry: doc.absEntry,
-        Type: doc.type || "C",
-        ObjType: d.objType || "4",
-        ObjCode: (d.objKey ?? "").trim(),
-        DiscRel: pct,
-        ValidFor: doc.validFor || "Y",
-        EstatusSync: doc.estatusSync ?? "",
-        FechaSync: doc.fechaSync ?? "",
-        ErrorSync: doc.errorSync ?? "",
-      };
-    });
+    return [...otras, ...(doc.detalles ?? []).map(filaDesdeDetalle)];
   }
 
-  return base.map((fila) => {
-    const detalle = porMarca.get((fila.ObjCode || "").trim());
-    const pct = detalle && detalle.discount > 0 ? String(detalle.discount) : fila.porcentaje;
+  const usados = new Set<string>();
+  const actualizadas = base.map((fila) => {
+    const clave = claveObjMarca(fila.ObjCode);
+    const detalle = porMarca.get(clave);
+    if (detalle) usados.add(clave);
+    const pct =
+      detalle && detalle.discount > 0
+        ? String(detalle.discount)
+        : fila.porcentaje;
     return {
       ...fila,
       idClienteDescuento: doc.idDescuento,
-      idDescuentoDetalle: detalle?.idDescuentoDetalle ?? null,
+      idDescuentoDetalle:
+        detalle?.idDescuentoDetalle ?? fila.idDescuentoDetalle ?? null,
       idCliente: doc.idCliente,
       AbsEntry: doc.absEntry,
       Type: doc.type || fila.Type,
       ObjType: detalle?.objType || fila.ObjType,
+      ObjCode: clave || fila.ObjCode,
       porcentaje: pct,
       DiscRel: porcentajeADiscRelEntero(pct, fila.discountLimit),
       ValidFor: doc.validFor || fila.ValidFor,
       EstatusSync: doc.estatusSync ?? "",
       FechaSync: doc.fechaSync ?? "",
       ErrorSync: doc.errorSync ?? "",
+      idEmpresa:
+        detalle?.idEmpresa != null && detalle.idEmpresa > 0
+          ? detalle.idEmpresa
+          : idEmpresaDoc,
     };
   });
+  const extras = [...porMarca.entries()]
+    .filter(([k]) => !usados.has(k))
+    .map(([, d]) => filaDesdeDetalle(d));
+  return [...otras, ...actualizadas, ...extras];
 }
 
 /** % de descuento como decimal para SAP (ej. 38 → 38.0). */
@@ -622,9 +1030,8 @@ export function armarPayloadSapDiscountGroup(opts: {
   const header =
     opts.filas.find((d) => (d.idClienteDescuento ?? 0) > 0) ?? opts.filas[0];
   const validFor = (header?.ValidFor || "Y").trim().toUpperCase();
-  const active = validFor === "N" || validFor === "NO" || validFor === "0"
-    ? "tNO"
-    : "tYES";
+  const active =
+    validFor === "N" || validFor === "NO" || validFor === "0" ? "tNO" : "tYES";
 
   const lineas = opts.filas
     .map((fila) => {
@@ -734,6 +1141,16 @@ function pickStr(o: Record<string, unknown>, ...keys: string[]): string {
   if (typeof v === "string") return v;
   if (typeof v === "number" && !Number.isNaN(v)) return String(v);
   return "";
+}
+
+function pickNum(o: Record<string, unknown>, ...keys: string[]): number | null {
+  const v = pickRaw(o, ...keys);
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v.replace(",", "."));
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
 }
 
 function tipoPersonaDesdeSap(companyPrivate: string): TipoPersonaCliente | "" {

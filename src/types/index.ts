@@ -10,6 +10,8 @@ export interface User {
   idUsuario: number;
   cardCode: string;
   fullname: string;
+  /** Username de Usuarios; en vendedores coincide con slpName (ej. VTX01). */
+  username?: string | null;
   /** Ruta inicial del rol (desde backend); opcional */
   defaultRoute?: string | null;
 }

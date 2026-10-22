@@ -1,15 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ADDENDA_ESP_FIJA,
   ClienteAltaForm,
   DIAS_VISITA_SAP,
 } from "./clienteAltaUtils";
 import {
+  ID_EMPRESA_CODIAL,
+  ID_EMPRESA_CODIALUB,
+  etiquetaVendedorSap,
   prospectoInputClass,
   prospectoInputClassError,
   prospectoLabelClass,
   prospectoLabelClassError,
 } from "./prospectoFormUtils";
+import type { Vendedores } from "../../services/reportesService";
 import {
   etiquetaSatItem,
   satCatalogoService,
@@ -21,6 +25,10 @@ type Props = {
   onChange: (parcial: Partial<ClienteAltaForm>) => void;
   soloLectura?: boolean;
   camposInvalidos?: Set<string>;
+  idEmpresa?: number | null;
+  catalogoVendedores?: Vendedores[];
+  idVendedorSeleccionado?: number | null;
+  onVendedorSeleccionado?: (idVendedor: number | null) => void;
 };
 
 function Asterisco() {
@@ -43,11 +51,31 @@ export default function TabCamposUsuarioCliente({
   onChange,
   soloLectura = false,
   camposInvalidos,
+  idEmpresa = null,
+  catalogoVendedores = [],
+  idVendedorSeleccionado = null,
+  onVendedorSeleccionado,
 }: Props) {
   const [regimenes, setRegimenes] = useState<SatCatalogoItem[]>([]);
   const [loadingRegimen, setLoadingRegimen] = useState(true);
   const [errorRegimen, setErrorRegimen] = useState<string | null>(null);
   const invalido = (clave: string) => Boolean(camposInvalidos?.has(clave));
+  const vendedoresOpciones = useMemo(() => {
+    const activos = catalogoVendedores.filter((v) => v.activo);
+    if (
+      idVendedorSeleccionado &&
+      !activos.some((v) => v.idVendedor === idVendedorSeleccionado)
+    ) {
+      const extra = catalogoVendedores.find(
+        (v) => v.idVendedor === idVendedorSeleccionado,
+      );
+      if (extra) return [...activos, extra];
+    }
+    return activos;
+  }, [catalogoVendedores, idVendedorSeleccionado]);
+  const vendedorSel =
+    catalogoVendedores.find((v) => v.idVendedor === idVendedorSeleccionado) ??
+    null;
 
   useEffect(() => {
     let cancelled = false;
@@ -276,15 +304,37 @@ export default function TabCamposUsuarioCliente({
             Vendedor SAP
             <Asterisco />
           </label>
-          <input
+          <select
             id="cliente-slp"
-            type="number"
-            min={0}
-            value={datos.salesPersonCode}
-            onChange={(e) => onChange({ salesPersonCode: e.target.value })}
-            placeholder="SlpCode"
+            value={idVendedorSeleccionado ? String(idVendedorSeleccionado) : ""}
+            onChange={(e) => {
+              const id = e.target.value ? Number(e.target.value) : null;
+              onVendedorSeleccionado?.(id && id > 0 ? id : null);
+            }}
+            disabled={soloLectura}
             className={prospectoInputClassError(invalido("salesPersonCode"))}
-          />
+          >
+            <option value="">
+              {vendedoresOpciones.length === 0
+                ? "Cargando vendedores…"
+                : "Seleccione vendedor"}
+            </option>
+            {vendedoresOpciones.map((v) => (
+              <option key={v.idVendedor} value={v.idVendedor}>
+                {etiquetaVendedorSap(v)}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {idEmpresa !== ID_EMPRESA_CODIAL &&
+            idEmpresa !== ID_EMPRESA_CODIALUB
+              ? "Seleccione Codialub o Codial para asignar el SlpCode del vendedor."
+              : vendedorSel
+                ? `${idEmpresa === ID_EMPRESA_CODIAL ? "SlpCode Codial" : "SlpCode Codialub"}: ${
+                    datos.salesPersonCode || "—"
+                  }`
+                : "Si no es vendedor, elija a quién pertenecerá el cliente."}
+          </p>
         </div>
       </div>
     </fieldset>

@@ -20,6 +20,153 @@ export type TabCreacionClienteId = (typeof TABS_CREACION_CLIENTE)[number]["id"];
 export const ID_EMPRESA_CODIALUB = 1;
 export const ID_EMPRESA_CODIAL = 2;
 
+export type VendedorSapRef = {
+  idVendedor: number;
+  slpName?: string | null;
+  nombre?: string | null;
+  salesPersonCode?: number | null;
+  salesPersonCode2?: number | null;
+  idUsuarioPrizma?: number | null;
+  idUsuarioPrizma2?: number | null;
+  activo?: boolean;
+};
+
+/** Codialub → salesPersonCode; Codial → salesPersonCode2. Vacío si no hay SlpCode. */
+export function salesPersonCodeSegunEmpresa(
+  vendedor: VendedorSapRef | null | undefined,
+  idEmpresa: number | null | undefined,
+): string {
+  if (!vendedor || idEmpresa == null) return "";
+  const empresa = Number(idEmpresa);
+  const code =
+    empresa === ID_EMPRESA_CODIAL
+      ? vendedor.salesPersonCode2
+      : empresa === ID_EMPRESA_CODIALUB
+        ? vendedor.salesPersonCode
+        : null;
+  return code != null && Number(code) > 0 ? String(code) : "";
+}
+
+export function vendedorPorIdUsuario<T extends VendedorSapRef>(
+  lista: T[],
+  idUsuario: number | null | undefined,
+): T | null {
+  if (!idUsuario || idUsuario <= 0) return null;
+  return (
+    lista.find(
+      (v) =>
+        v.idUsuarioPrizma === idUsuario || v.idUsuarioPrizma2 === idUsuario,
+    ) ?? null
+  );
+}
+
+/** El username de Usuarios coincide con slpName del catálogo (ej. VTX01). */
+export function vendedorPorUsername<T extends VendedorSapRef>(
+  lista: T[],
+  username: string | null | undefined,
+): T | null {
+  const clave = (username ?? "").trim().toLowerCase();
+  if (!clave) return null;
+  return (
+    lista.find((v) => (v.slpName ?? "").trim().toLowerCase() === clave) ?? null
+  );
+}
+
+export function vendedorPorSalesPersonCode<T extends VendedorSapRef>(
+  lista: T[],
+  codigo: string | number | null | undefined,
+  idEmpresa?: number | null,
+): T | null {
+  const code = Number(codigo);
+  if (!code || Number.isNaN(code)) return null;
+  const empresa = idEmpresa != null ? Number(idEmpresa) : null;
+  return (
+    lista.find((v) => {
+      if (empresa === ID_EMPRESA_CODIAL) return Number(v.salesPersonCode2) === code;
+      if (empresa === ID_EMPRESA_CODIALUB) return Number(v.salesPersonCode) === code;
+      return (
+        Number(v.salesPersonCode) === code || Number(v.salesPersonCode2) === code
+      );
+    }) ?? null
+  );
+}
+
+/** CardCode de Codialub (quita la C extra de Codial: CC002899 → C002899). */
+export function cardCodeBaseCodialub(
+  cardCode: string | null | undefined,
+): string {
+  const c = (cardCode ?? "").trim().toUpperCase();
+  if (!c) return "";
+  return c.startsWith("CC") ? c.slice(1) : c;
+}
+
+/** CardCode Codial = C + CardCode Codialub (C002899 → CC002899). */
+export function cardCodeParaCodial(
+  cardCodeCodialub: string | null | undefined,
+): string {
+  const base = cardCodeBaseCodialub(cardCodeCodialub);
+  if (!base) return "";
+  return `C${base}`;
+}
+
+/** Empresas ya enviadas a SAP, inferidas del estatus y del CardCode. */
+export function empresasSapEnviadasDesdeCliente(opts: {
+  estatusSap?: string | null;
+  cardCode?: string | null;
+}): number[] {
+  const enviado =
+    (opts.estatusSap ?? "").trim().toLowerCase() === "enviado";
+  if (!enviado) return [];
+  const code = (opts.cardCode ?? "").trim().toUpperCase();
+  if (code.startsWith("CC")) {
+    return [ID_EMPRESA_CODIALUB, ID_EMPRESA_CODIAL];
+  }
+  return [ID_EMPRESA_CODIALUB];
+}
+
+export function descuentoEnviadoSap(
+  estatusSync?: string | null,
+  absEntry?: number | null,
+): boolean {
+  const estatus = (estatusSync ?? "").trim().toLowerCase();
+  return estatus === "enviado" || (absEntry ?? 0) > 0;
+}
+
+/** Codialub=1, Codial=2. Si falta idEmpresa, se infiere por CardCode (CC… → Codial). */
+export function idEmpresaDescuentoDesdeDoc(opts: {
+  idEmpresa?: number | null;
+  cardCode?: string | null;
+}): number | null {
+  if (opts.idEmpresa != null && opts.idEmpresa > 0) return opts.idEmpresa;
+  const code = (opts.cardCode ?? "").trim().toUpperCase();
+  if (code.startsWith("CC")) return ID_EMPRESA_CODIAL;
+  if (code.startsWith("C")) return ID_EMPRESA_CODIALUB;
+  return null;
+}
+
+export function empresasDescuentosEnviadasDesdeDocs(
+  docs: Array<{
+    idEmpresa?: number | null;
+    cardCode?: string | null;
+    estatusSync?: string | null;
+    absEntry?: number | null;
+  }>,
+): number[] {
+  const ids = new Set<number>();
+  for (const doc of docs) {
+    if (!descuentoEnviadoSap(doc.estatusSync, doc.absEntry)) continue;
+    ids.add(idEmpresaDescuentoDesdeDoc(doc) ?? ID_EMPRESA_CODIALUB);
+  }
+  return [...ids];
+}
+
+export function etiquetaVendedorSap(vendedor: VendedorSapRef): string {
+  const slp = (vendedor.slpName ?? "").trim();
+  const nombre = (vendedor.nombre ?? "").trim();
+  if (slp && nombre) return `${slp} · ${nombre}`;
+  return nombre || slp || `Vendedor #${vendedor.idVendedor}`;
+}
+
 function normalizarNombreCatalogo(nombre: string): string {
   return nombre
     .trim()

@@ -48,6 +48,11 @@ const isCheckAuthUrl = (url?: string) => {
 type RetryableConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
 api.interceptors.request.use((config) => {
+  const method = (config.method ?? "get").toLowerCase();
+  if (method === "get" || method === "head") {
+    config.headers.delete("Content-Type");
+  }
+
   const fallbackToken = getTokenFallback();
   if (fallbackToken) {
     config.headers.Authorization = `Bearer ${fallbackToken}`;

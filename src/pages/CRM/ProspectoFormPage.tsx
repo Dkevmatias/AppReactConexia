@@ -24,7 +24,9 @@ import {
   camposFaltantesClienteAlta,
   esClienteEnviadoSap,
   armarPayloadDescuentoLocal,
-  aplicarDescuentoApiAFilas,
+  esDescuentoDeEmpresa,
+  mergeDocumentosDescuentoAFilas,
+  partirDocumentosPorEmpresaDetalle,
   type ClienteAltaForm,
   type ContactoClienteForm,
   type DireccionClienteForm,
@@ -37,6 +39,16 @@ import {
   prepararPayload,
   valoresDefectoNuevoProspecto,
   esCorreoValido,
+  salesPersonCodeSegunEmpresa,
+  vendedorPorIdUsuario,
+  vendedorPorSalesPersonCode,
+  vendedorPorUsername,
+  cardCodeBaseCodialub,
+  cardCodeParaCodial,
+  empresasSapEnviadasDesdeCliente,
+  empresasDescuentosEnviadasDesdeDocs,
+  ID_EMPRESA_CODIAL,
+  ID_EMPRESA_CODIALUB,
 } from "../../components/CRM/prospectoFormUtils";
 import {
   crmService,
@@ -50,11 +62,26 @@ import { LeadPayload, leadsService, normalizeLead } from "../../services/leadsSe
 import { useAuth } from "../../hooks/useAuth";
 import { useModalAlerta } from "../../hooks/useModalAlerta";
 import { clienteService } from "../../services/clienteService";
-import { getContextoOperativoPersona } from "../../services/authService";
+import {
+  getContextoOperativoPersona,
+  getUsuarioPorId,
+} from "../../services/authService";
 import {
   activityTimelineService,
   type ActivityTimelineItem,
 } from "../../services/activityTimelineService";
+import {
+  getReportesService,
+  type Vendedores,
+} from "../../services/reportesService";
+
+async function cargarMarcasCatalogo() {
+  try {
+    return await getReportesService.getMarcas();
+  } catch {
+    return [];
+  }
+}
 
 export default function ProspectoFormPage() {
   const { idLead: idLeadParam } = useParams<{ idLead?: string }>();
@@ -82,6 +109,7 @@ export default function ProspectoFormPage() {
   const [mensajeOk, setMensajeOk] = useState<string | null>(null);
   const [jsonSapVisible, setJsonSapVisible] = useState(false);
   const [enviandoSap, setEnviandoSap] = useState(false);
+  const [validandoCardCode, setValidandoCardCode] = useState(false);
   const [mensajeEnvioSap, setMensajeEnvioSap] = useState<string | null>(null);
   const [errorEnvioSap, setErrorEnvioSap] = useState<string | null>(null);
   const [jsonSapDescuentosVisible, setJsonSapDescuentosVisible] = useState(false);
@@ -95,12 +123,33 @@ export default function ProspectoFormPage() {
   const [actividades, setActividades] = useState<ActivityTimelineItem[]>([]);
   const [loadingActividades, setLoadingActividades] = useState(false);
   const [mostrarErroresCliente, setMostrarErroresCliente] = useState(false);
+  const [catalogoVendedores, setCatalogoVendedores] = useState<Vendedores[]>(
+    [],
+  );
+  const [idVendedorSeleccionado, setIdVendedorSeleccionado] = useState<
+    number | null
+  >(null);
+  const [usernameSesion, setUsernameSesion] = useState<string | null>(null);
+  const [empresasEnviadasSap, setEmpresasEnviadasSap] = useState<number[]>([]);
+  const [cardCodeCodialub, setCardCodeCodialub] = useState("");
+  const [idEmpresaDescuentos, setIdEmpresaDescuentos] = useState<
+    number | null
+  >(null);
+  const [empresasEnviadasDescuentos, setEmpresasEnviadasDescuentos] =
+    useState<number[]>([]);
 
   const clienteYaEnviadoSap = esClienteEnviadoSap(clienteEstatusSap);
   // TODO(pruebas): restaurar → clienteYaEnviadoSap && !permisoActivo(..., PERMISO_CLIENTE_EDITAR_POST_SAP)
   const clienteSoloLectura = false;
+  const empresaDestinoSap =
+    form.idEmpresa && form.idEmpresa > 0 ? form.idEmpresa : null;
+  const empresaDestinoYaEnviada =
+    empresaDestinoSap != null &&
+    empresasEnviadasSap.includes(empresaDestinoSap);
   const puedeEnviarASap =
-    clienteGuardadoId != null && !clienteYaEnviadoSap;
+    clienteGuardadoId != null &&
+    empresaDestinoSap != null &&
+    !empresaDestinoYaEnviada;
   const camposInvalidosCliente = useMemo(
     () =>
       mostrarErroresCliente
@@ -118,9 +167,14 @@ export default function ProspectoFormPage() {
     setError(null);
 
     setClienteAlta(clienteAltaVacio());
+    setIdVendedorSeleccionado(null);
     setClienteGuardadoId(null);
     setClienteCardCode(null);
     setClienteEstatusSap(null);
+    setEmpresasEnviadasSap([]);
+    setCardCodeCodialub("");
+    setIdEmpresaDescuentos(null);
+    setEmpresasEnviadasDescuentos([]);
     setActividades([]);
     setMostrarErroresCliente(false);
 
@@ -172,6 +226,15 @@ export default function ProspectoFormPage() {
               setClienteGuardadoId(existente.idCliente);
               setClienteCardCode(existente.cardCode);
               setClienteEstatusSap(existente.estatusSap);
+              setEmpresasEnviadasSap(
+                empresasSapEnviadasDesdeCliente({
+                  estatusSap: existente.estatusSap,
+                  cardCode: existente.cardCode,
+                }),
+              );
+              setCardCodeCodialub(
+                cardCodeBaseCodialub(existente.cardCode),
+              );
               const detalle = await clienteService.getById(existente.idCliente);
               const alta = clienteAltaDesdeApi(detalle);
               let contactos = alta.contactos;
@@ -191,8 +254,22 @@ export default function ProspectoFormPage() {
                 const docs = await clienteService.getDescuentos(
                   existente.idCliente,
                 );
-                if (docs[0]) {
-                  descuentos = aplicarDescuentoApiAFilas([], docs[0]);
+                if (docs.length > 0) {
+                  const marcasCatalogo = await cargarMarcasCatalogo();
+                  descuentos = mergeDocumentosDescuentoAFilas(
+                    docs,
+                    [],
+                    undefined,
+                    marcasCatalogo,
+                  );
+                  setEmpresasEnviadasDescuentos(
+                    empresasDescuentosEnviadasDesdeDocs(
+                      partirDocumentosPorEmpresaDetalle(
+                        docs,
+                        marcasCatalogo,
+                      ),
+                    ),
+                  );
                 }
               } catch {
                 /* sin descuentos previos */
@@ -252,6 +329,92 @@ export default function ProspectoFormPage() {
   useEffect(() => {
     void cargar();
   }, [cargar]);
+
+  const vendedorSesion = useMemo(
+    () =>
+      vendedorPorUsername(catalogoVendedores, usernameSesion) ??
+      vendedorPorIdUsuario(catalogoVendedores, user?.idUsuario),
+    [catalogoVendedores, usernameSesion, user?.idUsuario],
+  );
+
+  const aplicarVendedorSeleccionado = useCallback(
+    (idVendedor: number | null, idEmpresa: number | null | undefined) => {
+      const vendedor =
+        catalogoVendedores.find((v) => v.idVendedor === idVendedor) ?? null;
+      const code = salesPersonCodeSegunEmpresa(vendedor, idEmpresa);
+      setClienteAlta((prev) =>
+        prev.salesPersonCode === code
+          ? prev
+          : { ...prev, salesPersonCode: code },
+      );
+    },
+    [catalogoVendedores],
+  );
+
+  useEffect(() => {
+    let cancelado = false;
+    void (async () => {
+      try {
+        const lista = await getReportesService.getVendedoresPrizma();
+        if (!cancelado) setCatalogoVendedores(lista);
+      } catch {
+        if (!cancelado) setCatalogoVendedores([]);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const idUsuario = user?.idUsuario;
+    if (!idUsuario) {
+      setUsernameSesion(null);
+      return;
+    }
+    if (user?.username) setUsernameSesion(user.username);
+    let cancelado = false;
+    void (async () => {
+      const usuario = await getUsuarioPorId(idUsuario);
+      if (!cancelado && usuario?.username) {
+        setUsernameSesion(usuario.username);
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [user?.idUsuario, user?.username]);
+
+  useEffect(() => {
+    if (loading || clienteSoloLectura) return;
+
+    let id = idVendedorSeleccionado;
+    if (!id) {
+      const porCodigo = vendedorPorSalesPersonCode(
+        catalogoVendedores,
+        clienteAlta.salesPersonCode,
+        form.idEmpresa,
+      );
+      if (porCodigo) id = porCodigo.idVendedor;
+    }
+    if (!id && vendedorSesion) id = vendedorSesion.idVendedor;
+
+    if (id && id !== idVendedorSeleccionado) {
+      setIdVendedorSeleccionado(id);
+    }
+
+    if (!form.idEmpresa || !id) return;
+    aplicarVendedorSeleccionado(id, form.idEmpresa);
+  }, [
+    loading,
+    clienteSoloLectura,
+    catalogoVendedores,
+    vendedorSesion,
+    form.idEmpresa,
+    idVendedorSeleccionado,
+    clienteAlta.salesPersonCode,
+    aplicarVendedorSeleccionado,
+  ]);
 
   const recargarActividades = useCallback(async () => {
     if (!idLead || idLead <= 0) {
@@ -451,6 +614,18 @@ export default function ProspectoFormPage() {
     actualizarClienteAlta({ direcciones: persistidas });
   };
 
+  const cardCodeDescuentosParaEmpresa = (
+    idEmpresa: number | null | undefined,
+  ) => {
+    if (idEmpresa === ID_EMPRESA_CODIAL) {
+      return cardCodeParaCodial(cardCodeCodialub || clienteCardCode);
+    }
+    return (
+      cardCodeBaseCodialub(cardCodeCodialub || clienteCardCode) ||
+      (clienteCardCode ?? "").trim()
+    );
+  };
+
   const guardarDescuentosDesdeTab = async () => {
     if (!clienteGuardadoId) {
       throw new Error(
@@ -461,8 +636,21 @@ export default function ProspectoFormPage() {
     const contexto = user?.idPersona
       ? await getContextoOperativoPersona(user.idPersona)
       : null;
+    if (!idEmpresaDescuentos) {
+      throw new Error(
+        "Seleccione Codialub o Codial en la pestaña Descuentos.",
+      );
+    }
+    if (!empresasEnviadasSap.includes(idEmpresaDescuentos)) {
+      throw new Error(
+        idEmpresaDescuentos === ID_EMPRESA_CODIAL
+          ? "Envíe primero el cliente a Codial."
+          : "Envíe primero el cliente a Codialub.",
+      );
+    }
     const payload = armarPayloadDescuentoLocal(clienteAlta.descuentos, {
       idCliente: clienteGuardadoId,
+      idEmpresa: idEmpresaDescuentos,
       idSucursal: contexto?.idSucursal ?? null,
       idLeadOrigen: idLead,
       idUsuario: user?.idUsuario ?? null,
@@ -472,8 +660,25 @@ export default function ProspectoFormPage() {
       clienteGuardadoId,
       payload,
     );
+    let recargado: Awaited<ReturnType<typeof clienteService.getDescuentos>> =
+      [];
+    try {
+      recargado = await clienteService.getDescuentos(clienteGuardadoId);
+    } catch {
+      recargado = [];
+    }
+    const docs =
+      recargado.length > 0
+        ? recargado
+        : [{ ...saved, idEmpresa: idEmpresaDescuentos }];
+    const marcasCatalogo = await cargarMarcasCatalogo();
     actualizarClienteAlta({
-      descuentos: aplicarDescuentoApiAFilas(clienteAlta.descuentos, saved),
+      descuentos: mergeDocumentosDescuentoAFilas(
+        docs,
+        clienteAlta.descuentos,
+        idEmpresaDescuentos,
+        marcasCatalogo,
+      ),
     });
     setMensajeOk(
       saved.detalles.length === 1
@@ -490,39 +695,98 @@ export default function ProspectoFormPage() {
   };
 
   const enviarDescuentosSapDesdeTab = async () => {
-    const code = (clienteCardCode || cardCodeDraft || "").trim();
-    if (!code) {
-      throw new Error(
-        "Asigne un CardCode al cliente antes de enviar los descuentos a SAP.",
-      );
-    }
     if (!clienteGuardadoId) {
       throw new Error("Guarde el cliente en el CRM primero.");
     }
+    if (!idEmpresaDescuentos) {
+      throw new Error(
+        "Seleccione Codialub o Codial en la pestaña Descuentos.",
+      );
+    }
+    if (empresasEnviadasDescuentos.includes(idEmpresaDescuentos)) {
+      throw new Error("Los descuentos de esta sociedad ya fueron enviados a SAP.");
+    }
+    if (!empresasEnviadasSap.includes(idEmpresaDescuentos)) {
+      throw new Error(
+        idEmpresaDescuentos === ID_EMPRESA_CODIAL
+          ? "Envíe primero el cliente a Codial."
+          : "Envíe primero el cliente a Codialub.",
+      );
+    }
+    if (
+      idEmpresaDescuentos === ID_EMPRESA_CODIAL &&
+      !empresasEnviadasDescuentos.includes(ID_EMPRESA_CODIALUB)
+    ) {
+      throw new Error("Envíe primero los descuentos a Codialub.");
+    }
+    const code = cardCodeDescuentosParaEmpresa(idEmpresaDescuentos);
+    if (!code) {
+      throw new Error(
+        idEmpresaDescuentos === ID_EMPRESA_CODIAL
+          ? "No hay CardCode de Codialub para armar el de Codial."
+          : "El cliente necesita CardCode antes de enviar los descuentos a SAP.",
+      );
+    }
 
     const saved = await guardarDescuentosDesdeTab();
-    if (!saved.idDescuento) {
+    const idDescuento =
+      saved.idDescuento ||
+      clienteAlta.descuentos.find(
+        (d) =>
+          esDescuentoDeEmpresa(d.idEmpresa, idEmpresaDescuentos) &&
+          (d.idClienteDescuento ?? 0) > 0,
+      )?.idClienteDescuento ||
+      0;
+    if (!idDescuento) {
       throw new Error("No se obtuvo el descuento guardado para enviar a SAP.");
     }
-    if (saved.detalles.length === 0) {
+    const detallesEmpresa = (saved.detalles ?? []).filter((d) =>
+      esDescuentoDeEmpresa(d.idEmpresa, idEmpresaDescuentos),
+    );
+    if (detallesEmpresa.length === 0 && (saved.detalles ?? []).length === 0) {
       throw new Error(
         "Capture al menos un porcentaje de marca mayor a 0 antes de enviar a SAP.",
       );
     }
 
-    const result = await clienteService.enviarDescuentosASap(saved.idDescuento);
-    const recargado = await clienteService.getDescuentos(clienteGuardadoId);
+    const result = await clienteService.enviarDescuentosASap(
+      idDescuento,
+      idEmpresaDescuentos,
+    );
+    let recargado: Awaited<ReturnType<typeof clienteService.getDescuentos>> =
+      [];
+    try {
+      recargado = await clienteService.getDescuentos(clienteGuardadoId);
+    } catch {
+      recargado = [];
+    }
+    const enviado: typeof saved = {
+      ...saved,
+      idEmpresa: saved.idEmpresa || idEmpresaDescuentos,
+      estatusSync: result.estatusSync || saved.estatusSync || "Enviado",
+      absEntry: result.absEntry || saved.absEntry,
+    };
+    const docs = recargado.length > 0 ? recargado : [enviado];
+    const marcasCatalogo = await cargarMarcasCatalogo();
     actualizarClienteAlta({
-      descuentos: aplicarDescuentoApiAFilas(
+      descuentos: mergeDocumentosDescuentoAFilas(
+        docs,
         clienteAlta.descuentos,
-        recargado[0] ?? {
-          ...saved,
-          absEntry: result.absEntry || saved.absEntry,
-          estatusSync: result.estatusSync || saved.estatusSync,
-        },
+        idEmpresaDescuentos,
+        marcasCatalogo,
       ),
     });
-    setMensajeOk(result.mensaje || "Descuento enviado a SAP.");
+    setEmpresasEnviadasDescuentos((prev) =>
+      prev.includes(idEmpresaDescuentos)
+        ? prev
+        : [...prev, idEmpresaDescuentos],
+    );
+    setMensajeOk(
+      result.mensaje ||
+        `Descuento enviado a SAP ${
+          idEmpresaDescuentos === ID_EMPRESA_CODIAL ? "Codial" : "Codialub"
+        }.`,
+    );
     return result;
   };
 
@@ -551,7 +815,22 @@ export default function ProspectoFormPage() {
     if (!esEtapaCliente(form.idEtapa, etapas)) return false;
     if (clienteSoloLectura) return false;
 
-    const resultado = validarClienteAlta(clienteAlta);
+    const idEmpresa = form.idEmpresa && form.idEmpresa > 0 ? form.idEmpresa : 0;
+    const vendedorSel =
+      catalogoVendedores.find((v) => v.idVendedor === idVendedorSeleccionado) ??
+      vendedorSesion;
+    const slpDelVendedor = salesPersonCodeSegunEmpresa(
+      vendedorSel,
+      idEmpresa,
+    );
+    const formCliente = slpDelVendedor
+      ? { ...clienteAlta, salesPersonCode: slpDelVendedor }
+      : clienteAlta;
+    if (slpDelVendedor && clienteAlta.salesPersonCode !== slpDelVendedor) {
+      actualizarClienteAlta({ salesPersonCode: slpDelVendedor });
+    }
+
+    const resultado = validarClienteAlta(formCliente);
     if (resultado.mensaje) {
       setMostrarErroresCliente(true);
       throw new Error(resultado.mensaje);
@@ -561,7 +840,6 @@ export default function ProspectoFormPage() {
     const contexto = user?.idPersona
       ? await getContextoOperativoPersona(user.idPersona)
       : null;
-    const idEmpresa = form.idEmpresa && form.idEmpresa > 0 ? form.idEmpresa : 0;
     if (!idEmpresa) {
       throw new Error(
         "Seleccione Codialub o Codial para indicar en qué base se guardará el cliente.",
@@ -595,7 +873,7 @@ export default function ProspectoFormPage() {
       await clienteService.actualizar(
         existente.idCliente,
         armarPayloadClienteUpdate({
-          form: clienteAlta,
+          form: formCliente,
           idEmpresa,
           idSucursal: contexto?.idSucursal ?? null,
           idLeadOrigen: idLeadGuardado,
@@ -617,7 +895,7 @@ export default function ProspectoFormPage() {
 
     const creado = await clienteService.crear(
       armarPayloadClienteCreate({
-        form: clienteAlta,
+        form: formCliente,
         idEmpresa,
         idSucursal: contexto?.idSucursal ?? null,
         idLeadOrigen: idLeadGuardado,
@@ -765,36 +1043,134 @@ export default function ProspectoFormPage() {
     2,
   );
 
-  const cardCodeDescuentos = (clienteCardCode || cardCodeDraft || "").trim();
+  const cardCodeDescuentos = cardCodeDescuentosParaEmpresa(
+    idEmpresaDescuentos,
+  );
+  const filasDescuentosEmpresa = idEmpresaDescuentos
+    ? clienteAlta.descuentos.filter((d) =>
+        esDescuentoDeEmpresa(d.idEmpresa, idEmpresaDescuentos),
+      )
+    : [];
   const jsonSapDescuentosPreview = stringifyPayloadSapDiscountGroup(
     armarPayloadSapDiscountGroup({
       cardCode: cardCodeDescuentos,
-      filas: clienteAlta.descuentos,
+      filas: filasDescuentosEmpresa,
     }),
   );
   const puedeEnviarDescuentosASap =
     clienteGuardadoId != null &&
+    idEmpresaDescuentos != null &&
+    !empresasEnviadasDescuentos.includes(idEmpresaDescuentos) &&
+    empresasEnviadasSap.includes(idEmpresaDescuentos) &&
+    (idEmpresaDescuentos !== ID_EMPRESA_CODIAL ||
+      empresasEnviadasDescuentos.includes(ID_EMPRESA_CODIALUB)) &&
     cardCodeDescuentos.length > 0 &&
-    clienteAlta.descuentos.some((d) => {
+    filasDescuentosEmpresa.some((d) => {
       const n = Number(
         (d.DiscRel || d.porcentaje || "").toString().replace(",", "."),
       );
       return Number.isFinite(n) && n > 0 && (d.ObjCode || "").trim().length > 0;
     });
 
+  useEffect(() => {
+    if (!clienteGuardadoId || !idEmpresaDescuentos) return;
+    let cancelled = false;
+    const recargar = async () => {
+      try {
+        const docs = await clienteService.getDescuentos(clienteGuardadoId);
+        if (cancelled || docs.length === 0) return;
+        const marcasCatalogo = await cargarMarcasCatalogo();
+        if (cancelled) return;
+        actualizarClienteAlta({
+          descuentos: mergeDocumentosDescuentoAFilas(
+            docs,
+            [],
+            idEmpresaDescuentos,
+            marcasCatalogo,
+          ),
+        });
+        setEmpresasEnviadasDescuentos(
+          empresasDescuentosEnviadasDesdeDocs(
+            partirDocumentosPorEmpresaDetalle(docs, marcasCatalogo),
+          ),
+        );
+      } catch {
+        /* se mantienen los descuentos ya cargados */
+      }
+    };
+    void recargar();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clienteGuardadoId, idEmpresaDescuentos]);
+
+  useEffect(() => {
+    if (form.idEmpresa !== ID_EMPRESA_CODIAL) return;
+    const origen = cardCodeCodialub || cardCodeBaseCodialub(clienteCardCode);
+    const prefixed = cardCodeParaCodial(origen);
+    if (!prefixed) return;
+    setCardCodeDraft((prev) =>
+      prev.trim().toUpperCase() === prefixed ? prev : prefixed,
+    );
+  }, [form.idEmpresa, cardCodeCodialub, clienteCardCode]);
+
   const abrirModalSap = () => {
     if (!puedeEnviarASap) return;
     setMensajeEnvioSap(null);
     setErrorEnvioSap(null);
-    setCardCodeDraft((clienteCardCode ?? "").trim());
+    if (form.idEmpresa === ID_EMPRESA_CODIAL) {
+      setCardCodeDraft(
+        cardCodeParaCodial(cardCodeCodialub || clienteCardCode),
+      );
+    } else {
+      setCardCodeDraft((clienteCardCode ?? "").trim());
+    }
     setJsonSapVisible(true);
   };
 
+  const validarCardCodeSap = async () => {
+    setValidandoCardCode(true);
+    setErrorEnvioSap(null);
+    setMensajeEnvioSap(null);
+    try {
+      const code = await clienteService.getUltimoCardCode();
+      setCardCodeDraft(code);
+    } catch (err) {
+      setErrorEnvioSap(
+        err instanceof Error
+          ? err.message
+          : "No se pudo consultar el CardCode en SAP.",
+      );
+    } finally {
+      setValidandoCardCode(false);
+    }
+  };
+
   const enviarClienteASap = async () => {
-    if (!clienteGuardadoId || clienteYaEnviadoSap) return;
-    const code = cardCodeDraft.trim().toUpperCase();
+    if (!clienteGuardadoId) return;
+    const idEmpresa = form.idEmpresa && form.idEmpresa > 0 ? form.idEmpresa : 0;
+    if (!idEmpresa) {
+      setErrorEnvioSap("Seleccione Codialub o Codial para enviar a SAP.");
+      return;
+    }
+    if (empresasEnviadasSap.includes(idEmpresa)) {
+      setErrorEnvioSap("Esta empresa ya fue enviada a SAP.");
+      return;
+    }
+
+    let code = cardCodeDraft.trim().toUpperCase();
+    if (idEmpresa === ID_EMPRESA_CODIAL) {
+      code =
+        cardCodeParaCodial(cardCodeCodialub || clienteCardCode) || code;
+      setCardCodeDraft(code);
+    }
     if (!code) {
-      setErrorEnvioSap("Indique el CardCode antes de enviar.");
+      setErrorEnvioSap(
+        idEmpresa === ID_EMPRESA_CODIAL
+          ? "No hay CardCode de Codialub para armar el de Codial."
+          : "Valide el CardCode en SAP antes de enviar.",
+      );
       return;
     }
     if (code.length > 15) {
@@ -806,6 +1182,37 @@ export default function ProspectoFormPage() {
     setErrorEnvioSap(null);
     setMensajeEnvioSap(null);
     try {
+      const vendedorSel =
+        catalogoVendedores.find(
+          (v) => v.idVendedor === idVendedorSeleccionado,
+        ) ?? vendedorSesion;
+      const slp = salesPersonCodeSegunEmpresa(vendedorSel, idEmpresa);
+      const formCliente = slp
+        ? { ...clienteAlta, salesPersonCode: slp }
+        : clienteAlta;
+      if (slp && clienteAlta.salesPersonCode !== slp) {
+        actualizarClienteAlta({ salesPersonCode: slp });
+      }
+
+      if (idLead) {
+        const contexto = user?.idPersona
+          ? await getContextoOperativoPersona(user.idPersona)
+          : null;
+        await clienteService.actualizar(
+          clienteGuardadoId,
+          armarPayloadClienteUpdate({
+            form: formCliente,
+            idEmpresa,
+            idSucursal: contexto?.idSucursal ?? null,
+            idLeadOrigen: idLead,
+            idUsuarioActualizacion: user?.idUsuario ?? null,
+            groupCode:
+              gruposSAP.find((g) => g.idGrupo === form.idGrupo)?.groupCode ??
+              null,
+          }),
+        );
+      }
+
       if (code !== (clienteCardCode ?? "").trim().toUpperCase()) {
         const asignado = await clienteService.asignarCardCode(
           clienteGuardadoId,
@@ -815,18 +1222,30 @@ export default function ProspectoFormPage() {
         setCardCodeDraft(asignado.cardCode ?? code);
       }
 
-      const result = await clienteService.enviarASap(clienteGuardadoId);
+      const result = await clienteService.enviarASap(
+        clienteGuardadoId,
+        idEmpresa,
+      );
+      const nombreEmpresa =
+        idEmpresa === ID_EMPRESA_CODIAL ? "Codial" : "Codialub";
       const texto =
         result.mensaje ||
         (result.accion === "Updated"
-          ? "Cliente actualizado en SAP."
-          : "Cliente creado en SAP.");
+          ? `Cliente actualizado en SAP ${nombreEmpresa}.`
+          : `Cliente creado en SAP ${nombreEmpresa}.`);
       setMensajeEnvioSap(texto);
       setMensajeOk(texto);
-      if (result.cardCode) {
-        setClienteCardCode(result.cardCode);
-        setCardCodeDraft(result.cardCode);
+      const codeFinal = (result.cardCode || code).trim().toUpperCase();
+      if (codeFinal) {
+        setClienteCardCode(codeFinal);
+        setCardCodeDraft(codeFinal);
       }
+      if (idEmpresa === ID_EMPRESA_CODIALUB) {
+        setCardCodeCodialub(cardCodeBaseCodialub(codeFinal));
+      }
+      setEmpresasEnviadasSap((prev) =>
+        prev.includes(idEmpresa) ? prev : [...prev, idEmpresa],
+      );
       setClienteEstatusSap(
         result.estatusSap?.trim() || "Enviado",
       );
@@ -897,6 +1316,12 @@ export default function ProspectoFormPage() {
               gruposSAP={gruposSAP}
               clienteAlta={clienteAlta}
               onClienteAltaChange={actualizarClienteAlta}
+              catalogoVendedores={catalogoVendedores}
+              idVendedorSeleccionado={idVendedorSeleccionado}
+              onVendedorSeleccionado={(idVendedor) => {
+                setIdVendedorSeleccionado(idVendedor);
+                aplicarVendedorSeleccionado(idVendedor, form.idEmpresa);
+              }}
               clienteExistente={clienteGuardadoId != null}
               etapaBloqueada={clienteGuardadoId != null}
               onGuardarContactos={guardarContactosDesdeModal}
@@ -905,7 +1330,9 @@ export default function ProspectoFormPage() {
                 await guardarDescuentosDesdeTab();
               }}
               onEnviarDescuentosSap={abrirModalSapDescuentos}
-              cardCodeCliente={clienteCardCode || cardCodeDraft}
+              cardCodeCliente={
+                cardCodeDescuentos || clienteCardCode || cardCodeDraft
+              }
               actividades={actividades}
               loadingActividades={loadingActividades}
               idLead={idLead && idLead > 0 ? idLead : null}
@@ -918,10 +1345,18 @@ export default function ProspectoFormPage() {
               }}
               clienteSoloLectura={clienteSoloLectura}
               camposInvalidosCliente={camposInvalidosCliente}
+              empresasEnviadasSap={empresasEnviadasSap}
+              idEmpresaDescuentos={idEmpresaDescuentos}
+              onIdEmpresaDescuentosChange={setIdEmpresaDescuentos}
+              empresasEnviadasDescuentos={empresasEnviadasDescuentos}
               avisoClienteSap={
-                clienteYaEnviadoSap
-                  ? `Cliente enviado a SAP${clienteCardCode ? ` (${clienteCardCode})` : ""}. Edición temporalmente habilitada para pruebas; el reenvío sigue deshabilitado.`
-                  : null
+                empresasEnviadasSap.includes(ID_EMPRESA_CODIALUB) &&
+                !empresasEnviadasSap.includes(ID_EMPRESA_CODIAL)
+                  ? `Enviado a Codialub${cardCodeCodialub ? ` (${cardCodeCodialub})` : ""}. Active Codial para enviar a esa sociedad.`
+                  : empresasEnviadasSap.includes(ID_EMPRESA_CODIALUB) &&
+                      empresasEnviadasSap.includes(ID_EMPRESA_CODIAL)
+                    ? `Cliente enviado a Codialub y Codial${clienteCardCode ? ` (${clienteCardCode})` : ""}.`
+                    : null
               }
             />
 
@@ -939,15 +1374,17 @@ export default function ProspectoFormPage() {
                 onClick={abrirModalSap}
                 disabled={!puedeEnviarASap}
                 title={
-                  clienteYaEnviadoSap
-                    ? "Este cliente ya fue enviado a SAP"
-                    : clienteGuardadoId
-                      ? "Revisar y enviar el cliente a SAP"
-                      : "Guarde el cliente en CRM primero"
+                  !clienteGuardadoId
+                    ? "Guarde el cliente en CRM primero"
+                    : !empresaDestinoSap
+                      ? "Seleccione Codialub o Codial"
+                      : empresaDestinoYaEnviada
+                        ? "Esta empresa ya fue enviada a SAP"
+                        : "Revisar y enviar el cliente a SAP"
                 }
                 className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
               >
-                {clienteYaEnviadoSap ? "Enviado a SAP" : "Enviar a SAP"}
+                {empresaDestinoYaEnviada ? "Enviado a SAP" : "Enviar a SAP"}
               </button>
               <button
                 type="button"
@@ -978,7 +1415,16 @@ export default function ProspectoFormPage() {
         enviando={enviandoSap}
         puedeEnviar={puedeEnviarASap}
         cardCode={cardCodeDraft}
-        onCardCodeChange={setCardCodeDraft}
+        onValidarCardCode={() => void validarCardCodeSap()}
+        validandoCardCode={validandoCardCode}
+        mostrarValidarCardCode={form.idEmpresa !== ID_EMPRESA_CODIAL}
+        etiquetaEmpresa={
+          form.idEmpresa === ID_EMPRESA_CODIAL
+            ? "Codial"
+            : form.idEmpresa === ID_EMPRESA_CODIALUB
+              ? "Codialub"
+              : null
+        }
         mensaje={mensajeEnvioSap}
         errorEnvio={errorEnvioSap}
       />
@@ -992,6 +1438,13 @@ export default function ProspectoFormPage() {
         enviando={enviandoSapDescuentos}
         puedeEnviar={puedeEnviarDescuentosASap}
         cardCode={cardCodeDescuentos}
+        etiquetaEmpresa={
+          idEmpresaDescuentos === ID_EMPRESA_CODIAL
+            ? "Codial"
+            : idEmpresaDescuentos === ID_EMPRESA_CODIALUB
+              ? "Codialub"
+              : null
+        }
         mensaje={mensajeEnvioSapDescuentos}
         errorEnvio={errorEnvioSapDescuentos}
       />

@@ -11,6 +11,7 @@ import {
 } from "../../../services/reportesService";
 import ReactApexChart from "react-apexcharts";
 import { formatCurrency, formatNumber } from "../../../utils/format";
+import TablaScroll from "../../../components/reportes/TablaScroll";
 
 interface ReportesDashboardProps {
   fechaInicio: string;
@@ -257,10 +258,11 @@ export default function ReportesDashboard({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <div className="min-w-0 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Ventas por Marca</h3>
           {ventasMarca.length > 0 ? (
-            <table className="w-full text-sm">
+            <TablaScroll>
+            <table className="w-full min-w-[28rem] text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-3 py-2 text-left">Marca</th>
@@ -293,6 +295,7 @@ export default function ReportesDashboard({
                 </tr>
               </tfoot>
             </table>
+            </TablaScroll>
           ) : (
             <p className="text-center text-gray-500 py-10">
               No hay datos de marcas
@@ -300,7 +303,7 @@ export default function ReportesDashboard({
           )}
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <div className="min-w-0 overflow-x-auto bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Ventas por Almacén</h3>
           {ventasAlmacen.length > 0 ? (
             <ReactApexChart
@@ -332,9 +335,10 @@ export default function ReportesDashboard({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <div className="min-w-0 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Top 10 Clientes</h3>
-          <table className="w-full text-sm">
+          <TablaScroll>
+          <table className="w-full min-w-[22rem] text-sm">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th className="px-3 py-2 text-left">Cliente</th>
@@ -362,11 +366,13 @@ export default function ReportesDashboard({
               </tfoot>
             ) : null}
           </table>
+          </TablaScroll>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <div className="min-w-0 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Top 10 Productos</h3>
-          <table className="w-full text-sm">
+          <TablaScroll>
+          <table className="w-full min-w-[28rem] text-sm">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th className="px-3 py-2 text-left">Producto</th>
@@ -403,6 +409,7 @@ export default function ReportesDashboard({
               </tfoot>
             ) : null}
           </table>
+          </TablaScroll>
         </div>
       </div>
     </div>

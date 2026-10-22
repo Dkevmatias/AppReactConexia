@@ -8,6 +8,7 @@ import {
   TipoMetricaCumplimiento,
 } from "../../../services/reportesService";
 import { formatCurrency, formatNumber } from "../../../utils/format";
+import TablaScroll from "../../../components/reportes/TablaScroll";
 
 interface ReportesVendedoresProps {
   fechaInicio: string;
@@ -182,12 +183,13 @@ export default function ReportesVendedores({
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <div className="min-w-0 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">
             Cumplimiento de objetivos por marca
           </h3>
           {cumplimientoMarca.length > 0 ? (
-            <table className="w-full text-sm">
+            <TablaScroll>
+            <table className="w-full min-w-[36rem] text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-3 py-2 text-left">Marca</th>
@@ -260,6 +262,7 @@ export default function ReportesVendedores({
                 </tr>
               </tfoot>
             </table>
+            </TablaScroll>
           ) : (
             <p className="text-center text-gray-500 py-10">
               No hay datos de cumplimiento por marca
@@ -313,13 +316,13 @@ export default function ReportesVendedores({
         </div>
         */}
 
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <div className="min-w-0 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">
             Ventas por Marca Detallada
           </h3>
           {ventasMarcaDetalle.length > 0 ? (
-            <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
-              <table className="w-full text-sm">
+            <TablaScroll className="max-h-[420px] overflow-y-auto">
+              <table className="w-full min-w-[28rem] text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
                   <tr>
                     <th className="px-3 py-2 text-left">Vendedor</th>
@@ -355,7 +358,7 @@ export default function ReportesVendedores({
                   </tr>
                 </tfoot>
               </table>
-            </div>
+            </TablaScroll>
           ) : (
             <p className="text-center text-gray-500 py-10">
               No hay datos del detalle por marca
@@ -371,11 +374,12 @@ export default function ReportesVendedores({
         */}
       </div>
 
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+      <div className="min-w-0 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
         <h3 className="text-lg font-semibold mb-4">
           Top 10 Clientes por Ventas
         </h3>
-        <table className="w-full text-sm">
+        <TablaScroll>
+        <table className="w-full min-w-[28rem] text-sm">
           <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
               <th className="px-3 py-2 text-left">Cliente</th>
@@ -410,6 +414,7 @@ export default function ReportesVendedores({
             </tfoot>
           ) : null}
         </table>
+        </TablaScroll>
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import {
   Vendedores,
 } from "../../services/reportesService";
 import { useListadoOperacionesPermisos } from "../../hooks/useListadoOperacionesPermisos";
+import { empresaVisibleEnCombo } from "../../utils/sucursalOperativa";
 
 const inputClass =
   "rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white";
@@ -104,7 +105,11 @@ export default function ListaBitacorasCobranza() {
       setBitacoras(lista);
       setVendedores(vendedoresData ?? []);
       setRutas(rutasData ?? []);
-      setSucursales(sucursalesData ?? []);
+      setSucursales(
+        (sucursalesData ?? []).filter((s) =>
+          empresaVisibleEnCombo(s.idEmpresa),
+        ),
+      );
     } catch (err) {
       console.error(err);
       setError(

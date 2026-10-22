@@ -20,6 +20,7 @@ interface User {
   idSucursal: number;
   cardCode: string;
   fullname: string;
+  username?: string | null;
   defaultRoute?: string | null;
 }
 

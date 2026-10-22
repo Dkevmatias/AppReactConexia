@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   getReportesService,
   Marca,
@@ -22,6 +22,12 @@ interface ReportesFiltersProps {
   onVendedorChange: (value: number | null, nombre: string | null) => void;
   onMarcaChange: (firmName: string | null) => void;
   onFilter: () => void;
+  bloquearVendedor?: boolean;
+  vendedorSesion?: {
+    idUsuario: number;
+    username: string;
+    nombre: string;
+  } | null;
 }
 
 const getYears = () => {
@@ -47,6 +53,8 @@ export default function ReportesFilters({
   onVendedorChange,
   onMarcaChange,
   onFilter,
+  bloquearVendedor = false,
+  vendedorSesion = null,
 }: ReportesFiltersProps) {
   const [tempFechaInicio, setTempFechaInicio] = useState(fechaInicio);
   const [tempFechaFin, setTempFechaFin] = useState(fechaFin);
@@ -66,7 +74,9 @@ export default function ReportesFilters({
     setTempFechaInicio(fechaInicio);
     setTempFechaFin(fechaFin);
     setTempAñoComparar(añoComparar);
-    setTempVendedor(vendedorSeleccionado);
+    if (!bloquearVendedor) {
+      setTempVendedor(vendedorSeleccionado);
+    }
     setTempFirmName(firmNameSeleccionado);
   }, [
     fechaInicio,
@@ -74,6 +84,7 @@ export default function ReportesFilters({
     añoComparar,
     vendedorSeleccionado,
     firmNameSeleccionado,
+    bloquearVendedor,
   ]);
 
   useEffect(() => {
@@ -83,7 +94,8 @@ export default function ReportesFilters({
           getReportesService.getVendedores(),
           getReportesService.getMarcas(),
         ]);
-        setVendedores(vendedoresData || []);
+        const lista = vendedoresData || [];
+        setVendedores(lista);
         setMarcas(marcasData || []);
       } catch (error) {
         console.error("Error cargando datos:", error);
@@ -94,11 +106,67 @@ export default function ReportesFilters({
     cargarDatos();
   }, []);
 
+  const vendedoresOpciones = useMemo(() => {
+    if (!bloquearVendedor || !vendedorSesion) return vendedores;
+    const id = vendedorSesion.idUsuario;
+    const username = (vendedorSesion.username ?? "").trim().toLowerCase();
+    const nombre = (vendedorSesion.nombre ?? "").trim().toLowerCase();
+    const filtrados = vendedores.filter((v) => {
+      if (id > 0 && v.idUsuario === id) return true;
+      const claveUser = (v.username ?? "").trim().toLowerCase();
+      const claveSlp = (v.slpName ?? "").trim().toLowerCase();
+      const claveNombre = (v.nombre ?? "").trim().toLowerCase();
+      return (
+        (username &&
+          (claveUser === username ||
+            claveSlp === username ||
+            claveNombre === username)) ||
+        (nombre &&
+          (claveUser === nombre || claveSlp === nombre || claveNombre === nombre))
+      );
+    });
+    if (filtrados.length > 0) return filtrados;
+    if (!username && !nombre) return [];
+    return [
+      {
+        idUsuario: id > 0 ? id : 0,
+        nombre: vendedorSesion.nombre || vendedorSesion.username,
+        username: vendedorSesion.username,
+        slpName: vendedorSesion.username,
+        email: "",
+        idRol: 0,
+        idPersona: 0,
+        cardCode: "",
+      } satisfies Vendedor,
+    ];
+  }, [bloquearVendedor, vendedorSesion, vendedores]);
+
+  useEffect(() => {
+    if (!bloquearVendedor || vendedoresOpciones.length === 0) return;
+    const unico = vendedoresOpciones[0];
+    const id = unico.idUsuario ?? null;
+    if (id !== tempVendedor) {
+      setTempVendedor(id);
+    }
+    const clave = unico.slpName || unico.username || unico.nombre;
+    if (clave) {
+      onVendedorChange(id, clave);
+    }
+    // onVendedorChange se recrea en cada render del padre; no debe ir en deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bloquearVendedor, vendedoresOpciones, tempVendedor]);
+
   const handleFilter = () => {
-    const vendedor = vendedores.find((v) => v.idUsuario === tempVendedor);
-    const nombreVendedor = vendedor
-      ? (vendedor.slpName ?? vendedor.username)
+    const vendedor =
+      vendedoresOpciones.find((v) => v.idUsuario === tempVendedor) ??
+      vendedores.find((v) => v.idUsuario === tempVendedor);
+    let nombreVendedor = vendedor
+      ? (vendedor.slpName || vendedor.username || vendedor.nombre)
       : null;
+    if (bloquearVendedor && !nombreVendedor) {
+      nombreVendedor =
+        vendedorSesion?.username || vendedorSesion?.nombre || null;
+    }
     onFechaInicioChange(tempFechaInicio);
     onFechaFinChange(tempFechaFin);
     onAñoCompararChange(tempAñoComparar);
@@ -109,8 +177,8 @@ export default function ReportesFilters({
 
   return (
     <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
-      <div className="flex flex-wrap gap-4 items-end">
-        <div>
+      <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end sm:gap-4">
+        <div className="min-w-0 w-full sm:w-auto">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Fecha Inicio
           </label>
@@ -118,9 +186,10 @@ export default function ReportesFilters({
             compact={false}
             value={tempFechaInicio}
             onChange={setTempFechaInicio}
+            className="w-full"
           />
         </div>
-        <div>
+        <div className="min-w-0 w-full sm:w-auto">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Fecha Fin
           </label>
@@ -128,16 +197,17 @@ export default function ReportesFilters({
             compact={false}
             value={tempFechaFin}
             onChange={setTempFechaFin}
+            className="w-full"
           />
         </div>
-        <div>
+        <div className="min-w-0 w-full sm:w-auto">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Comparar con Año
           </label>
           <select
             value={tempAñoComparar}
             onChange={(e) => setTempAñoComparar(Number(e.target.value))}
-            className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
+            className="w-full min-h-[40px] px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 sm:w-auto"
           >
             {years.map((year) => (
               <option key={year} value={year}>
@@ -146,7 +216,7 @@ export default function ReportesFilters({
             ))}
           </select>
         </div>
-        <div>
+        <div className="min-w-0 w-full sm:w-auto">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Vendedor
           </label>
@@ -155,25 +225,27 @@ export default function ReportesFilters({
             onChange={(e) =>
               setTempVendedor(e.target.value ? Number(e.target.value) : null)
             }
-            disabled={loadingVendedores}
-            className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-w-[180px]"
+            disabled={loadingVendedores || bloquearVendedor}
+            className="w-full min-h-[40px] px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 sm:min-w-[180px] disabled:cursor-not-allowed disabled:opacity-80"
           >
-            <option value="">Todos los vendedores</option>
-            {vendedores.map((v) => (
-              <option key={v.idUsuario} value={v.idUsuario}>
-                {v.nombre}
+            {bloquearVendedor ? null : (
+              <option value="">Todos los vendedores</option>
+            )}
+            {vendedoresOpciones.map((v) => (
+              <option key={v.idUsuario || v.username} value={v.idUsuario}>
+                {v.nombre || v.slpName || v.username}
               </option>
             ))}
           </select>
         </div>
-        <div>
+        <div className="min-w-0 w-full sm:w-auto">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Marca
           </label>
           <select
             value={tempFirmName ?? ""}
             onChange={(e) => setTempFirmName(e.target.value || null)}
-            className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-w-[180px]"
+            className="w-full min-h-[40px] px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 sm:min-w-[180px]"
           >
             <option value="">Todas las marcas</option>
             {marcas.map((m) => (
@@ -183,7 +255,7 @@ export default function ReportesFilters({
             ))}
           </select>
         </div>
-        <div>
+        <div className="min-w-0 w-full sm:w-auto">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Métrica
           </label>
@@ -192,7 +264,7 @@ export default function ReportesFilters({
             onChange={(e) =>
               onTipoMetricaChange(e.target.value as TipoMetricaCumplimiento)
             }
-            className="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 min-w-[120px]"
+            className="w-full min-h-[40px] px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 sm:min-w-[120px]"
           >
             <option value="pesos">Pesos</option>
             <option value="ulkp">ULKP</option>
@@ -200,7 +272,7 @@ export default function ReportesFilters({
         </div>
         <button
           onClick={handleFilter}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="w-full min-h-[40px] px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 sm:w-auto"
         >
           Filtrar
         </button>

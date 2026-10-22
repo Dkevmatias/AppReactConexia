@@ -62,7 +62,8 @@ export default function BasicDatePicker({
                 "& .MuiInputBase-input": { py: 0.5 },
               }
             : {
-                minWidth: 168,
+                width: "100%",
+                minWidth: { xs: 0, sm: 168 },
                 "& .MuiInputBase-root": {
                   fontSize: "0.875rem",
                   height: 40,

@@ -1,22 +1,86 @@
 import { api } from "./apiServices";
-import type {
-  ClienteCreatePayload,
-  ClienteUpdatePayload,
-  ContactoCreatePayload,
-  DireccionCreatePayload,
-  ClienteDescuentoApi,
-  ClienteDescuentoWritePayload,
+import {
+  descuentoApiDesdeRaw,
+  extraerDocumentosDescuentoApi,
+  fusionarDocumentosDescuento,
+  type ClienteCreatePayload,
+  type ClienteUpdatePayload,
+  type ContactoCreatePayload,
+  type DireccionCreatePayload,
+  type ClienteDescuentoApi,
+  type ClienteDescuentoWritePayload,
 } from "../components/CRM/clienteAltaUtils";
+import {
+  ID_EMPRESA_CODIAL,
+  ID_EMPRESA_CODIALUB,
+} from "../components/CRM/prospectoFormUtils";
 
-function errorDesdeRespuesta(data: unknown, fallback: string): string {
+const TITULO_VALIDACION_GENERICO =
+  /one or more validation errors occurred|se han producido uno o varios errores de validación|bad request|an error occurred while/i;
+
+function listaMensajesValidacion(errors: unknown): string[] {
+  if (!errors || typeof errors !== "object") return [];
+  const msgs: string[] = [];
+  for (const [campo, valor] of Object.entries(
+    errors as Record<string, unknown>,
+  )) {
+    const lista = Array.isArray(valor)
+      ? valor
+      : valor &&
+          typeof valor === "object" &&
+          Array.isArray((valor as { $values?: unknown[] }).$values)
+        ? (valor as { $values: unknown[] }).$values
+        : [valor];
+    for (const item of lista) {
+      if (typeof item !== "string" || !item.trim()) continue;
+      const texto = item.trim();
+      const nombre = campo.replace(/^\$\.?/, "").trim();
+      msgs.push(
+        nombre && nombre !== "$" && !texto.toLowerCase().includes(nombre.toLowerCase())
+          ? `${nombre}: ${texto}`
+          : texto,
+      );
+    }
+  }
+  return msgs;
+}
+
+export function mensajeErrorDesdeApi(data: unknown, fallback: string): string {
+  if (typeof data === "string" && data.trim()) return data.trim();
   if (data && typeof data === "object") {
     const o = data as Record<string, unknown>;
-    if (typeof o.message === "string" && o.message) return o.message;
-    if (typeof o.mensaje === "string" && o.mensaje) return o.mensaje;
-    if (typeof o.detail === "string" && o.detail) return o.detail;
-    if (typeof o.title === "string" && o.title) return o.title;
+    const deCampos = listaMensajesValidacion(
+      o.errors ?? o.Errors ?? o.modelState ?? o.ModelState,
+    );
+    if (deCampos.length > 0) return deCampos.join(" ");
+    const candidatos = [
+      o.mensaje,
+      o.Mensaje,
+      o.message,
+      o.Message,
+      o.detail,
+      o.Detail,
+      o.errorSync,
+      o.ErrorSync,
+      o.error,
+      o.Error,
+      o.title,
+      o.Title,
+    ];
+    for (const c of candidatos) {
+      if (typeof c === "string" && c.trim() && !TITULO_VALIDACION_GENERICO.test(c)) {
+        return c.trim();
+      }
+    }
+    for (const c of candidatos) {
+      if (typeof c === "string" && c.trim()) return c.trim();
+    }
   }
   return fallback;
+}
+
+function errorDesdeRespuesta(data: unknown, fallback: string): string {
+  return mensajeErrorDesdeApi(data, fallback);
 }
 
 function assertOk<T>(
@@ -315,6 +379,38 @@ export const clienteService = {
       });
   },
 
+  /** Siguiente CardCode disponible en SAP. GET /api/UltimoCardCode */
+  getUltimoCardCode: async (): Promise<string> => {
+    const response = await api.get<unknown>("/api/UltimoCardCode");
+    const data = assertOk(
+      response,
+      "No se pudo consultar el siguiente CardCode en SAP.",
+    );
+    const o =
+      data && typeof data === "object"
+        ? (data as Record<string, unknown>)
+        : {};
+    const nested =
+      o.data && typeof o.data === "object" && !Array.isArray(o.data)
+        ? (o.data as Record<string, unknown>)
+        : o;
+    const code = (
+      pickString(
+        nested,
+        "nextCardCode",
+        "NextCardCode",
+        "cardCode",
+        "CardCode",
+      ) ?? ""
+    )
+      .trim()
+      .toUpperCase();
+    if (!code) {
+      throw new Error("SAP no devolvió el siguiente CardCode.");
+    }
+    return code;
+  },
+
   /** Requiere permiso API `cliente.asignar-cardcode` (o admin). */
   asignarCardCode: async (
     id: number,
@@ -343,24 +439,45 @@ export const clienteService = {
     assertOk(response, "No se pudo actualizar el cliente.");
   },
 
-  enviarASap: async (id: number): Promise<{
+  enviarASap: async (
+    id: number,
+    idEmpresa: number,
+  ): Promise<{
     success: boolean;
     accion: string;
     cardCode: string;
     estatusSap: string;
     mensaje: string | null;
   }> => {
-    const response = await api.post<unknown>(`/api/Cliente/${id}/enviar-sap`, {}, {
-      timeout: 120000,
-    });
+    if (!idEmpresa || idEmpresa <= 0) {
+      throw new Error("Seleccione Codialub o Codial para enviar a SAP.");
+    }
+    const response = await api.post<unknown>(
+      `/api/Cliente/${id}/enviar-sap`,
+      { idEmpresa },
+      {
+        timeout: 120000,
+        params: { idEmpresa },
+      },
+    );
     const data = assertOk(response, "No se pudo enviar el cliente a SAP.");
-    const o = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+    const o = (data && typeof data === "object" ? data : {}) as Record<
+      string,
+      unknown
+    >;
+    const mensaje =
+      pickString(o, "mensaje", "Mensaje") ??
+      pickString(o, "message", "Message");
+    const successFlag = o.success ?? o.Success;
+    if (successFlag === false) {
+      throw new Error(mensaje || "No se pudo enviar el cliente a SAP.");
+    }
     return {
-      success: Boolean(o.success ?? o.Success),
+      success: successFlag == null ? true : Boolean(successFlag),
       accion: pickString(o, "accion", "Accion") ?? "",
       cardCode: pickString(o, "cardCode", "CardCode") ?? "",
       estatusSap: pickString(o, "estatusSap", "EstatusSap") ?? "",
-      mensaje: pickString(o, "mensaje", "Mensaje") ?? pickString(o, "message", "Message"),
+      mensaje,
     };
   },
 
@@ -479,90 +596,99 @@ export const clienteService = {
   },
 
   getDescuentos: async (idCliente: number): Promise<ClienteDescuentoApi[]> => {
-    const response = await api.get<unknown>(
-      `/api/ClienteDescuentos/cliente/${idCliente}`,
-    );
-    return normalizeArray(
-      assertOk(response, "No se pudieron cargar los descuentos."),
-    )
-      .map(normalizeDescuentoApi)
-      .filter((d) => d.idDescuento > 0);
+    const parsear = (raw: unknown, idEmpresaConsulta?: number) =>
+      extraerDocumentosDescuentoApi(raw)
+        .map(descuentoApiDesdeRaw)
+        .filter((d) => d.idDescuento > 0)
+        .map((d) => ({
+          ...d,
+          idEmpresa:
+            d.idEmpresa && d.idEmpresa > 0
+              ? d.idEmpresa
+              : (idEmpresaConsulta ?? d.idEmpresa),
+        }));
+
+    const pedir = async (idEmpresa?: number) => {
+      try {
+        const response = await api.get<unknown>(
+          `/api/ClienteDescuentos/cliente/${idCliente}`,
+          { params: idEmpresa ? { idEmpresa } : undefined },
+        );
+        return parsear(
+          assertOk(response, "No se pudieron cargar los descuentos."),
+          idEmpresa,
+        );
+      } catch {
+        return [] as ClienteDescuentoApi[];
+      }
+    };
+
+    const [todos, codialub, codial] = await Promise.all([
+      pedir(),
+      pedir(ID_EMPRESA_CODIALUB),
+      pedir(ID_EMPRESA_CODIAL),
+    ]);
+    return fusionarDocumentosDescuento([...todos, ...codialub, ...codial]);
   },
 
   upsertDescuentos: async (
     idCliente: number,
     payload: ClienteDescuentoWritePayload,
   ): Promise<ClienteDescuentoApi> => {
+    const idEmpresa =
+      payload.idEmpresa && payload.idEmpresa > 0
+        ? payload.idEmpresa
+        : payload.IdEmpresa && payload.IdEmpresa > 0
+          ? payload.IdEmpresa
+          : undefined;
     const response = await api.put<unknown>(
       `/api/ClienteDescuentos/cliente/${idCliente}`,
       payload,
+      { params: idEmpresa ? { idEmpresa } : undefined },
     );
-    return normalizeDescuentoApi(
-      assertOk(response, "No se pudieron guardar los descuentos."),
-    );
+    const data = assertOk(response, "No se pudieron guardar los descuentos.");
+    const docs = extraerDocumentosDescuentoApi(data)
+      .map(descuentoApiDesdeRaw)
+      .filter((d) => d.idDescuento > 0);
+    return docs[0] ?? descuentoApiDesdeRaw(data);
   },
 
   enviarDescuentosASap: async (
     idDescuento: number,
+    idEmpresa: number,
   ): Promise<ClienteDescuentoEnvioSap> => {
+    if (!idDescuento || idDescuento <= 0) {
+      throw new Error("Guarde los descuentos en el CRM antes de enviar a SAP.");
+    }
+    if (!idEmpresa || idEmpresa <= 0) {
+      throw new Error("Seleccione Codialub o Codial para enviar el descuento a SAP.");
+    }
     const response = await api.post<unknown>(
       `/api/ClienteDescuentos/${idDescuento}/enviar-sap`,
-      {},
-      { timeout: 120000 },
+      { idEmpresa },
+      { timeout: 120000, params: { idEmpresa } },
     );
     const data = assertOk(response, "No se pudo enviar el descuento a SAP.");
     const o = (data && typeof data === "object" ? data : {}) as Record<
       string,
       unknown
     >;
+    const mensaje =
+      pickString(o, "mensaje", "Mensaje") ??
+      pickString(o, "message", "Message") ??
+      pickString(o, "errorSync", "ErrorSync");
+    const successFlag = o.success ?? o.Success;
+    if (successFlag === false) {
+      throw new Error(mensaje || "No se pudo enviar el descuento a SAP.");
+    }
     return {
-      success: Boolean(o.success ?? o.Success),
+      success: successFlag == null ? true : Boolean(successFlag),
       accion: pickString(o, "accion", "Accion") ?? "",
       idDescuento: pickNumber(o, "idDescuento", "IdDescuento") ?? idDescuento,
       absEntry: pickNumber(o, "absEntry", "AbsEntry") ?? 0,
       cardCode: pickString(o, "cardCode", "CardCode"),
       estatusSync: pickString(o, "estatusSync", "EstatusSync") ?? "",
-      mensaje:
-        pickString(o, "mensaje", "Mensaje") ??
-        pickString(o, "message", "Message"),
+      mensaje,
     };
   },
 };
-
-function normalizeDescuentoApi(raw: unknown): ClienteDescuentoApi {
-  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
-    string,
-    unknown
-  >;
-  return {
-    idDescuento: pickNumber(o, "idDescuento", "IdDescuento") ?? 0,
-    idCliente: pickNumber(o, "idCliente", "IdCliente") ?? 0,
-    cardCode: pickString(o, "cardCode", "CardCode"),
-    absEntry: pickNumber(o, "absEntry", "AbsEntry") ?? 0,
-    type: pickString(o, "type", "Type"),
-    objType: pickString(o, "objType", "ObjType"),
-    objCode: pickString(o, "objCode", "ObjCode"),
-    discRel: pickString(o, "discRel", "DiscRel"),
-    validFor: pickString(o, "validFor", "ValidFor"),
-    estatusSync: pickString(o, "estatusSync", "EstatusSync"),
-    fechaSync: pickString(o, "fechaSync", "FechaSync"),
-    errorSync: pickString(o, "errorSync", "ErrorSync"),
-    detalles: normalizeArray(o.detalles ?? o.Detalles).map((item) => {
-      const d = (item && typeof item === "object" ? item : {}) as Record<
-        string,
-        unknown
-      >;
-      return {
-        idDescuentoDetalle:
-          pickNumber(d, "idDescuentoDetalle", "IdDescuentoDetalle") ?? 0,
-        objType: pickString(d, "objType", "ObjType"),
-        objKey: pickString(d, "objKey", "ObjKey"),
-        discType: pickString(d, "discType", "DiscType"),
-        discount: pickNumber(d, "discount", "Discount") ?? 0,
-        payFor: pickNumber(d, "payFor", "PayFor") ?? 0,
-        forFree: pickNumber(d, "forFree", "ForFree") ?? 0,
-        upTo: pickNumber(d, "upTo", "UpTo") ?? 0,
-      };
-    }),
-  };
-}

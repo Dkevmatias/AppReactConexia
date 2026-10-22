@@ -28,12 +28,12 @@ function LayoutContent() {
 
       {/*Contenedor principal */}
       <div
-        className={`flex-1 transition-all duration-300 ease-in-out ${
+        className={`min-w-0 flex-1 transition-all duration-300 ease-in-out ${
           isExpanded || isHovered ? "lg:ml-[290px]" : "lg:ml-[90px]"
         } ${isMobileOpen ? "ml-0" : ""}`}
       >
         <AppHeader />
-        <main className="mx-auto max-w-screen-2xl overflow-x-hidden p-4 md:p-6">
+        <main className="mx-auto w-full min-w-0 max-w-screen-2xl p-4 md:p-6">
           <Outlet />
         </main>
       </div>

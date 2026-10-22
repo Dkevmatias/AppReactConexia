@@ -28,3 +28,9 @@ dist-ssr
 
 # Videos
 public/video/*
+
+# Tests
+coverage
+playwright-report
+test-results
+blob-report

@@ -10,6 +10,7 @@ import {
   TABS_CREACION_CLIENTE,
   type TabCreacionClienteId,
 } from "./prospectoFormUtils";
+import type { Vendedores } from "../../services/reportesService";
 
 type TabsCreacionClienteProps = {
   visible: boolean;
@@ -25,14 +26,21 @@ type TabsCreacionClienteProps = {
   onGuardarDescuentos?: () => void | Promise<void>;
   onEnviarDescuentosSap?: () => void | Promise<void>;
   cardCode?: string | null;
-  /** Empresa seleccionada (Codialub=1, Codial=2) para filtrar marcas de descuento. */
+  /** Empresa del cliente (vendedor SAP). */
   idEmpresa?: number | null;
+  idEmpresaDescuentos?: number | null;
+  onIdEmpresaDescuentosChange?: (idEmpresa: number | null) => void;
+  empresasEnviadasDescuentos?: number[];
+  empresasClienteEnviadas?: number[];
   /** Si true, no renderiza el encabezado/borde externo (para usar dentro de otra tab). */
   embebido?: boolean;
   /** Cliente enviado a SAP: formularios en solo lectura. */
   soloLectura?: boolean;
   /** Campos obligatorios faltantes para resaltar. */
   camposInvalidos?: Set<string>;
+  catalogoVendedores?: Vendedores[];
+  idVendedorSeleccionado?: number | null;
+  onVendedorSeleccionado?: (idVendedor: number | null) => void;
 };
 
 export default function TabsCreacionCliente({
@@ -46,9 +54,16 @@ export default function TabsCreacionCliente({
   onEnviarDescuentosSap,
   cardCode = null,
   idEmpresa = null,
+  idEmpresaDescuentos = null,
+  onIdEmpresaDescuentosChange,
+  empresasEnviadasDescuentos = [],
+  empresasClienteEnviadas = [],
   embebido = false,
   soloLectura = false,
   camposInvalidos,
+  catalogoVendedores = [],
+  idVendedorSeleccionado = null,
+  onVendedorSeleccionado,
 }: TabsCreacionClienteProps) {
   const [tabActiva, setTabActiva] = useState<TabCreacionClienteId>("general");
   const [modalContactosAbierto, setModalContactosAbierto] = useState(false);
@@ -87,6 +102,10 @@ export default function TabsCreacionCliente({
             onChange={onChange}
             soloLectura={soloLectura}
             camposInvalidos={camposInvalidos}
+            idEmpresa={idEmpresa}
+            catalogoVendedores={catalogoVendedores}
+            idVendedorSeleccionado={idVendedorSeleccionado}
+            onVendedorSeleccionado={onVendedorSeleccionado}
           />
         );
       case "descuentos":
@@ -98,7 +117,10 @@ export default function TabsCreacionCliente({
             onGuardarDescuentos={onGuardarDescuentos}
             onEnviarDescuentosSap={onEnviarDescuentosSap}
             cardCode={cardCode}
-            idEmpresa={idEmpresa}
+            idEmpresa={idEmpresaDescuentos}
+            onIdEmpresaChange={onIdEmpresaDescuentosChange}
+            empresasEnviadas={empresasEnviadasDescuentos}
+            empresasClienteEnviadas={empresasClienteEnviadas}
             soloLectura={false}
             camposInvalidos={camposInvalidos}
           />

@@ -4,10 +4,17 @@ import {
   aplicarLimitePorcentaje,
   porcentajeADiscRelEntero,
   sanitizarPorcentajeDescuento,
+  esDescuentoDeEmpresa,
   sincronizarDescuentosConMarcas,
   type DescuentoClienteForm,
 } from "./clienteAltaUtils";
-import { prospectoInputClassError, prospectoLabelClass } from "./prospectoFormUtils";
+import {
+  ID_EMPRESA_CODIAL,
+  ID_EMPRESA_CODIALUB,
+  descuentoEnviadoSap,
+  prospectoInputClassError,
+  prospectoLabelClass,
+} from "./prospectoFormUtils";
 import { getReportesService, type Marca } from "../../services/reportesService";
 import ModalAlerta from "../common/ModalAlerta";
 
@@ -18,8 +25,12 @@ type TabDescuentosClienteProps = {
   onGuardarDescuentos?: () => void | Promise<void>;
   onEnviarDescuentosSap?: () => void | Promise<void>;
   cardCode?: string | null;
-  /** Codialub = 1, Codial = 2. Filtra marcas por idEmpresa. */
+  /** Empresa de descuentos (independiente de la del cliente). */
   idEmpresa?: number | null;
+  onIdEmpresaChange?: (idEmpresa: number | null) => void;
+  empresasEnviadas?: number[];
+  /** Empresas a las que ya se envió el cliente (el BP debe existir en SAP). */
+  empresasClienteEnviadas?: number[];
   soloLectura?: boolean;
   camposInvalidos?: Set<string>;
 };
@@ -38,6 +49,9 @@ export default function TabDescuentosCliente({
   onEnviarDescuentosSap,
   cardCode = null,
   idEmpresa = null,
+  onIdEmpresaChange,
+  empresasEnviadas = [],
+  empresasClienteEnviadas = [],
   soloLectura = false,
 }: TabDescuentosClienteProps) {
   const [marcas, setMarcas] = useState<Marca[]>([]);
@@ -52,15 +66,52 @@ export default function TabDescuentosCliente({
   const syncHechoRef = useRef(false);
   const empresaSeleccionada =
     idEmpresa != null && idEmpresa > 0 ? idEmpresa : null;
+  const enviadoCodialub = empresasEnviadas.includes(ID_EMPRESA_CODIALUB);
+  const enviadoCodial = empresasEnviadas.includes(ID_EMPRESA_CODIAL);
+  const clienteEnCodialub = empresasClienteEnviadas.includes(
+    ID_EMPRESA_CODIALUB,
+  );
+  const clienteEnCodial = empresasClienteEnviadas.includes(ID_EMPRESA_CODIAL);
 
-  const meta = descuentos.find((d) => (d.idClienteDescuento ?? 0) > 0);
+  const descuentosEmpresa = useMemo(
+    () =>
+      empresaSeleccionada
+        ? descuentos.filter((d) =>
+            esDescuentoDeEmpresa(d.idEmpresa, empresaSeleccionada),
+          )
+        : [],
+    [descuentos, empresaSeleccionada],
+  );
+
+  const meta = descuentosEmpresa.find((d) => (d.idClienteDescuento ?? 0) > 0);
   const idDescuento = meta?.idClienteDescuento ?? 0;
   const absEntry = meta?.AbsEntry ?? 0;
   const estatusSync = (meta?.EstatusSync ?? "").trim();
   const errorSync = (meta?.ErrorSync ?? "").trim();
   const guardadoEnCrm = idDescuento > 0;
   const enviadoSap =
-    estatusSync.toLowerCase() === "enviado" || absEntry > 0;
+    (empresaSeleccionada != null &&
+      empresasEnviadas.includes(empresaSeleccionada)) ||
+    descuentoEnviadoSap(estatusSync, absEntry);
+
+  const seleccionarEmpresa = (id: number, marcado: boolean) => {
+    if (id === ID_EMPRESA_CODIALUB && !clienteEnCodialub) return;
+    if (id === ID_EMPRESA_CODIAL && (!enviadoCodialub || !clienteEnCodial)) {
+      return;
+    }
+    const yaEnviado =
+      (id === ID_EMPRESA_CODIALUB && enviadoCodialub) ||
+      (id === ID_EMPRESA_CODIAL && enviadoCodial);
+    if (!marcado) {
+      if (yaEnviado) {
+        onIdEmpresaChange?.(id);
+        return;
+      }
+      onIdEmpresaChange?.(null);
+      return;
+    }
+    onIdEmpresaChange?.(id);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -109,30 +160,40 @@ export default function TabDescuentosCliente({
     const lista =
       marcasDeEmpresa.length === 0
         ? []
-        : sincronizarDescuentosConMarcas(descuentos, marcasDeEmpresa);
+        : sincronizarDescuentosConMarcas(
+            descuentosEmpresa,
+            marcasDeEmpresa,
+            empresaSeleccionada,
+          );
     return [...lista].sort((a, b) =>
       (a.firmName || "").localeCompare(b.firmName || "", "es", {
         sensitivity: "base",
       }),
     );
-  }, [marcasDeEmpresa, descuentos, empresaSeleccionada]);
+  }, [marcasDeEmpresa, descuentosEmpresa, empresaSeleccionada]);
 
   useEffect(() => {
-    if (soloLectura || !empresaSeleccionada || marcasDeEmpresa.length === 0)
+    if (
+      soloLectura ||
+      enviadoSap ||
+      !empresaSeleccionada ||
+      marcasDeEmpresa.length === 0
+    )
       return;
     if (filas.length === 0) return;
 
     const mismoContenido =
-      filas.length === descuentos.length &&
+      filas.length === descuentosEmpresa.length &&
       filas.every((d, i) => {
-        const prev = descuentos[i];
+        const prev = descuentosEmpresa[i];
         return (
           !!prev &&
           claveMarca(prev) === claveMarca(d) &&
           (prev.porcentaje ?? "") === (d.porcentaje ?? "") &&
           (prev.DiscRel ?? "") === (d.DiscRel ?? "") &&
           (prev.firmName ?? "") === (d.firmName ?? "") &&
-          (prev.discountLimit ?? 0) === (d.discountLimit ?? 0)
+          (prev.discountLimit ?? 0) === (d.discountLimit ?? 0) &&
+          (prev.idEmpresa ?? null) === (d.idEmpresa ?? null)
         );
       });
 
@@ -141,16 +202,23 @@ export default function TabDescuentosCliente({
       return;
     }
 
-    onChange(filas);
+    const otras = descuentos.filter(
+      (d) => !esDescuentoDeEmpresa(d.idEmpresa, empresaSeleccionada),
+    );
+    onChange([...otras, ...filas]);
     syncHechoRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filas, soloLectura, marcasDeEmpresa.length, empresaSeleccionada]);
+  }, [
+    filas,
+    soloLectura,
+    enviadoSap,
+    marcasDeEmpresa.length,
+    empresaSeleccionada,
+  ]);
 
   const actualizarPorcentaje = (idLocal: string, valor: string) => {
-    const base =
-      descuentos.length === filas.length && descuentos.length > 0
-        ? descuentos
-        : filas;
+    if (enviadoSap) return;
+    const base = filas.length > 0 ? filas : descuentosEmpresa;
     const actual = base.find((d) => d.idLocal === idLocal);
     const limite = actual?.discountLimit ?? 0;
 
@@ -159,17 +227,20 @@ export default function TabDescuentosCliente({
 
     setAvisosLimite((prev) => ({ ...prev, [idLocal]: excedio }));
 
-    onChange(
-      base.map((d) =>
-        d.idLocal === idLocal
-          ? {
-              ...d,
-              porcentaje: acotado,
-              DiscRel: porcentajeADiscRelEntero(acotado, d.discountLimit),
-            }
-          : d,
-      ),
+    const actualizadas = base.map((d) =>
+      d.idLocal === idLocal
+        ? {
+            ...d,
+            porcentaje: acotado,
+            DiscRel: porcentajeADiscRelEntero(acotado, d.discountLimit),
+            idEmpresa: empresaSeleccionada ?? d.idEmpresa,
+          }
+        : d,
     );
+    const otras = descuentos.filter(
+      (d) => !esDescuentoDeEmpresa(d.idEmpresa, empresaSeleccionada),
+    );
+    onChange([...otras, ...actualizadas]);
   };
 
   const bloquearNoNumericos = (
@@ -247,14 +318,88 @@ export default function TabDescuentosCliente({
             Descuentos por marca
           </h3>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Se guarda en el CRM (1 grupo del cliente + una línea por marca con
-            %). El envío a SAP usa ese documento ya persistido.
-            {empresaSeleccionada === 1
-              ? " Marcas de Codialub (empresa 1)."
-              : empresaSeleccionada === 2
-                ? " Marcas de Codial (empresa 2)."
-                : ""}
+            Independiente de los checks del cliente. Elija la sociedad para
+            ver o configurar sus marcas. Tras un envío correcto puede seguir
+            consultando los %; esa sociedad queda en solo lectura.
           </p>
+          <div className="mt-3 flex flex-wrap gap-6">
+            <label
+              className={`inline-flex items-center gap-2 rounded-md px-1.5 py-0.5 text-sm font-medium text-gray-700 dark:text-gray-300 ${
+                empresaSeleccionada === ID_EMPRESA_CODIALUB
+                  ? "ring-2 ring-blue-500"
+                  : ""
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={
+                  enviadoCodialub ||
+                  empresaSeleccionada === ID_EMPRESA_CODIALUB
+                }
+                disabled={
+                  soloLectura || !clientePersistido || !clienteEnCodialub
+                }
+                title={
+                  !clientePersistido
+                    ? "Guarde el cliente en CRM primero"
+                    : !clienteEnCodialub
+                      ? "Envíe primero el cliente a Codialub"
+                      : enviadoCodialub
+                        ? "Enviado a SAP. Clic para consultar los descuentos"
+                        : undefined
+                }
+                onChange={(e) =>
+                  seleccionarEmpresa(ID_EMPRESA_CODIALUB, e.target.checked)
+                }
+              />
+              Codialub
+              {enviadoCodialub ? (
+                <span className="text-[11px] font-normal text-emerald-700 dark:text-emerald-300">
+                  (enviado)
+                </span>
+              ) : null}
+            </label>
+            <label
+              className={`inline-flex items-center gap-2 rounded-md px-1.5 py-0.5 text-sm font-medium text-gray-700 dark:text-gray-300 ${
+                empresaSeleccionada === ID_EMPRESA_CODIAL
+                  ? "ring-2 ring-blue-500"
+                  : ""
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={
+                  enviadoCodial || empresaSeleccionada === ID_EMPRESA_CODIAL
+                }
+                disabled={
+                  soloLectura ||
+                  !enviadoCodialub ||
+                  !clientePersistido ||
+                  !clienteEnCodial
+                }
+                title={
+                  !clientePersistido
+                    ? "Guarde el cliente en CRM primero"
+                    : !clienteEnCodial
+                      ? "Envíe primero el cliente a Codial"
+                      : !enviadoCodialub
+                        ? "Envíe primero los descuentos a Codialub"
+                        : enviadoCodial
+                          ? "Enviado a SAP. Clic para consultar los descuentos"
+                          : undefined
+                }
+                onChange={(e) =>
+                  seleccionarEmpresa(ID_EMPRESA_CODIAL, e.target.checked)
+                }
+              />
+              Codial
+              {enviadoCodial ? (
+                <span className="text-[11px] font-normal text-emerald-700 dark:text-emerald-300">
+                  (enviado)
+                </span>
+              ) : null}
+            </label>
+          </div>
           <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
             {guardadoEnCrm ? (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
@@ -287,12 +432,16 @@ export default function TabDescuentosCliente({
             <button
               type="button"
               onClick={() => void guardar()}
-              disabled={guardando || enviando || !clientePersistido}
+              disabled={
+                guardando || enviando || !clientePersistido || enviadoSap
+              }
               className="inline-flex items-center gap-1 rounded-lg border border-blue-300 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200"
               title={
-                clientePersistido
-                  ? "Guardar grupo de descuento en CRM"
-                  : "Guarde el cliente en CRM primero"
+                enviadoSap
+                  ? "Esta sociedad ya recibió los descuentos"
+                  : clientePersistido
+                    ? "Guardar grupo de descuento en CRM"
+                    : "Guarde el cliente en CRM primero"
               }
             >
               <Save className="h-3.5 w-3.5" />
@@ -303,15 +452,17 @@ export default function TabDescuentosCliente({
             <button
               type="button"
               onClick={() => void enviarSap()}
-              disabled={guardando || enviando || !guardadoEnCrm}
+              disabled={
+                guardando || enviando || !guardadoEnCrm || enviadoSap
+              }
               className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
               title={
-                !guardadoEnCrm
-                  ? "Guarde los descuentos en CRM antes de enviar a SAP"
-                  : !cardCode
-                    ? "El cliente necesita CardCode para el envío a SAP"
-                    : enviadoSap
-                      ? "Reenviar grupo de descuento a SAP"
+                enviadoSap
+                  ? "Esta sociedad ya recibió los descuentos"
+                  : !guardadoEnCrm
+                    ? "Guarde los descuentos en CRM antes de enviar a SAP"
+                    : !cardCode
+                      ? "El cliente necesita CardCode para el envío a SAP"
                       : "Enviar grupo de descuento a SAP"
               }
             >
@@ -319,7 +470,7 @@ export default function TabDescuentosCliente({
               {enviando
                 ? "Enviando…"
                 : enviadoSap
-                  ? "Reenviar a SAP"
+                  ? "Enviado a SAP"
                   : "Enviar a SAP"}
             </button>
           ) : null}
@@ -336,9 +487,19 @@ export default function TabDescuentosCliente({
         <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
           Cargando marcas…
         </p>
+      ) : !clientePersistido ? (
+        <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 py-10 text-center text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+          Guarde el cliente en CRM antes de configurar descuentos.
+        </p>
+      ) : !clienteEnCodialub && !clienteEnCodial ? (
+        <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 py-10 text-center text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+          Envíe primero el cliente a SAP. Los checks de descuentos se habilitan
+          por sociedad cuando el cliente ya existe en esa empresa.
+        </p>
       ) : !empresaSeleccionada ? (
         <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 py-10 text-center text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
-          Seleccione Codialub o Codial para listar las marcas de esa empresa.
+          Seleccione Codialub o Codial en esta pestaña para listar las marcas
+          de esa sociedad.
         </p>
       ) : filas.length === 0 ? (
         <p className="rounded-lg border border-dashed border-gray-300 py-10 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
@@ -375,6 +536,7 @@ export default function TabDescuentosCliente({
                     inputMode="decimal"
                     pattern="[0-9]*[.,]?[0-9]*"
                     value={d.porcentaje ?? ""}
+                    disabled={enviadoSap}
                     onKeyDown={bloquearNoNumericos}
                     onChange={(e) =>
                       actualizarPorcentaje(d.idLocal, e.target.value)

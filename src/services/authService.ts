@@ -13,6 +13,8 @@ export interface User {
   role: number;
   cardCode: string;
   fullname: string;
+  /** Username de Usuarios; en vendedores coincide con slpName (ej. VTX01). */
+  username?: string | null;
   /** Ruta inicial definida en el rol (API); si falta, se usa el mapa local en postLoginRoutes */
   defaultRoute?: string | null;
 }
@@ -72,6 +74,16 @@ function normalizeUser(raw: unknown): User | undefined {
   const cardCode = pickString(src, "cardCode", "CardCode") ?? "";
   const fullname =
     pickString(src, "fullname", "Fullname", "nombre", "Nombre") ?? "";
+  const username = pickString(
+    src,
+    "username",
+    "Username",
+    "userName",
+    "UserName",
+    "slpName",
+    "SlpName",
+    "slPName",
+  );
   const defaultRoute = pickString(
     src,
     "defaultRoute",
@@ -90,6 +102,7 @@ function normalizeUser(raw: unknown): User | undefined {
     role,
     cardCode,
     fullname,
+    username,
     defaultRoute,
   };
 }
@@ -113,6 +126,7 @@ export function mergeSessionUser(
         : (previous?.idSucursal ?? 0),
     cardCode: incoming.cardCode || previous?.cardCode || "",
     fullname: incoming.fullname || previous?.fullname || "",
+    username: incoming.username || previous?.username || null,
     defaultRoute: incoming.defaultRoute ?? previous?.defaultRoute ?? null,
   };
 }
@@ -275,6 +289,71 @@ export const getUsuario = async () => {
     withCredentials: true,
   });
   return response.data;
+};
+
+export interface UsuarioPorId {
+  idUsuario: number;
+  username: string;
+  nombre?: string;
+  email?: string;
+  idRol?: number;
+  idPersona?: number;
+}
+
+function unwrapUsuarioPayload(data: unknown): Record<string, unknown> | null {
+  if (data == null || typeof data !== "object" || Array.isArray(data)) {
+    return null;
+  }
+  const o = data as Record<string, unknown>;
+  for (const key of [
+    "data",
+    "Data",
+    "result",
+    "Result",
+    "usuario",
+    "Usuario",
+    "user",
+    "User",
+  ]) {
+    const nested = o[key];
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      return nested as Record<string, unknown>;
+    }
+  }
+  return o;
+}
+
+/** GET /api/Usuarios/{idUsuario} */
+export const getUsuarioPorId = async (
+  idUsuario: number,
+): Promise<UsuarioPorId | null> => {
+  if (!idUsuario || idUsuario <= 0) return null;
+  const response = await api.get<unknown>(`/api/Usuarios/${idUsuario}`);
+  if (response.status < 200 || response.status >= 300) return null;
+  const o = unwrapUsuarioPayload(response.data);
+  if (!o) return null;
+  const username = (
+    pickString(
+      o,
+      "username",
+      "Username",
+      "userName",
+      "UserName",
+      "slpName",
+      "SlpName",
+      "slPName",
+    ) ?? ""
+  ).trim();
+  if (!username) return null;
+  return {
+    idUsuario: pickNumber(o, "idUsuario", "IdUsuario") || idUsuario,
+    username,
+    nombre:
+      pickString(o, "nombre", "Nombre", "fullname", "Fullname") ?? undefined,
+    email: pickString(o, "email", "Email") ?? undefined,
+    idRol: pickNumber(o, "idRol", "IdRol") || undefined,
+    idPersona: pickNumber(o, "idPersona", "IdPersona") || undefined,
+  };
 };
 
 export interface DatosCliente {

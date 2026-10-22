@@ -16,7 +16,11 @@ import {
   type TransferStatusItem,
 } from "../../../services/reportesService";
 import { formatNumber } from "../../../utils/format";
-import { SUCURSAL_POR_ID } from "../../../utils/sucursalOperativa";
+import TablaScroll from "../../../components/reportes/TablaScroll";
+import {
+  SUCURSAL_POR_ID,
+  empresaVisibleEnCombo,
+} from "../../../utils/sucursalOperativa";
 import {
   almacenService,
   etiquetaGrupoSucursal,
@@ -294,9 +298,12 @@ export default function ReportesTraspasos() {
   const [catalogoListo, setCatalogoListo] = useState(false);
 
   const paresPorSucursal = useMemo(() => {
-    const desdeApi = paresAlmacenesPorSucursal(almacenesCatalogo);
+    const catalogoEmpresas = almacenesCatalogo.filter((a) =>
+      empresaVisibleEnCombo(a.idEmpresa),
+    );
+    const desdeApi = paresAlmacenesPorSucursal(catalogoEmpresas);
     if (desdeApi.length > 0) return desdeApi;
-    if (!catalogoListo) return [];
+    if (!catalogoListo || almacenesCatalogo.length > 0) return [];
     return paresAlmacenesFallback();
   }, [almacenesCatalogo, catalogoListo]);
 
@@ -905,8 +912,8 @@ export default function ReportesTraspasos() {
                 </button>
 
                 {abierto ? (
-                  <div className="overflow-x-auto border-t border-gray-100 dark:border-gray-700">
-                    <table className="min-w-full text-xs sm:text-sm">
+                  <TablaScroll className="border-t border-gray-100 dark:border-gray-700">
+                    <table className="min-w-[52rem] w-full text-xs sm:text-sm">
                       <thead className="bg-gray-50 dark:bg-gray-700/80">
                         <tr className="text-left text-gray-600 dark:text-gray-200">
                           <th className="whitespace-nowrap px-3 py-2">Línea</th>
@@ -1012,7 +1019,7 @@ export default function ReportesTraspasos() {
                         })}
                       </tbody>
                     </table>
-                  </div>
+                  </TablaScroll>
                 ) : null}
               </div>
             );

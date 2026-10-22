@@ -12,6 +12,7 @@ import type { ActivityTimelineItem } from "../../services/activityTimelineServic
 import TabsCreacionCliente from "./TabsCreacionCliente";
 import TabSeguimientosLead from "./TabSeguimientosLead";
 import { ClienteAltaForm, prellenarClienteDesdeLead } from "./clienteAltaUtils";
+import type { Vendedores } from "../../services/reportesService";
 import {
   esCorreoValido,
   esEtapaCliente,
@@ -63,6 +64,14 @@ export type FormularioProspectoProps = {
   camposInvalidosCliente?: Set<string>;
   /** Texto opcional del aviso de bloqueo SAP. */
   avisoClienteSap?: string | null;
+  catalogoVendedores?: Vendedores[];
+  idVendedorSeleccionado?: number | null;
+  onVendedorSeleccionado?: (idVendedor: number | null) => void;
+  /** Empresas ya enviadas a SAP (Codialub=1, Codial=2). */
+  empresasEnviadasSap?: number[];
+  idEmpresaDescuentos?: number | null;
+  onIdEmpresaDescuentosChange?: (idEmpresa: number | null) => void;
+  empresasEnviadasDescuentos?: number[];
 };
 
 export default function FormularioProspecto({
@@ -90,6 +99,13 @@ export default function FormularioProspecto({
   clienteSoloLectura = false,
   camposInvalidosCliente,
   avisoClienteSap = null,
+  catalogoVendedores = [],
+  idVendedorSeleccionado = null,
+  onVendedorSeleccionado,
+  empresasEnviadasSap = [],
+  idEmpresaDescuentos = null,
+  onIdEmpresaDescuentosChange,
+  empresasEnviadasDescuentos = [],
 }: FormularioProspectoProps) {
   const [crearClienteActivo, setCrearClienteActivo] = useState(
     () => clienteExistente || esEtapaCliente(form.idEtapa, etapas),
@@ -127,13 +143,24 @@ export default function FormularioProspecto({
     onChange(key, value ? Number(value) : null);
   };
 
-  const usarCodialub = form.idEmpresa === ID_EMPRESA_CODIALUB;
-  const usarCodial = form.idEmpresa === ID_EMPRESA_CODIAL;
+  const enviadoCodialub = empresasEnviadasSap.includes(ID_EMPRESA_CODIALUB);
+  const enviadoCodial = empresasEnviadasSap.includes(ID_EMPRESA_CODIAL);
+  const usarCodialub =
+    enviadoCodialub || form.idEmpresa === ID_EMPRESA_CODIALUB;
+  const usarCodial = form.idEmpresa === ID_EMPRESA_CODIAL || enviadoCodial;
 
   const seleccionarEmpresa = (idEmpresa: number, marcado: boolean) => {
+    if (
+      (idEmpresa === ID_EMPRESA_CODIALUB && enviadoCodialub) ||
+      (idEmpresa === ID_EMPRESA_CODIAL && enviadoCodial)
+    ) {
+      return;
+    }
+    if (idEmpresa === ID_EMPRESA_CODIAL && !enviadoCodialub) {
+      return;
+    }
     const siguiente = marcado ? idEmpresa : null;
     onChange("idEmpresa", siguiente);
-    onClienteAltaChange({ descuentos: [] });
   };
 
   const handleEtapaChange = (value: string) => {
@@ -455,7 +482,12 @@ export default function FormularioProspecto({
                         <input
                           type="checkbox"
                           checked={usarCodialub}
-                          disabled={clienteSoloLectura}
+                          disabled={clienteSoloLectura || enviadoCodialub}
+                          title={
+                            enviadoCodialub
+                              ? "Ya se envió a SAP Codialub"
+                              : undefined
+                          }
                           onChange={(e) => {
                             seleccionarEmpresa(
                               ID_EMPRESA_CODIALUB,
@@ -464,12 +496,28 @@ export default function FormularioProspecto({
                           }}
                         />
                         Codialub
+                        {enviadoCodialub ? (
+                          <span className="text-[11px] font-normal text-emerald-700 dark:text-emerald-300">
+                            (enviado)
+                          </span>
+                        ) : null}
                       </label>
                       <label className="mb-2 inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                         <input
                           type="checkbox"
                           checked={usarCodial}
-                          disabled={clienteSoloLectura}
+                          disabled={
+                            clienteSoloLectura ||
+                            enviadoCodial ||
+                            !enviadoCodialub
+                          }
+                          title={
+                            enviadoCodial
+                              ? "Ya se envió a SAP Codial"
+                              : !enviadoCodialub
+                                ? "Envíe primero el cliente a Codialub"
+                                : undefined
+                          }
                           onChange={(e) => {
                             seleccionarEmpresa(
                               ID_EMPRESA_CODIAL,
@@ -478,6 +526,11 @@ export default function FormularioProspecto({
                           }}
                         />
                         Codial
+                        {enviadoCodial ? (
+                          <span className="text-[11px] font-normal text-emerald-700 dark:text-emerald-300">
+                            (enviado)
+                          </span>
+                        ) : null}
                       </label>
                     </div>
                   </div>
@@ -494,8 +547,15 @@ export default function FormularioProspecto({
                     onEnviarDescuentosSap={onEnviarDescuentosSap}
                     cardCode={cardCodeCliente}
                     idEmpresa={form.idEmpresa}
+                    idEmpresaDescuentos={idEmpresaDescuentos}
+                    onIdEmpresaDescuentosChange={onIdEmpresaDescuentosChange}
+                    empresasEnviadasDescuentos={empresasEnviadasDescuentos}
+                    empresasClienteEnviadas={empresasEnviadasSap}
                     soloLectura={clienteSoloLectura}
                     camposInvalidos={camposInvalidosCliente}
+                    catalogoVendedores={catalogoVendedores}
+                    idVendedorSeleccionado={idVendedorSeleccionado}
+                    onVendedorSeleccionado={onVendedorSeleccionado}
                   />
                 </div>
               ) : (

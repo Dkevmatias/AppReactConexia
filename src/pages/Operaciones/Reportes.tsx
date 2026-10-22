@@ -13,7 +13,7 @@ export default function ReportesOperaciones() {
   const [activeTab, setActiveTab] = useState("por-surtir");
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <PageMeta
         title="Reportes Operaciones"
         description="Por surtir y estatus de traspasos"

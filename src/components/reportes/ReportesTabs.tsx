@@ -13,7 +13,7 @@ interface ReportesTabsProps {
 export default function ReportesTabs({ tabs, activeTab, onTabChange }: ReportesTabsProps) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
-      <div className="flex overflow-x-auto">
+      <div className="flex overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
         {tabs.map((tab) => (
           <button
             key={tab.id}

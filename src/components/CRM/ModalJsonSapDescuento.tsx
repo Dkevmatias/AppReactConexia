@@ -8,6 +8,7 @@ type ModalJsonSapDescuentoProps = {
   enviando?: boolean;
   puedeEnviar?: boolean;
   cardCode: string;
+  etiquetaEmpresa?: string | null;
   mensaje?: string | null;
   errorEnvio?: string | null;
 };
@@ -20,6 +21,7 @@ export default function ModalJsonSapDescuento({
   enviando = false,
   puedeEnviar = false,
   cardCode,
+  etiquetaEmpresa = null,
   mensaje = null,
   errorEnvio = null,
 }: ModalJsonSapDescuentoProps) {
@@ -53,6 +55,9 @@ export default function ModalJsonSapDescuento({
               Enviar Discount Group a SAP
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
+              {etiquetaEmpresa
+                ? `Sociedad destino: ${etiquetaEmpresa}. `
+                : ""}
               Revise el payload de{" "}
               <code className="text-[10px]">EnhancedDiscountGroups</code> antes
               de confirmar el envío.

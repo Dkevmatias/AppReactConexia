@@ -16,6 +16,18 @@ export const SUCURSAL_POR_ID: Record<number, SucursalOperativaConfig> = {
   5: { nombre: "COMITAN", almacenes: ["AM5CO01"] },
 };
 
+/** Empresas que se listan en combos (Codialub=1, Codial=2). */
+export const IDS_EMPRESAS_COMBO = [1, 2] as const;
+
+export function empresaVisibleEnCombo(
+  idEmpresa: number | null | undefined,
+): boolean {
+  return (
+    idEmpresa != null &&
+    (IDS_EMPRESAS_COMBO as readonly number[]).includes(idEmpresa)
+  );
+}
+
 export function configSucursalPorId(
   idSucursal: number | null | undefined,
 ): SucursalOperativaConfig | null {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getReportesService, TopCliente, VentaPorGrupo, ComparativoAnual } from "../../../services/reportesService";
 import ReactApexChart from "react-apexcharts";
 import { formatCurrency, formatNumber, formatPercent } from "../../../utils/format";
+import TablaScroll from "../../../components/reportes/TablaScroll";
 
 interface ReportesClientesProps {
   fechaInicio: string;
@@ -82,9 +83,10 @@ export default function ReportesClientes({ fechaInicio, fechaFin }: ReportesClie
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <div className="min-w-0 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Top 20 Clientes</h3>
-          <table className="w-full text-sm">
+          <TablaScroll>
+          <table className="w-full min-w-[28rem] text-sm">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 <th className="px-3 py-2 text-left">Cliente</th>
@@ -102,9 +104,10 @@ export default function ReportesClientes({ fechaInicio, fechaFin }: ReportesClie
               ))}
             </tbody>
           </table>
+          </TablaScroll>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+        <div className="min-w-0 overflow-x-auto bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">Ventas por Marca/Grupo</h3>
           {ventasPorGrupo.length > 0 ? (
             <ReactApexChart

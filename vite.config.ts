@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
@@ -14,13 +15,27 @@ export default defineConfig(({ mode }) => ({
       },
     }),
     mode === "development" && basicSsl(),
-  ],//.filter(Boolean),
+  ].filter(Boolean),
 
   server: {
- host: "0.0.0.0",   // 🔥 CLAVE
-    port: 5173,
+    host: "0.0.0.0",
+    port: mode === "e2e" ? 4173 : 5173,
     strictPort: true,
     allowedHosts: [".trycloudflare.com"],
+  },
+
+  test: {
+    environment: "happy-dom",
+    setupFiles: "./src/test/setup.ts",
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    css: false,
+    restoreMocks: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      include: ["src/components/CRM/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.{test,spec}.{ts,tsx}", "src/test/**"],
+    },
   },
 
   build: {
