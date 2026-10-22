@@ -29,7 +29,19 @@ dist-ssr
 # Videos
 public/video/*
 
-# Tests
+# Tests (locales; no se versionan)
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/*.test.js
+**/*.test.jsx
+**/__tests__/
+src/test/
+e2e/
+docs/
+playwright.config.ts
+.github/workflows/qa.yml
 coverage
 playwright-report
 test-results

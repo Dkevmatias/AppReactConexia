@@ -9,9 +9,6 @@ Este proyecto está basado en el template:
 - Autenticación con JWT y cookies
 - Integración con API .NET
 
-## Pruebas (QA)
-Ver [docs/QA.md](docs/QA.md). Comandos: `npm test`, `npm run test:watch`, `npm run qa`.
-
 # TailAdmin React - Free React Tailwind Admin Dashboard Template
 
 TailAdmin is a free and open-source admin dashboard template built on **React and Tailwind CSS**, providing developers
