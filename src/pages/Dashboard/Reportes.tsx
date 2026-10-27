@@ -70,7 +70,7 @@ export default function Reportes() {
   >(null);
   const [filterKey, setFilterKey] = useState(0);
   const [tipoMetrica, setTipoMetrica] =
-    useState<TipoMetricaCumplimiento>("pesos");
+    useState<TipoMetricaCumplimiento>("ulkp");
 
   const handleVendedorChange = (id: number | null, nombre: string | null) => {
     setVendedorSeleccionado(id);

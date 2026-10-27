@@ -11,6 +11,8 @@ type ModalJsonSapDescuentoProps = {
   etiquetaEmpresa?: string | null;
   mensaje?: string | null;
   errorEnvio?: string | null;
+  /** Temporalmente oculto: el JSON y Copiar JSON no se muestran. */
+  mostrarJson?: boolean;
 };
 
 export default function ModalJsonSapDescuento({
@@ -24,6 +26,7 @@ export default function ModalJsonSapDescuento({
   etiquetaEmpresa = null,
   mensaje = null,
   errorEnvio = null,
+  mostrarJson = false,
 }: ModalJsonSapDescuentoProps) {
   if (!abierto) return null;
 
@@ -43,12 +46,12 @@ export default function ModalJsonSapDescuento({
       className="fixed inset-0 z-[220] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="JSON descuento hacia SAP"
+      aria-label="Enviar descuento a SAP"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget && !enviando) onCerrar();
       }}
     >
-      <div className="flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:rounded-xl dark:border-gray-600 dark:bg-gray-800">
+      <div className="flex max-h-[94vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-xl sm:rounded-xl dark:border-gray-600 dark:bg-gray-800">
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-200 px-4 py-4 dark:border-gray-700">
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -58,9 +61,8 @@ export default function ModalJsonSapDescuento({
               {etiquetaEmpresa
                 ? `Sociedad destino: ${etiquetaEmpresa}. `
                 : ""}
-              Revise el payload de{" "}
-              <code className="text-[10px]">EnhancedDiscountGroups</code> antes
-              de confirmar el envío.
+              Confirme la sociedad y el CardCode antes de enviar el grupo de
+              descuento.
             </p>
           </div>
           <button
@@ -98,18 +100,22 @@ export default function ModalJsonSapDescuento({
             {errorEnvio}
           </p>
         ) : null}
-        <pre className="min-h-0 flex-1 overflow-auto bg-gray-950 p-4 text-xs text-green-100">
-          {json}
-        </pre>
+        {mostrarJson ? (
+          <pre className="min-h-0 flex-1 overflow-auto bg-gray-950 p-4 text-xs text-green-100">
+            {json}
+          </pre>
+        ) : null}
         <div className="flex shrink-0 justify-end gap-2 border-t border-gray-200 px-4 py-3 dark:border-gray-700">
-          <button
-            type="button"
-            onClick={() => void copiar()}
-            disabled={enviando}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
-          >
-            Copiar JSON
-          </button>
+          {mostrarJson ? (
+            <button
+              type="button"
+              onClick={() => void copiar()}
+              disabled={enviando}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              Copiar JSON
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onEnviar}

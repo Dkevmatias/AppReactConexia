@@ -411,7 +411,7 @@ export const clienteService = {
     return code;
   },
 
-  /** Requiere permiso API `cliente.asignar-cardcode` (o admin). */
+  /** Requiere `CRM.Enviar.Cliente` (o legado `cliente.asignar-cardcode` / admin). */
   asignarCardCode: async (
     id: number,
     cardCode: string,
@@ -442,6 +442,7 @@ export const clienteService = {
   enviarASap: async (
     id: number,
     idEmpresa: number,
+    cardCode?: string | null,
   ): Promise<{
     success: boolean;
     accion: string;
@@ -452,9 +453,12 @@ export const clienteService = {
     if (!idEmpresa || idEmpresa <= 0) {
       throw new Error("Seleccione Codialub o Codial para enviar a SAP.");
     }
+    const code = (cardCode ?? "").trim().toUpperCase();
+    const body: { idEmpresa: number; cardCode?: string } = { idEmpresa };
+    if (code) body.cardCode = code;
     const response = await api.post<unknown>(
       `/api/Cliente/${id}/enviar-sap`,
-      { idEmpresa },
+      body,
       {
         timeout: 120000,
         params: { idEmpresa },
@@ -656,6 +660,7 @@ export const clienteService = {
   enviarDescuentosASap: async (
     idDescuento: number,
     idEmpresa: number,
+    payloadSap?: object | null,
   ): Promise<ClienteDescuentoEnvioSap> => {
     if (!idDescuento || idDescuento <= 0) {
       throw new Error("Guarde los descuentos en el CRM antes de enviar a SAP.");
@@ -665,7 +670,7 @@ export const clienteService = {
     }
     const response = await api.post<unknown>(
       `/api/ClienteDescuentos/${idDescuento}/enviar-sap`,
-      { idEmpresa },
+      payloadSap && Object.keys(payloadSap).length > 0 ? payloadSap : {},
       { timeout: 120000, params: { idEmpresa } },
     );
     const data = assertOk(response, "No se pudo enviar el descuento a SAP.");

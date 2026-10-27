@@ -22,8 +22,10 @@ function estatusActivoClass(estatus: EstatusCrm): string {
 
 export default function CatalogoTipoEstatus({
   embebido = false,
+  soloLectura = false,
 }: {
   embebido?: boolean;
+  soloLectura?: boolean;
 }) {
   const { mostrarAdvertencia, mostrarError, AlertaHost } = useModalAlerta();
   const [loading, setLoading] = useState(true);
@@ -59,12 +61,14 @@ export default function CatalogoTipoEstatus({
   }, [cargar]);
 
   const abrirCrear = () => {
+    if (soloLectura) return;
     setForm({ nombre: "", estatus: ESTATUS_ACTIVO });
     setEditando(null);
     setModalAbierto(true);
   };
 
   const abrirEditar = (row: TipoEstatusCatalogo) => {
+    if (soloLectura) return;
     setForm({ nombre: row.nombre, estatus: row.estatus });
     setEditando(row);
     setModalAbierto(true);
@@ -76,6 +80,7 @@ export default function CatalogoTipoEstatus({
   };
 
   const guardar = async () => {
+    if (soloLectura) return;
     const nombre = form.nombre.trim();
     if (!nombre) {
       mostrarAdvertencia("El nombre del tipo de estatus es obligatorio.", "Dato requerido");
@@ -105,6 +110,7 @@ export default function CatalogoTipoEstatus({
   };
 
   const eliminar = async (row: TipoEstatusCatalogo) => {
+    if (soloLectura) return;
     if (!window.confirm(`¿Eliminar el tipo de estatus "${row.nombre}"?`)) return;
     setError(null);
     try {
@@ -169,15 +175,17 @@ export default function CatalogoTipoEstatus({
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Tipos de estatus
           </h2>
-          <button
-            type="button"
-            onClick={abrirCrear}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-            Agregar
-          </button>
+          {!soloLectura ? (
+            <button
+              type="button"
+              onClick={abrirCrear}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              Agregar
+            </button>
+          ) : null}
         </div>
 
         {loading ? (
@@ -200,9 +208,11 @@ export default function CatalogoTipoEstatus({
                   <th className="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-300">
                     Activo en catálogo
                   </th>
-                  <th className="px-4 py-2 text-right font-medium text-gray-700 dark:text-gray-300">
-                    Acciones
-                  </th>
+                  {!soloLectura ? (
+                    <th className="px-4 py-2 text-right font-medium text-gray-700 dark:text-gray-300">
+                      Acciones
+                    </th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
@@ -219,26 +229,28 @@ export default function CatalogoTipoEstatus({
                         {estatusActivoLabel(row.estatus)}
                       </span>
                     </td>
-                    <td className="px-4 py-2 text-right">
-                      <div className="inline-flex gap-1">
-                        <button
-                          type="button"
-                          onClick={() => abrirEditar(row)}
-                          title="Editar"
-                          className="rounded p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void eliminar(row)}
-                          title="Eliminar"
-                          className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {!soloLectura ? (
+                      <td className="px-4 py-2 text-right">
+                        <div className="inline-flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => abrirEditar(row)}
+                            title="Editar"
+                            className="rounded p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void eliminar(row)}
+                            title="Eliminar"
+                            className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>

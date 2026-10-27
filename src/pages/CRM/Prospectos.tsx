@@ -16,6 +16,7 @@ import ModalDetalleRegistro, {
   CampoDetalle,
 } from "../../components/common/ModalDetalleRegistro";
 import { useClientPagination } from "../../hooks/useClientPagination";
+import { useCrmPermisos } from "../../hooks/useCrmPermisos";
 import {
   formatearFechaLead,
   Lead,
@@ -32,6 +33,11 @@ const rowClass =
 
 export default function Prospectos() {
   const navigate = useNavigate();
+  const {
+    puedeVerProspectos,
+    puedeCrearProspecto,
+    puedeEliminarProspecto,
+  } = useCrmPermisos();
   const { mostrarError, AlertaHost } = useModalAlerta();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +113,7 @@ export default function Prospectos() {
   };
 
   const eliminar = async (row: LeadListado) => {
+    if (!puedeEliminarProspecto) return;
     if (!window.confirm(`¿Eliminar el prospecto "${nombreCompletoLead(row)}"?`))
       return;
     try {
@@ -138,6 +145,19 @@ export default function Prospectos() {
       />
     ) : null;
 
+  if (!puedeVerProspectos) {
+    return (
+      <div className="space-y-2 p-6">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          Prospectos
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          No tiene permiso para consultar prospectos.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 p-6">
       <PageMeta
@@ -163,15 +183,17 @@ export default function Prospectos() {
           >
             Actualizar
           </button>
-          <button
-            type="button"
-            onClick={() => navigate("/CRM/Prospectos/nuevo")}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo prospecto
-          </button>
+          {puedeCrearProspecto ? (
+            <button
+              type="button"
+              onClick={() => navigate("/CRM/Prospectos/nuevo")}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              Nuevo prospecto
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -269,14 +291,16 @@ export default function Prospectos() {
                         >
                           <ArrowBigRight className="h-4 w-4" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => void eliminar(row)}
-                          title="Eliminar"
-                          className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {puedeEliminarProspecto ? (
+                          <button
+                            type="button"
+                            onClick={() => void eliminar(row)}
+                            title="Eliminar"
+                            className="rounded p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

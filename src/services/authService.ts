@@ -1,6 +1,7 @@
 import { api } from "./apiServices";
 import {
   applyMobileAuthHeaders,
+  clearTokenFallback,
   getRefreshFallback,
   persistTokensFromAuthResponse,
 } from "../utils/tokenFallback";
@@ -159,6 +160,44 @@ export const loginService = async (
     ...res.data,
     user: user ?? res.data.user,
   };
+};
+
+export interface CambiarPasswordResponse {
+  success: boolean;
+  message: string;
+}
+
+/** Requiere sesión (cookie o Bearer). No uses ActualizarPassword: es solo Admin. */
+export const cambiarPasswordService = async (
+  currentPassword: string,
+  newPassword: string,
+  confirmPassword: string,
+): Promise<CambiarPasswordResponse> => {
+  const headers: Record<string, string> = {};
+  applyMobileAuthHeaders({ headers });
+
+  const res = await api.post<{ message?: string }>(
+    "/api/Acceso/CambiarPassword",
+    { currentPassword, newPassword, confirmPassword },
+    {
+      withCredentials: true,
+      headers,
+      validateStatus: (status) => status < 500,
+    },
+  );
+
+  const message =
+    res.data?.message ??
+    (res.status >= 200 && res.status < 300
+      ? "Contraseña actualizada. Inicia sesión de nuevo."
+      : "No se pudo cambiar la contraseña");
+
+  if (res.status >= 200 && res.status < 300) {
+    clearTokenFallback();
+    return { success: true, message };
+  }
+
+  return { success: false, message };
 };
 
 // CHECK AUTH (lee cookie HttpOnly o Bearer en móvil)

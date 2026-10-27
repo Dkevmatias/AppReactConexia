@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react";
 import { api } from "../../services/apiServices";
 
 export default function CambiarContrasena() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = (searchParams.get("token") ?? "").trim();
+  const conToken = token.length > 0;
+
   const [email, setEmail] = useState("");
   const [passwordNueva, setPasswordNueva] = useState("");
   const [passwordConfirmar, setPasswordConfirmar] = useState("");
@@ -13,6 +17,7 @@ export default function CambiarContrasena() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [mensajeExito, setMensajeExito] = useState("");
 
   const [passwordStrength, setPasswordStrength] = useState({
     hasMinLength: false,
@@ -30,11 +35,15 @@ export default function CambiarContrasena() {
     });
   }, [passwordNueva]);
 
-  const validar = () => {
+  const validarSolicitud = () => {
     if (!email.trim()) {
       setError("El correo es requerido");
       return false;
     }
+    return true;
+  };
+
+  const validarConfirmacion = () => {
     if (!passwordNueva.trim()) {
       setError("La nueva contraseña es requerida");
       return false;
@@ -59,22 +68,42 @@ export default function CambiarContrasena() {
     setError(null);
     setSuccess(false);
 
-    if (!validar()) return;
+    if (conToken) {
+      if (!validarConfirmacion()) return;
+      setLoading(true);
+      try {
+        await api.post("/api/Acceso/ConfirmarPasswordReset", {
+          token,
+          newPassword: passwordNueva,
+          confirmPassword: passwordConfirmar,
+        });
+        setMensajeExito("Contraseña actualizada. Redirigiendo al login...");
+        setSuccess(true);
+        setTimeout(() => {
+          navigate("/signin");
+        }, 2000);
+      } catch (err: unknown) {
+        const axiosError = err as { response?: { data?: { message?: string } } };
+        setError(axiosError.response?.data?.message || "No se pudo restablecer la contraseña");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
+    if (!validarSolicitud()) return;
     setLoading(true);
     try {
-      await api.post("/api/Acceso/ActualizarPassword", {
-        email,
-        newPassword: passwordNueva,
-        confirmPassword: passwordConfirmar,
+      await api.post("/api/Acceso/SolicitarPasswordReset", {
+        email: email.trim(),
       });
+      setMensajeExito(
+        "Si el correo existe, se envió un enlace de recuperación. Revisa tu bandeja."
+      );
       setSuccess(true);
-      setTimeout(() => {
-        navigate("/signin");
-      }, 2000);
     } catch (err: unknown) {
       const axiosError = err as { response?: { data?: { message?: string } } };
-      setError(axiosError.response?.data?.message || "Error al actualizar la contraseña");
+      setError(axiosError.response?.data?.message || "No se pudo solicitar el restablecimiento");
     } finally {
       setLoading(false);
     }
@@ -89,10 +118,12 @@ export default function CambiarContrasena() {
               <Lock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
             </div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Cambiar Contraseña
+              {conToken ? "Restablecer contraseña" : "Recuperar contraseña"}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Ingresa tu correo y crea una nueva contraseña
+              {conToken
+                ? "Crea una nueva contraseña con el enlace que recibiste"
+                : "Te enviaremos un enlace de recuperación a tu correo"}
             </p>
           </div>
 
@@ -106,118 +137,136 @@ export default function CambiarContrasena() {
           {success && (
             <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2 text-green-700 dark:text-green-400 text-sm">
               <CheckCircle className="w-4 h-4 flex-shrink-0" />
-              <span>Contraseña actualizada correctamente. Redirigiendo al login...</span>
+              <span>{mensajeExito}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Correo electrónico
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@correo.com"
-                disabled={loading || success}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Nueva contraseña
-              </label>
-              <div className="relative">
+            {!conToken && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Correo electrónico
+                </label>
                 <input
-                  type={showPasswordNueva ? "text" : "password"}
-                  value={passwordNueva}
-                  onChange={(e) => setPasswordNueva(e.target.value)}
-                  placeholder="Mínimo 8 caracteres"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@correo.com"
                   disabled={loading || success}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPasswordNueva(!showPasswordNueva)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPasswordNueva ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
               </div>
+            )}
 
-              {passwordNueva && (
-                <div className="mt-2 space-y-1">
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className={`w-2 h-2 rounded-full ${passwordStrength.hasMinLength ? "bg-green-500" : "bg-gray-300"}`} />
-                    <span className={passwordStrength.hasMinLength ? "text-green-600" : "text-gray-500"}>
-                      Mínimo 8 caracteres
-                    </span>
+            {conToken && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Nueva contraseña
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPasswordNueva ? "text" : "password"}
+                      value={passwordNueva}
+                      onChange={(e) => setPasswordNueva(e.target.value)}
+                      placeholder="Mínimo 8 caracteres"
+                      disabled={loading || success}
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordNueva(!showPasswordNueva)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPasswordNueva ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className={`w-2 h-2 rounded-full ${passwordStrength.hasUpperCase && passwordStrength.hasLowerCase ? "bg-green-500" : "bg-gray-300"}`} />
-                    <span className={passwordStrength.hasUpperCase && passwordStrength.hasLowerCase ? "text-green-600" : "text-gray-500"}>
-                      Mayúsculas y minúsculas
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className={`w-2 h-2 rounded-full ${passwordStrength.hasNumber ? "bg-green-500" : "bg-gray-300"}`} />
-                    <span className={passwordStrength.hasNumber ? "text-green-600" : "text-gray-500"}>
-                      Al menos un número
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Confirmar nueva contraseña
-              </label>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={passwordConfirmar}
-                  onChange={(e) => setPasswordConfirmar(e.target.value)}
-                  placeholder="Repite tu contraseña"
-                  disabled={loading || success}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {passwordConfirmar && (
-                <div className="flex items-center gap-2 mt-1.5 text-xs">
-                  {passwordNueva === passwordConfirmar ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span className="text-green-600">Las contraseñas coinciden</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-4 h-4 text-red-500" />
-                      <span className="text-red-600">Las contraseñas no coinciden</span>
-                    </>
+                  {passwordNueva && (
+                    <div className="mt-2 space-y-1">
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className={`w-2 h-2 rounded-full ${passwordStrength.hasMinLength ? "bg-green-500" : "bg-gray-300"}`} />
+                        <span className={passwordStrength.hasMinLength ? "text-green-600" : "text-gray-500"}>
+                          Mínimo 8 caracteres
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className={`w-2 h-2 rounded-full ${passwordStrength.hasUpperCase && passwordStrength.hasLowerCase ? "bg-green-500" : "bg-gray-300"}`} />
+                        <span className={passwordStrength.hasUpperCase && passwordStrength.hasLowerCase ? "text-green-600" : "text-gray-500"}>
+                          Mayúsculas y minúsculas
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className={`w-2 h-2 rounded-full ${passwordStrength.hasNumber ? "bg-green-500" : "bg-gray-300"}`} />
+                        <span className={passwordStrength.hasNumber ? "text-green-600" : "text-gray-500"}>
+                          Al menos un número
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Confirmar nueva contraseña
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={passwordConfirmar}
+                      onChange={(e) => setPasswordConfirmar(e.target.value)}
+                      placeholder="Repite tu contraseña"
+                      disabled={loading || success}
+                      className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {passwordConfirmar && (
+                    <div className="flex items-center gap-2 mt-1.5 text-xs">
+                      {passwordNueva === passwordConfirmar ? (
+                        <>
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                          <span className="text-green-600">Las contraseñas coinciden</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-4 h-4 text-red-500" />
+                          <span className="text-red-600">Las contraseñas no coinciden</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             <button
               type="submit"
               disabled={loading || success}
               className="w-full py-2 bg-black dark:bg-gray-700 text-white rounded-lg hover:bg-gray-900 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
             >
-              {loading ? "Actualizando..." : success ? "Actualizado" : "Actualizar contraseña"}
+              {loading
+                ? "Enviando..."
+                : success
+                  ? "Listo"
+                  : conToken
+                    ? "Restablecer contraseña"
+                    : "Enviar enlace"}
             </button>
           </form>
+
+          <p className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+            <Link to="/signin" className="text-blue-600 hover:underline dark:text-blue-400">
+              Volver al inicio de sesión
+            </Link>
+          </p>
         </div>
       </div>
     </div>

@@ -38,7 +38,8 @@ import {
   type Almacen,
 } from "../../../services/almacenService";
 
-type FiltroAtraso = "" | "0-7" | "8-14" | "15+" | "8+";
+type FiltroAtraso = "" | "0-3" | "3-7" | "7+" | "3+";
+type BandaAtraso = "verde" | "amarillo" | "rojo";
 type FiltroExistencia = "" | "sin-cero" | "solo-cero";
 
 type GrupoFolio = {
@@ -99,23 +100,42 @@ function diasAtrasoDesdeFecha(iso: string): number {
   return Math.max(0, Math.floor(ms / 86_400_000));
 }
 
+function bandaAtraso(dias: number): BandaAtraso {
+  if (dias > 7) return "rojo";
+  if (dias > 3) return "amarillo";
+  return "verde";
+}
+
 function pasaFiltroAtraso(dias: number, filtro: FiltroAtraso): boolean {
   if (!filtro) return true;
-  if (filtro === "0-7") return dias <= 7;
-  if (filtro === "8-14") return dias >= 8 && dias <= 14;
-  if (filtro === "15+") return dias >= 15;
-  if (filtro === "8+") return dias >= 8;
+  const banda = bandaAtraso(dias);
+  if (filtro === "0-3") return banda === "verde";
+  if (filtro === "3-7") return banda === "amarillo";
+  if (filtro === "7+") return banda === "rojo";
+  if (filtro === "3+") return banda !== "verde";
   return true;
 }
 
 function claseSemáforoAtraso(dias: number): string {
-  if (dias >= 15) {
+  const banda = bandaAtraso(dias);
+  if (banda === "rojo") {
     return "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/40";
   }
-  if (dias >= 8) {
+  if (banda === "amarillo") {
     return "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30";
   }
-  return "border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800";
+  return "border-green-200 bg-green-50 dark:border-green-700 dark:bg-green-950/30";
+}
+
+function claseBadgeAtraso(dias: number): string {
+  const banda = bandaAtraso(dias);
+  if (banda === "rojo") {
+    return "bg-red-200 text-red-900 dark:bg-red-900/60 dark:text-red-100";
+  }
+  if (banda === "amarillo") {
+    return "bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-100";
+  }
+  return "bg-green-200 text-green-900 dark:bg-green-900/60 dark:text-green-100";
 }
 
 function etiquetaAtraso(dias: number): string {
@@ -454,7 +474,8 @@ export default function ReportesPorSurtir({
 
   useEffect(() => {
     if (!restringirAVendedor || !vendedorSesion.listo) return;
-    const valor = vendedores[0] || vendedorSesion.username || vendedorSesion.nombre;
+    const valor =
+      vendedores[0] || vendedorSesion.username || vendedorSesion.nombre;
     if (valor && filtroVendedor !== valor) setFiltroVendedor(valor);
   }, [
     restringirAVendedor,
@@ -641,16 +662,16 @@ export default function ReportesPorSurtir({
           </p>
           <p className="mt-1 flex flex-wrap gap-3 text-[11px] text-gray-500 dark:text-gray-400">
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-sm border border-gray-300 bg-white" />
-              0–7 días
+              <span className="h-2.5 w-2.5 rounded-sm border border-green-400 bg-green-200" />
+              0–3 días
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-sm border border-amber-400 bg-amber-200" />
-              8–14 días
+              4–6 días
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-sm border border-red-400 bg-red-200" />
-              15+ días
+              7+ días
             </span>
           </p>
           {almacenesConsulta.length > 0 ? (
@@ -843,10 +864,10 @@ export default function ReportesPorSurtir({
             className="w-full min-h-[40px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="">Todos</option>
-            <option value="0-7">0–7 días</option>
-            <option value="8-14">8–14 días (amarillo)</option>
-            <option value="15+">15+ días (rojo)</option>
-            <option value="8+">8+ días (amarillo y rojo)</option>
+            <option value="0-3">0–3 días</option>
+            <option value="4-6">4–6 días (amarillo)</option>
+            <option value="7+">7+ días (rojo)</option>
+            <option value="4+">4+ días (amarillo y rojo)</option>
           </select>
         </div>
         <div className="w-full sm:w-44">
@@ -1001,13 +1022,9 @@ export default function ReportesPorSurtir({
                                   · {formatFechaCorta(folio.fecha)}
                                 </span>
                                 <span
-                                  className={`ml-2 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
-                                    folio.diasAtraso >= 15
-                                      ? "bg-red-200 text-red-900 dark:bg-red-900/60 dark:text-red-100"
-                                      : folio.diasAtraso >= 8
-                                        ? "bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-100"
-                                        : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                                  }`}
+                                  className={`ml-2 inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${claseBadgeAtraso(
+                                    folio.diasAtraso,
+                                  )}`}
                                 >
                                   {etiquetaAtraso(folio.diasAtraso)}
                                 </span>
@@ -1130,115 +1147,115 @@ export default function ReportesPorSurtir({
                                 ))}
                               </div>
                               <TablaScroll className="hidden md:block">
-                              <table className="min-w-[56rem] w-full text-xs sm:text-sm">
-                                <thead className="bg-black/[0.03] dark:bg-black/30">
-                                  <tr className="text-left text-gray-600 dark:text-gray-200">
-                                    <th className="whitespace-nowrap px-3 py-2">
-                                      Artículo
-                                    </th>
-                                    <th className="whitespace-nowrap px-3 py-2">
-                                      Cód. prov.
-                                    </th>
-                                    <th className="min-w-[160px] px-3 py-2">
-                                      Descripción
-                                    </th>
-                                    <th className="whitespace-nowrap px-3 py-2">
-                                      Marca
-                                    </th>
-                                    <th className="whitespace-nowrap px-3 py-2 text-right">
-                                      Cant. tot.
-                                    </th>
-                                    <th className="whitespace-nowrap px-3 py-2 text-right">
-                                      Cant. pdte.
-                                    </th>
-                                    <th className="whitespace-nowrap px-3 py-2 text-right">
-                                      Exist.
-                                    </th>
-                                    <th className="whitespace-nowrap px-3 py-2 text-right">
-                                      ULKP pdte.
-                                    </th>
-                                    <th className="whitespace-nowrap px-3 py-2 text-right">
-                                      Importe pdte.
-                                    </th>
-                                    <th
-                                      className="whitespace-nowrap px-2 py-2 text-center"
-                                      aria-label="Existencias por almacén"
-                                    >
-                                      <span className="sr-only">
-                                        Existencias
-                                      </span>
-                                      <Warehouse className="mx-auto h-3.5 w-3.5 text-gray-400" />
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {folio.articulos.map((r, idx) => (
-                                    <tr
-                                      key={`${r.articulo}-${r.almacen}-${idx}`}
-                                      className="cursor-pointer border-t border-black/5 hover:bg-sky-50/60 dark:border-white/10 dark:hover:bg-sky-950/20"
-                                      title="Doble clic o botón para ver existencias por almacén"
-                                      onDoubleClick={() =>
-                                        abrirExistenciasArticulo(r)
-                                      }
-                                    >
-                                      <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px]">
-                                        {r.articulo || "—"}
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2">
-                                        {r.codigoProv || "—"}
-                                      </td>
-                                      <td
-                                        className="max-w-[240px] truncate px-3 py-2"
-                                        title={r.descripcion}
+                                <table className="min-w-[56rem] w-full text-xs sm:text-sm">
+                                  <thead className="bg-black/[0.03] dark:bg-black/30">
+                                    <tr className="text-left text-gray-600 dark:text-gray-200">
+                                      <th className="whitespace-nowrap px-3 py-2">
+                                        Artículo
+                                      </th>
+                                      <th className="whitespace-nowrap px-3 py-2">
+                                        Cód. prov.
+                                      </th>
+                                      <th className="min-w-[160px] px-3 py-2">
+                                        Descripción
+                                      </th>
+                                      <th className="whitespace-nowrap px-3 py-2">
+                                        Marca
+                                      </th>
+                                      <th className="whitespace-nowrap px-3 py-2 text-right">
+                                        Cant. tot.
+                                      </th>
+                                      <th className="whitespace-nowrap px-3 py-2 text-right">
+                                        Cant. pdte.
+                                      </th>
+                                      <th className="whitespace-nowrap px-3 py-2 text-right">
+                                        Exist.
+                                      </th>
+                                      <th className="whitespace-nowrap px-3 py-2 text-right">
+                                        ULKP pdte.
+                                      </th>
+                                      <th className="whitespace-nowrap px-3 py-2 text-right">
+                                        Importe pdte.
+                                      </th>
+                                      <th
+                                        className="whitespace-nowrap px-2 py-2 text-center"
+                                        aria-label="Existencias por almacén"
                                       >
-                                        {r.descripcion || "—"}
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2">
-                                        {r.marca || "—"}
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                                        {formatNumber(r.cantidadTotal)}
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums font-medium">
-                                        {formatNumber(r.cantidadPdnte)}
-                                      </td>
-                                      <td
-                                        className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
-                                          (r.existencia ?? 0) <= 0
-                                            ? "font-semibold text-red-700 dark:text-red-300"
-                                            : ""
-                                        }`}
-                                      >
-                                        {formatNumber(r.existencia)}
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                                        {formatNumber(r.ulkpsPartPdte)}
-                                      </td>
-                                      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                                        {formatCurrency(r.importePartPdte)}
-                                      </td>
-                                      <td className="whitespace-nowrap px-2 py-2 text-center">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            abrirExistenciasArticulo(r);
-                                          }}
-                                          disabled={
-                                            !r.articulo?.trim() &&
-                                            !r.codigoProv?.trim()
-                                          }
-                                          title="Ver existencias por almacén"
-                                          className="inline-flex min-h-[32px] min-w-[32px] items-center justify-center rounded-lg border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-900/50"
-                                          aria-label={`Ver existencias de ${r.articulo || r.codigoProv}`}
-                                        >
-                                          <Warehouse className="h-3.5 w-3.5" />
-                                        </button>
-                                      </td>
+                                        <span className="sr-only">
+                                          Existencias
+                                        </span>
+                                        <Warehouse className="mx-auto h-3.5 w-3.5 text-gray-400" />
+                                      </th>
                                     </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody>
+                                    {folio.articulos.map((r, idx) => (
+                                      <tr
+                                        key={`${r.articulo}-${r.almacen}-${idx}`}
+                                        className="cursor-pointer border-t border-black/5 hover:bg-sky-50/60 dark:border-white/10 dark:hover:bg-sky-950/20"
+                                        title="Doble clic o botón para ver existencias por almacén"
+                                        onDoubleClick={() =>
+                                          abrirExistenciasArticulo(r)
+                                        }
+                                      >
+                                        <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px]">
+                                          {r.articulo || "—"}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-2">
+                                          {r.codigoProv || "—"}
+                                        </td>
+                                        <td
+                                          className="max-w-[240px] truncate px-3 py-2"
+                                          title={r.descripcion}
+                                        >
+                                          {r.descripcion || "—"}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-2">
+                                          {r.marca || "—"}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                          {formatNumber(r.cantidadTotal)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums font-medium">
+                                          {formatNumber(r.cantidadPdnte)}
+                                        </td>
+                                        <td
+                                          className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
+                                            (r.existencia ?? 0) <= 0
+                                              ? "font-semibold text-red-700 dark:text-red-300"
+                                              : ""
+                                          }`}
+                                        >
+                                          {formatNumber(r.existencia)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                          {formatNumber(r.ulkpsPartPdte)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+                                          {formatCurrency(r.importePartPdte)}
+                                        </td>
+                                        <td className="whitespace-nowrap px-2 py-2 text-center">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              abrirExistenciasArticulo(r);
+                                            }}
+                                            disabled={
+                                              !r.articulo?.trim() &&
+                                              !r.codigoProv?.trim()
+                                            }
+                                            title="Ver existencias por almacén"
+                                            className="inline-flex min-h-[32px] min-w-[32px] items-center justify-center rounded-lg border border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 dark:hover:bg-sky-900/50"
+                                            aria-label={`Ver existencias de ${r.articulo || r.codigoProv}`}
+                                          >
+                                            <Warehouse className="h-3.5 w-3.5" />
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
                               </TablaScroll>
                             </div>
                           ) : null}

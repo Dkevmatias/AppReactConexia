@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router";
 import PageMeta from "../../components/common/PageMeta";
+import { useCrmPermisos } from "../../hooks/useCrmPermisos";
 import CatalogoEstatus from "./CatalogoEstatus";
 import CatalogoEtapas from "./CatalogoEtapas";
 import CatalogoFuentes from "./CatalogoFuentes";
@@ -23,6 +24,7 @@ function tabValida(raw: string | null): TabId {
 }
 
 export default function CrmCatalogos() {
+  const { puedeVerCatalogos, puedeOperarCatalogos } = useCrmPermisos();
   const [params, setParams] = useSearchParams();
   const tabActiva = useMemo(() => tabValida(params.get("tab")), [params]);
 
@@ -31,6 +33,19 @@ export default function CrmCatalogos() {
     next.set("tab", id);
     setParams(next, { replace: true });
   };
+
+  if (!puedeVerCatalogos) {
+    return (
+      <div className="space-y-2 p-6">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          Catálogos
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          No tiene permiso para consultar catálogos.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -46,6 +61,9 @@ export default function CrmCatalogos() {
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Un solo lugar para mantener los catálogos del CRM. Use las pestañas
           para cambiar entre ellos.
+          {!puedeOperarCatalogos
+            ? " Solo consulta: no puede crear, editar ni eliminar."
+            : ""}
         </p>
       </div>
 
@@ -77,14 +95,26 @@ export default function CrmCatalogos() {
         </div>
 
         <div className="p-4 sm:p-5" role="tabpanel">
-          {tabActiva === "etapas" ? <CatalogoEtapas embebido /> : null}
-          {tabActiva === "fuentes" ? <CatalogoFuentes embebido /> : null}
-          {tabActiva === "seguimientos" ? (
-            <CatalogoSeguimientos embebido />
+          {tabActiva === "etapas" ? (
+            <CatalogoEtapas embebido soloLectura={!puedeOperarCatalogos} />
           ) : null}
-          {tabActiva === "estatus" ? <CatalogoEstatus embebido /> : null}
+          {tabActiva === "fuentes" ? (
+            <CatalogoFuentes embebido soloLectura={!puedeOperarCatalogos} />
+          ) : null}
+          {tabActiva === "seguimientos" ? (
+            <CatalogoSeguimientos
+              embebido
+              soloLectura={!puedeOperarCatalogos}
+            />
+          ) : null}
+          {tabActiva === "estatus" ? (
+            <CatalogoEstatus embebido soloLectura={!puedeOperarCatalogos} />
+          ) : null}
           {tabActiva === "tipo-estatus" ? (
-            <CatalogoTipoEstatus embebido />
+            <CatalogoTipoEstatus
+              embebido
+              soloLectura={!puedeOperarCatalogos}
+            />
           ) : null}
         </div>
       </div>

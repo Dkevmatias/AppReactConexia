@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ClienteAltaForm } from "./clienteAltaUtils";
 import ModalContactosCliente from "./ModalContactosCliente";
 import TabCamposUsuarioCliente from "./TabCamposUsuarioCliente";
@@ -68,6 +68,15 @@ export default function TabsCreacionCliente({
   const [tabActiva, setTabActiva] = useState<TabCreacionClienteId>("general");
   const [modalContactosAbierto, setModalContactosAbierto] = useState(false);
 
+  useEffect(() => {
+    if (
+      camposInvalidos?.has("direccionEntrega") ||
+      camposInvalidos?.has("direcciones")
+    ) {
+      setTabActiva("direcciones");
+    }
+  }, [camposInvalidos]);
+
   if (!visible) return null;
 
   const renderPanel = () => {
@@ -91,6 +100,7 @@ export default function TabsCreacionCliente({
             onGuardarDireccion={onGuardarDireccion}
             soloLectura={soloLectura}
             camposInvalidos={camposInvalidos}
+            idEmpresa={idEmpresa}
           />
         );
       case "condicion-pago":

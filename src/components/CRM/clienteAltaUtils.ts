@@ -1,4 +1,5 @@
 import {
+  ID_EMPRESA_CODIAL,
   ID_EMPRESA_CODIALUB,
   idEmpresaDescuentoDesdeDoc,
 } from "./prospectoFormUtils";
@@ -205,6 +206,61 @@ export const MONEDA_FIJA = "MXN";
 /** Addenda especial fija (no editable en UI). */
 export const ADDENDA_ESP_FIJA = "Cap_31";
 
+export const NOMBRE_DIR_FISCAL = "Direccion Fiscal";
+export const NOMBRE_DIR_ENTREGA = "Direccion de Entrega";
+
+export const CODIGOS_IVA_DIRECCION = [
+  { value: "IVAT16", label: "IVAT16" },
+  { value: "IVAT0", label: "IVAT0" },
+  { value: "IVAT8", label: "IVAT8" },
+] as const;
+
+export const IVA_DIRECCION_CODIAL = "IVAT16";
+
+export function ivaFijoEnEmpresa(
+  idEmpresa: number | null | undefined,
+): boolean {
+  return idEmpresa === ID_EMPRESA_CODIAL;
+}
+
+export function ivaDireccionParaEmpresa(
+  iva: string,
+  idEmpresa: number | null | undefined,
+): string {
+  return ivaFijoEnEmpresa(idEmpresa) ? IVA_DIRECCION_CODIAL : iva;
+}
+
+export function opcionesIvaDireccion(
+  idEmpresa: number | null | undefined,
+): ReadonlyArray<{ value: string; label: string }> {
+  if (ivaFijoEnEmpresa(idEmpresa)) {
+    return CODIGOS_IVA_DIRECCION.filter(
+      (o) => o.value === IVA_DIRECCION_CODIAL,
+    );
+  }
+  return CODIGOS_IVA_DIRECCION;
+}
+
+export function nombreDireccionPorTipo(tipo: TipoDireccionCliente): string {
+  return tipo === "FISCAL" ? NOMBRE_DIR_FISCAL : NOMBRE_DIR_ENTREGA;
+}
+
+function esNombreDireccionGenerico(nombre: string): boolean {
+  const n = nombre
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return (
+    !n ||
+    n === "fiscal" ||
+    n === "entrega" ||
+    n === "direccion fiscal" ||
+    n === "direccion de entrega" ||
+    n === "fiscal (entrega)"
+  );
+}
+
 export const SI_NO_SAP = [
   { value: "", label: "Seleccione" },
   { value: "Y", label: "Sí" },
@@ -222,7 +278,7 @@ export function direccionVacia(
     idLocal: nuevoIdLocal(),
     idClienteDireccion: null,
     tipo,
-    nombre: tipo === "FISCAL" ? "Fiscal" : "Entrega",
+    nombre: nombreDireccionPorTipo(tipo),
     calle: "",
     numero: "",
     colonia: "",
@@ -230,7 +286,7 @@ export function direccionVacia(
     estado: "",
     pais: "MX",
     cp: "",
-    iva: "",
+    iva: "IVAT16",
     coloniaSat: "",
     localidadSat: "",
     municipioSat: "",
@@ -253,7 +309,7 @@ export function contactoVacio(): ContactoClienteForm {
     telefono2: "",
     email: "",
     genero: "",
-    enviarCorreo: "",
+    enviarCorreo: "Y",
   };
 }
 
@@ -1016,14 +1072,12 @@ export function armarPayloadSapDiscountGroup(opts: {
   ObjectCode: string;
   DiscountRelations: string | null;
   Active: string;
-  ValidTo: string | null;
+  ValidTo?: string | null;
   DiscountGroupLineCollection: Array<{
     ObjectType: string;
     ObjectCode: string;
     Discount: number;
     DiscountType: string;
-    PaidQuantity: number | null;
-    FreeQuantity: number | null;
   }>;
 } {
   const cardCode = (opts.cardCode || "").trim();
@@ -1035,19 +1089,20 @@ export function armarPayloadSapDiscountGroup(opts: {
 
   const lineas = opts.filas
     .map((fila) => {
-      const objectCode = (fila.ObjCode || "").trim();
+      const objectCode = claveObjMarca(fila.ObjCode);
       const discount = porcentajeADiscountDecimal(
         fila.porcentaje || fila.DiscRel,
         fila.discountLimit,
       );
-      if (!objectCode || discount <= 0) return null;
+      const firm = Number(objectCode);
+      if (!objectCode || !Number.isFinite(firm) || firm <= 0 || discount <= 0) {
+        return null;
+      }
       return {
         ObjectType: "dgboManufacturer",
         ObjectCode: objectCode,
         Discount: discount,
         DiscountType: "dt_Percentage",
-        PaidQuantity: null as number | null,
-        FreeQuantity: null as number | null,
       };
     })
     .filter((x): x is NonNullable<typeof x> => x != null);
@@ -1057,7 +1112,7 @@ export function armarPayloadSapDiscountGroup(opts: {
     ObjectCode: cardCode,
     DiscountRelations: "dgrDiscountTotals",
     Active: active,
-    ValidTo: header?.ValidTo || null,
+    ...(header?.ValidTo ? { ValidTo: header.ValidTo } : {}),
     DiscountGroupLineCollection: lineas,
   };
 }
@@ -1153,6 +1208,43 @@ function pickNum(o: Record<string, unknown>, ...keys: string[]): number | null {
   return null;
 }
 
+function enviarCorreoDesdeApi(valor: string): EnviarCorreoContacto {
+  const v = valor.trim().toUpperCase();
+  if (v === "N" || v === "NO" || v === "FALSE" || v === "TNO") return "N";
+  return "Y";
+}
+
+function formaPagoCfdiDesdeApi(
+  cliente: Record<string, unknown>,
+  fiscal: Record<string, unknown>,
+): string {
+  const directo = pickStr(
+    fiscal,
+    "formaPagoCfdi",
+    "FormaPagoCfdi",
+    "u_Forma",
+    "U_Forma",
+    "formaPago",
+    "FormaPago",
+  );
+  const enCliente = pickStr(
+    cliente,
+    "u_Forma",
+    "U_Forma",
+    "formaPagoCfdi",
+    "FormaPagoCfdi",
+  );
+  const metodos = asArray(
+    pickRaw(cliente, "metodosPago", "MetodosPago"),
+  )
+    .map((m) =>
+      pickStr(asRecord(m), "codigoMetodoPago", "CodigoMetodoPago", "codigo"),
+    )
+    .filter(Boolean);
+  const raw = directo || enCliente || metodos[0] || "";
+  return codigoFormaPagoSap(raw) ?? raw;
+}
+
 function tipoPersonaDesdeSap(companyPrivate: string): TipoPersonaCliente | "" {
   const v = companyPrivate.trim().toLowerCase();
   if (v === "ccompany") return "MORAL";
@@ -1189,6 +1281,9 @@ export function contactoFormDesdeApi(raw: unknown): ContactoClienteForm {
     telefono2: pickStr(c, "telefonoSecundario", "TelefonoSecundario"),
     email: pickStr(c, "email", "Email"),
     genero,
+    enviarCorreo: enviarCorreoDesdeApi(
+      pickStr(c, "enviarCorreo", "EnviarCorreo", "sendEmail", "SendEmail"),
+    ),
   };
 }
 
@@ -1216,7 +1311,7 @@ export function clienteAltaDesdeApi(raw: unknown): ClienteAltaForm {
     usoCfdi: pickStr(fiscal, "usoCfdi", "UsoCfdi", "mainUsage", "MainUsage"),
     regimenFiscal: pickStr(fiscal, "regimenFiscal", "RegimenFiscal"),
     metodoPagoCfdi: pickStr(fiscal, "metodoPagoCfdi", "MetodoPagoCfdi"),
-    formaPagoCfdi: pickStr(fiscal, "formaPagoCfdi", "FormaPagoCfdi"),
+    formaPagoCfdi: formaPagoCfdiDesdeApi(o, fiscal),
     phone1: pickStr(o, "phone1", "Phone1"),
     phone2: pickStr(o, "phone2", "Phone2"),
     emailAddress: pickStr(o, "emailAddress", "EmailAddress"),
@@ -1327,17 +1422,12 @@ export function clonarDireccionComoEntrega(
     idLocal: nuevoIdLocal(),
     idClienteDireccion: null,
     tipo: "ENTREGA",
-    nombre: origen.nombre
-      ? `${origen.nombre} (Entrega)`.replace(
-          / \(Entrega\)( \(Entrega\))+/,
-          " (Entrega)",
-        )
-      : "Entrega",
+    nombre: NOMBRE_DIR_ENTREGA,
   };
 }
 
 export function etiquetaTipoDireccion(tipo: TipoDireccionCliente): string {
-  return tipo === "FISCAL" ? "Fiscal" : "Entrega";
+  return tipo === "FISCAL" ? "Direccion Fiscal" : "Direccion de Entrega";
 }
 
 export function etiquetaTipoPersona(tipo: TipoPersonaCliente | ""): string {
@@ -1453,13 +1543,14 @@ const ETIQUETAS_CAMPO_CLIENTE: Record<string, string> = {
   uDiaVisita: "Día de visita",
   salesPersonCode: "Vendedor SAP",
   direcciones: "Direcciones",
+  direccionEntrega: "Dirección de entrega",
 };
 
 const CAMPOS_DIRECCION_OBLIGATORIOS: Array<{
   key: keyof DireccionClienteForm;
   etiqueta: string;
 }> = [
-  { key: "nombre", etiqueta: "Nombre" },
+  { key: "nombre", etiqueta: "Dirección" },
   { key: "calle", etiqueta: "Calle" },
   { key: "numero", etiqueta: "Número" },
   { key: "cp", etiqueta: "Código postal" },
@@ -1498,6 +1589,11 @@ export function camposFaltantesClienteAlta(form: ClienteAltaForm): string[] {
   if (vacio(form.uBxpDpp)) faltantes.push("uBxpDpp");
   if (vacio(form.uDiaVisita)) faltantes.push("uDiaVisita");
   if (vacio(form.salesPersonCode)) faltantes.push("salesPersonCode");
+
+  const hayEntrega = form.direcciones.some((d) => d.tipo === "ENTREGA");
+  if (!hayEntrega) {
+    faltantes.push("direccionEntrega");
+  }
 
   if (form.direcciones.length === 0) {
     faltantes.push("direcciones");
@@ -1541,6 +1637,19 @@ export function validarClienteAlta(
   const campos = camposFaltantesClienteAlta(form);
   if (campos.length === 0) {
     return { mensaje: null, campos: [] };
+  }
+
+  if (campos.includes("direccionEntrega")) {
+    const otros = campos.filter(
+      (c) => c !== "direccionEntrega" && c !== "direcciones",
+    );
+    if (otros.length === 0) {
+      return {
+        mensaje:
+          "Capture una dirección de entrega antes de guardar el cliente.",
+        campos,
+      };
+    }
   }
 
   const etiquetas = campos
@@ -1683,6 +1792,8 @@ export type ContactoCreatePayload = {
   firstName?: string | null;
   title?: string | null;
   gender?: string | null;
+  enviarCorreo?: EnviarCorreoContacto | null;
+  sendEmail?: EnviarCorreoContacto | null;
   activo: boolean;
 };
 
@@ -1749,7 +1860,7 @@ export function armarPayloadClienteCreate(opts: {
         state: codigoEstadoSap(d.estado),
         country: paisSap(d.pais),
         zipCode: trimOrNull(d.cp),
-        taxCode: trimOrNull(d.iva),
+        taxCode: trimOrNull(ivaDireccionParaEmpresa(d.iva, opts.idEmpresa)),
         federalTaxID: trimOrNull(form.rfc),
         u_COK1_01COL: trimOrNull(d.coloniaSat || d.colonia),
         u_COK1_01LOC: trimOrNull(d.localidadSat),
@@ -1841,6 +1952,8 @@ export function armarPayloadContacto(
     firstName: trimOrNull(c.nombre),
     title: trimOrNull(c.titulo),
     gender: trimOrNull(c.genero),
+    enviarCorreo: c.enviarCorreo || "Y",
+    sendEmail: c.enviarCorreo || "Y",
     activo: true,
   };
 }
@@ -1888,6 +2001,7 @@ export function armarPayloadDireccion(
     rfc?: string | null;
     esDefaultBillTo?: boolean;
     esDefaultShipTo?: boolean;
+    idEmpresa?: number | null;
   },
 ): DireccionCreatePayload {
   return {
@@ -1901,7 +2015,7 @@ export function armarPayloadDireccion(
     state: codigoEstadoSap(d.estado),
     country: paisSap(d.pais),
     zipCode: trimOrNull(d.cp),
-    taxCode: trimOrNull(d.iva),
+    taxCode: trimOrNull(ivaDireccionParaEmpresa(d.iva, opts.idEmpresa)),
     federalTaxID: trimOrNull(opts.rfc),
     u_COK1_01COL: trimOrNull(d.coloniaSat || d.colonia),
     u_COK1_01LOC: trimOrNull(d.localidadSat),
@@ -1924,7 +2038,10 @@ export function direccionFormDesdeApi(raw: unknown): DireccionClienteForm {
     ...direccionVacia(tipo),
     idClienteDireccion: idDir > 0 ? idDir : null,
     tipo,
-    nombre: pickStr(d, "addressName", "AddressName"),
+    nombre: (() => {
+      const n = pickStr(d, "addressName", "AddressName");
+      return esNombreDireccionGenerico(n) ? nombreDireccionPorTipo(tipo) : n;
+    })(),
     calle: pickStr(d, "street", "Street"),
     numero: pickStr(d, "streetNo", "StreetNo"),
     colonia: pickStr(d, "block", "Block"),
@@ -1947,10 +2064,11 @@ export function prellenarClienteDesdeLead(opts: {
   actual: ClienteAltaForm;
   nombre?: string | null;
   aPaterno?: string | null;
+  aMaterno?: string | null;
   telefono?: string | null;
   correo?: string | null;
 }): ClienteAltaForm {
-  const nombreNegocio = [opts.nombre, opts.aPaterno]
+  const nombreNegocio = [opts.nombre, opts.aPaterno, opts.aMaterno]
     .map((p) => (p ?? "").trim())
     .filter(Boolean)
     .join(" ");
@@ -1968,6 +2086,7 @@ export function armarPayloadSapBusinessPartner(opts: {
   form: ClienteAltaForm;
   groupCode?: number | null;
   cardCode?: string | null;
+  idEmpresa?: number | null;
 }): Record<string, unknown> {
   const { form } = opts;
   const formaPago = codigoFormaPagoSap(form.formaPagoCfdi);
@@ -2009,7 +2128,7 @@ export function armarPayloadSapBusinessPartner(opts: {
         State: codigoEstadoSap(d.estado),
         ZipCode: trimOrNull(d.cp),
         Country: paisSap(d.pais),
-        TaxCode: trimOrNull(d.iva),
+        TaxCode: trimOrNull(ivaDireccionParaEmpresa(d.iva, opts.idEmpresa)),
         AddressType: d.tipo === "FISCAL" ? "bo_BillTo" : "bo_ShipTo",
         U_IdUbic: null,
         U_COK1_01COL: trimOrNull(d.coloniaSat || d.colonia),
@@ -2030,6 +2149,7 @@ export function armarPayloadSapBusinessPartner(opts: {
         E_Mail: trimOrNull(c.email),
         Phone1: trimOrNull(c.telefono1),
         Gender: trimOrNull(c.genero),
+        SendEmail: c.enviarCorreo === "N" ? "tNO" : "tYES",
       })),
     BPPaymentMethods: metodosSap.map((PaymentMethodCode) => ({
       PaymentMethodCode,

@@ -7,6 +7,7 @@ import ModalDetalleRegistro, {
   CampoDetalle,
 } from "../../components/common/ModalDetalleRegistro";
 import { useClientPagination } from "../../hooks/useClientPagination";
+import { useCrmPermisos } from "../../hooks/useCrmPermisos";
 import {
   clienteService,
   type ClienteResumen,
@@ -32,6 +33,8 @@ function badgeEstatusSap(estatus: string | null): string {
 
 export default function CrmClientes() {
   const navigate = useNavigate();
+  const { puedeVerClientes, puedeOperarClientes, puedeVerProspectos } =
+    useCrmPermisos();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
@@ -97,6 +100,21 @@ export default function CrmClientes() {
     setDetalle(row);
     setModalAbierto(true);
   };
+
+  const puedeAbrirFicha = puedeOperarClientes || puedeVerProspectos;
+
+  if (!puedeVerClientes) {
+    return (
+      <div className="space-y-2 p-6">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          Clientes
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          No tiene permiso para consultar clientes.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -242,7 +260,7 @@ export default function CrmClientes() {
                       </span>
                     </td>
                     <td className="px-4 py-2">
-                      {row.idLeadOrigen ? (
+                      {row.idLeadOrigen && puedeAbrirFicha ? (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -254,6 +272,8 @@ export default function CrmClientes() {
                         >
                           #{row.idLeadOrigen}
                         </button>
+                      ) : row.idLeadOrigen ? (
+                        `#${row.idLeadOrigen}`
                       ) : (
                         "—"
                       )}
@@ -262,7 +282,7 @@ export default function CrmClientes() {
                       {formatearFechaLead(row.fechaCreacion)}
                     </td>
                     <td className="px-4 py-2 text-right">
-                      {row.idLeadOrigen ? (
+                      {row.idLeadOrigen && puedeAbrirFicha ? (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -306,7 +326,7 @@ export default function CrmClientes() {
             >
               Cerrar
             </button>
-            {detalle?.idLeadOrigen ? (
+            {detalle?.idLeadOrigen && puedeAbrirFicha ? (
               <button
                 type="button"
                 onClick={() =>

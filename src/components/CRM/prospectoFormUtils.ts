@@ -31,20 +31,25 @@ export type VendedorSapRef = {
   activo?: boolean;
 };
 
-/** Codialub → salesPersonCode; Codial → salesPersonCode2. Vacío si no hay SlpCode. */
+function slpCodeValido(
+  code: number | string | null | undefined,
+): string {
+  const n = Number(code);
+  return Number.isFinite(n) && n > 0 ? String(n) : "";
+}
+
+/** Codialub → salesPersonCode; Codial → salesPersonCode2. Si falta el de esa base, usa el otro. */
 export function salesPersonCodeSegunEmpresa(
   vendedor: VendedorSapRef | null | undefined,
   idEmpresa: number | null | undefined,
 ): string {
-  if (!vendedor || idEmpresa == null) return "";
+  if (!vendedor) return "";
+  const deCodialub = slpCodeValido(vendedor.salesPersonCode);
+  const deCodial = slpCodeValido(vendedor.salesPersonCode2);
   const empresa = Number(idEmpresa);
-  const code =
-    empresa === ID_EMPRESA_CODIAL
-      ? vendedor.salesPersonCode2
-      : empresa === ID_EMPRESA_CODIALUB
-        ? vendedor.salesPersonCode
-        : null;
-  return code != null && Number(code) > 0 ? String(code) : "";
+  if (empresa === ID_EMPRESA_CODIAL) return deCodial || deCodialub;
+  if (empresa === ID_EMPRESA_CODIALUB) return deCodialub || deCodial;
+  return deCodialub || deCodial;
 }
 
 export function vendedorPorIdUsuario<T extends VendedorSapRef>(

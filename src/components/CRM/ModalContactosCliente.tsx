@@ -40,7 +40,10 @@ export default function ModalContactosCliente({
     if (!abierto) return;
     setBorrador(
       contactos.length > 0
-        ? contactos.map((c) => ({ ...c }))
+        ? contactos.map((c) => ({
+            ...c,
+            enviarCorreo: c.enviarCorreo || "Y",
+          }))
         : [contactoVacio()],
     );
     setError(null);

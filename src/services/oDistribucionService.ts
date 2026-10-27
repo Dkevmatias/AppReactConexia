@@ -20,6 +20,13 @@ export interface ODistribucionParams {
   fechaHasta: string;
 }
 
+/** Catálogo VW_REPARTO: NomUser es el filtro de órdenes de distribución. */
+export type RepartidorCatalogo = {
+  idUsuario: number;
+  nombreUsuario: string;
+  nomUser: string;
+};
+
 export interface DocODistribucionDetalle {
   sociedad: string | null;
   tipoOD: string | null;
@@ -136,6 +143,20 @@ function normalizeList(raw: unknown): ODistribucionDocumento[] {
   return normalizeArray(raw, normalizeDocumento);
 }
 
+function normalizeRepartidor(raw: unknown): RepartidorCatalogo {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  return {
+    idUsuario: pickNumber(o, "idUsuario", "IdUsuario") ?? 0,
+    nombreUsuario:
+      pickString(o, "nombreUsuario", "NombreUsuario", "nombre", "Nombre") ??
+      "",
+    nomUser: pickString(o, "nomUser", "NomUser") ?? "",
+  };
+}
+
 function normalizeDetalle(raw: unknown): DocODistribucionDetalle {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<
     string,
@@ -233,6 +254,29 @@ export const filtrosODistribucionPorDefecto = () => ({
 });
 
 export const oDistribucionService = {
+  getRepartidores: async (): Promise<RepartidorCatalogo[]> => {
+    const response = await api.get<unknown>("/api/Reparto");
+    const lista = normalizeArray(
+      assertOk(response, "No se pudieron cargar los repartidores."),
+      normalizeRepartidor,
+    );
+    const vistos = new Set<string>();
+    return lista
+      .filter((r) => {
+        const clave = r.nomUser.trim().toLowerCase();
+        if (!clave || vistos.has(clave)) return false;
+        vistos.add(clave);
+        return true;
+      })
+      .sort((a, b) =>
+        (a.nombreUsuario || a.nomUser).localeCompare(
+          b.nombreUsuario || b.nomUser,
+          "es",
+          { sensitivity: "base" },
+        ),
+      );
+  },
+
   getDocumentos: async (
     params: ODistribucionParams,
   ): Promise<ODistribucionDocumento[]> => {

@@ -29,7 +29,7 @@ type TabDescuentosClienteProps = {
   idEmpresa?: number | null;
   onIdEmpresaChange?: (idEmpresa: number | null) => void;
   empresasEnviadas?: number[];
-  /** Empresas a las que ya se envió el cliente (el BP debe existir en SAP). */
+  /** Empresas a las que ya se envió el cliente (el BP debe existir en SAP para el envío). */
   empresasClienteEnviadas?: number[];
   soloLectura?: boolean;
   camposInvalidos?: Set<string>;
@@ -68,10 +68,6 @@ export default function TabDescuentosCliente({
     idEmpresa != null && idEmpresa > 0 ? idEmpresa : null;
   const enviadoCodialub = empresasEnviadas.includes(ID_EMPRESA_CODIALUB);
   const enviadoCodial = empresasEnviadas.includes(ID_EMPRESA_CODIAL);
-  const clienteEnCodialub = empresasClienteEnviadas.includes(
-    ID_EMPRESA_CODIALUB,
-  );
-  const clienteEnCodial = empresasClienteEnviadas.includes(ID_EMPRESA_CODIAL);
 
   const descuentosEmpresa = useMemo(
     () =>
@@ -94,11 +90,12 @@ export default function TabDescuentosCliente({
       empresasEnviadas.includes(empresaSeleccionada)) ||
     descuentoEnviadoSap(estatusSync, absEntry);
 
+  const clienteEnEmpresaSeleccionada =
+    empresaSeleccionada != null &&
+    empresasClienteEnviadas.includes(empresaSeleccionada);
+
   const seleccionarEmpresa = (id: number, marcado: boolean) => {
-    if (id === ID_EMPRESA_CODIALUB && !clienteEnCodialub) return;
-    if (id === ID_EMPRESA_CODIAL && (!enviadoCodialub || !clienteEnCodial)) {
-      return;
-    }
+    if (!clientePersistido) return;
     const yaEnviado =
       (id === ID_EMPRESA_CODIALUB && enviadoCodialub) ||
       (id === ID_EMPRESA_CODIAL && enviadoCodial);
@@ -318,9 +315,10 @@ export default function TabDescuentosCliente({
             Descuentos por marca
           </h3>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Independiente de los checks del cliente. Elija la sociedad para
-            ver o configurar sus marcas. Tras un envío correcto puede seguir
-            consultando los %; esa sociedad queda en solo lectura.
+            Puede guardar los descuentos en CRM sin enviar el cliente a SAP.
+            El envío a SAP de cada sociedad se habilita cuando el cliente ya
+            existe ahí. Tras un envío correcto esa sociedad queda en solo
+            lectura.
           </p>
           <div className="mt-3 flex flex-wrap gap-6">
             <label
@@ -336,17 +334,13 @@ export default function TabDescuentosCliente({
                   enviadoCodialub ||
                   empresaSeleccionada === ID_EMPRESA_CODIALUB
                 }
-                disabled={
-                  soloLectura || !clientePersistido || !clienteEnCodialub
-                }
+                disabled={soloLectura || !clientePersistido}
                 title={
                   !clientePersistido
                     ? "Guarde el cliente en CRM primero"
-                    : !clienteEnCodialub
-                      ? "Envíe primero el cliente a Codialub"
-                      : enviadoCodialub
-                        ? "Enviado a SAP. Clic para consultar los descuentos"
-                        : undefined
+                    : enviadoCodialub
+                      ? "Enviado a SAP. Clic para consultar los descuentos"
+                      : "Configurar descuentos Codialub (se guardan en CRM)"
                 }
                 onChange={(e) =>
                   seleccionarEmpresa(ID_EMPRESA_CODIALUB, e.target.checked)
@@ -371,22 +365,13 @@ export default function TabDescuentosCliente({
                 checked={
                   enviadoCodial || empresaSeleccionada === ID_EMPRESA_CODIAL
                 }
-                disabled={
-                  soloLectura ||
-                  !enviadoCodialub ||
-                  !clientePersistido ||
-                  !clienteEnCodial
-                }
+                disabled={soloLectura || !clientePersistido}
                 title={
                   !clientePersistido
                     ? "Guarde el cliente en CRM primero"
-                    : !clienteEnCodial
-                      ? "Envíe primero el cliente a Codial"
-                      : !enviadoCodialub
-                        ? "Envíe primero los descuentos a Codialub"
-                        : enviadoCodial
-                          ? "Enviado a SAP. Clic para consultar los descuentos"
-                          : undefined
+                    : enviadoCodial
+                      ? "Enviado a SAP. Clic para consultar los descuentos"
+                      : "Configurar descuentos Codial (se guardan en CRM). El envío a SAP requiere Codialub primero"
                 }
                 onChange={(e) =>
                   seleccionarEmpresa(ID_EMPRESA_CODIAL, e.target.checked)
@@ -453,7 +438,12 @@ export default function TabDescuentosCliente({
               type="button"
               onClick={() => void enviarSap()}
               disabled={
-                guardando || enviando || !guardadoEnCrm || enviadoSap
+                guardando ||
+                enviando ||
+                !guardadoEnCrm ||
+                enviadoSap ||
+                !clienteEnEmpresaSeleccionada ||
+                (empresaSeleccionada === ID_EMPRESA_CODIAL && !enviadoCodialub)
               }
               className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
               title={
@@ -461,9 +451,14 @@ export default function TabDescuentosCliente({
                   ? "Esta sociedad ya recibió los descuentos"
                   : !guardadoEnCrm
                     ? "Guarde los descuentos en CRM antes de enviar a SAP"
-                    : !cardCode
-                      ? "El cliente necesita CardCode para el envío a SAP"
-                      : "Enviar grupo de descuento a SAP"
+                    : !clienteEnEmpresaSeleccionada
+                      ? "Envíe primero el cliente a esta sociedad en SAP"
+                      : empresaSeleccionada === ID_EMPRESA_CODIAL &&
+                          !enviadoCodialub
+                        ? "Envíe primero los descuentos a Codialub"
+                        : !cardCode
+                          ? "El cliente necesita CardCode para el envío a SAP"
+                          : "Enviar grupo de descuento a SAP"
               }
             >
               <Send className="h-3.5 w-3.5" />
@@ -490,11 +485,6 @@ export default function TabDescuentosCliente({
       ) : !clientePersistido ? (
         <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 py-10 text-center text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
           Guarde el cliente en CRM antes de configurar descuentos.
-        </p>
-      ) : !clienteEnCodialub && !clienteEnCodial ? (
-        <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 py-10 text-center text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
-          Envíe primero el cliente a SAP. Los checks de descuentos se habilitan
-          por sociedad cuando el cliente ya existe en esa empresa.
         </p>
       ) : !empresaSeleccionada ? (
         <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 py-10 text-center text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/30 dark:text-amber-200">

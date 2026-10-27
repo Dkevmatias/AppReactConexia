@@ -19,6 +19,11 @@ import {
   satCatalogoService,
   type SatCatalogoItem,
 } from "../../services/satCatalogoService";
+import {
+  codigoRutaParaGenerar,
+  rutasService,
+  type Ruta,
+} from "../../services/rutasService";
 
 type Props = {
   datos: ClienteAltaForm;
@@ -59,19 +64,22 @@ export default function TabCamposUsuarioCliente({
   const [regimenes, setRegimenes] = useState<SatCatalogoItem[]>([]);
   const [loadingRegimen, setLoadingRegimen] = useState(true);
   const [errorRegimen, setErrorRegimen] = useState<string | null>(null);
+  const [rutas, setRutas] = useState<Ruta[]>([]);
+  const [loadingRutas, setLoadingRutas] = useState(false);
   const invalido = (clave: string) => Boolean(camposInvalidos?.has(clave));
   const vendedoresOpciones = useMemo(() => {
-    const activos = catalogoVendedores.filter((v) => v.activo);
+    const activos = catalogoVendedores.filter((v) => v.activo !== false);
+    const base = activos.length > 0 ? activos : catalogoVendedores;
     if (
       idVendedorSeleccionado &&
-      !activos.some((v) => v.idVendedor === idVendedorSeleccionado)
+      !base.some((v) => v.idVendedor === idVendedorSeleccionado)
     ) {
       const extra = catalogoVendedores.find(
         (v) => v.idVendedor === idVendedorSeleccionado,
       );
-      if (extra) return [...activos, extra];
+      if (extra) return [...base, extra];
     }
-    return activos;
+    return base;
   }, [catalogoVendedores, idVendedorSeleccionado]);
   const vendedorSel =
     catalogoVendedores.find((v) => v.idVendedor === idVendedorSeleccionado) ??
@@ -103,6 +111,43 @@ export default function TabCamposUsuarioCliente({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cargarRutas = async () => {
+      setLoadingRutas(true);
+      try {
+        const lista =
+          idEmpresa != null && idEmpresa > 0
+            ? await rutasService.getRutasPorEmpresa(idEmpresa)
+            : await rutasService.getRutas();
+        if (!cancelled) {
+          setRutas(lista.filter((r) => r.activo !== false && r.codigo.trim()));
+        }
+      } catch {
+        if (!cancelled) setRutas([]);
+      } finally {
+        if (!cancelled) setLoadingRutas(false);
+      }
+    };
+    void cargarRutas();
+    return () => {
+      cancelled = true;
+    };
+  }, [idEmpresa]);
+
+  const opcionesRuta = useMemo(() => {
+    const opts = rutas.map((r) => {
+      const value = codigoRutaParaGenerar(r) || r.codigo;
+      const etiqueta = [r.codigo, r.nombre].filter(Boolean).join(" — ");
+      return { value, etiqueta: etiqueta || value };
+    });
+    const actual = datos.uBxpRuta.trim();
+    if (actual && !opts.some((o) => o.value === actual)) {
+      opts.unshift({ value: actual, etiqueta: actual });
+    }
+    return opts;
+  }, [rutas, datos.uBxpRuta]);
 
   // Asegura Addenda especial fija
   useEffect(() => {
@@ -201,14 +246,22 @@ export default function TabCamposUsuarioCliente({
             Ruta
             <Asterisco />
           </label>
-          <input
+          <select
             id="cliente-ruta"
-            type="text"
             value={datos.uBxpRuta}
             onChange={(e) => onChange({ uBxpRuta: e.target.value })}
-            placeholder="Ej. CODIAL14F"
             className={prospectoInputClassError(invalido("uBxpRuta"))}
-          />
+            disabled={soloLectura}
+          >
+            <option value="">
+              {loadingRutas ? "Cargando rutas…" : "Seleccione ruta"}
+            </option>
+            {opcionesRuta.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.etiqueta}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -328,12 +381,12 @@ export default function TabCamposUsuarioCliente({
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {idEmpresa !== ID_EMPRESA_CODIAL &&
             idEmpresa !== ID_EMPRESA_CODIALUB
-              ? "Seleccione Codialub o Codial para asignar el SlpCode del vendedor."
+              ? "Seleccione Codialub o Codial y el vendedor SAP del cliente."
               : vendedorSel
-                ? `${idEmpresa === ID_EMPRESA_CODIAL ? "SlpCode Codial" : "SlpCode Codialub"}: ${
-                    datos.salesPersonCode || "—"
-                  }`
-                : "Si no es vendedor, elija a quién pertenecerá el cliente."}
+                ? datos.salesPersonCode
+                  ? `${idEmpresa === ID_EMPRESA_CODIAL ? "SlpCode Codial" : "SlpCode Codialub"}: ${datos.salesPersonCode}`
+                  : "Este vendedor no tiene SlpCode SAP para la empresa. Elija otro."
+                : "Si usted no es vendedor, elija a quién pertenecerá el cliente."}
           </p>
         </div>
       </div>

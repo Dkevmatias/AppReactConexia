@@ -7,6 +7,7 @@ import ModalDetalleRegistro, {
   CampoDetalle,
 } from "../../components/common/ModalDetalleRegistro";
 import { useClientPagination } from "../../hooks/useClientPagination";
+import { useCrmPermisos } from "../../hooks/useCrmPermisos";
 import {
   activityTimelineService,
   etiquetaTipoActividad,
@@ -42,6 +43,7 @@ const colorBadge: Record<string, string> = {
 
 export default function CrmSeguimientos() {
   const navigate = useNavigate();
+  const { puedeVerSeguimientos, puedeVerProspectos } = useCrmPermisos();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<ActivityTimelineItem[]>([]);
@@ -148,6 +150,19 @@ export default function CrmSeguimientos() {
       : itemLista?.idLead != null
         ? mapaLeads.get(itemLista.idLead) ?? `Lead #${itemLista.idLead}`
         : "—";
+
+  if (!puedeVerSeguimientos) {
+    return (
+      <div className="space-y-2 p-6">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          Seguimientos de Prospectos
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          No tiene permiso para consultar seguimientos.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -300,7 +315,7 @@ export default function CrmSeguimientos() {
                         </span>
                       </td>
                       <td className="px-4 py-2">
-                        {row.idLead ? (
+                        {row.idLead && puedeVerProspectos ? (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -313,7 +328,7 @@ export default function CrmSeguimientos() {
                             {nombreLead}
                           </button>
                         ) : (
-                          "—"
+                          nombreLead
                         )}
                       </td>
                       <td className="px-4 py-2">
@@ -361,7 +376,7 @@ export default function CrmSeguimientos() {
             >
               Cerrar
             </button>
-            {(detalle?.idLead ?? itemLista?.idLead) ? (
+            {(detalle?.idLead ?? itemLista?.idLead) && puedeVerProspectos ? (
               <button
                 type="button"
                 onClick={() =>

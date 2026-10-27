@@ -15,6 +15,7 @@ import {
   filtrosODistribucionPorDefecto,
   ODistribucionDocumento,
   oDistribucionService,
+  type RepartidorCatalogo,
 } from "../../services/oDistribucionService";
 
 import { rutasService, Ruta } from "../../services/rutasService";
@@ -22,7 +23,6 @@ import {
   ContextoOperativoPersona,
   getContextoOperativoPersona,
 } from "../../services/authService";
-import { getReportesService, Vendedores } from "../../services/reportesService";
 import { useAuth } from "../../hooks/useAuth";
 
 const inputClass =
@@ -124,7 +124,7 @@ export default function ComprobacionRutas() {
 
   const [rutas, setRutas] = useState<Ruta[]>([]);
 
-  const [repartidores, setRepartidores] = useState<Vendedores[]>([]);
+  const [repartidores, setRepartidores] = useState<RepartidorCatalogo[]>([]);
 
   const [documentos, setDocumentos] = useState<ODistribucionDocumento[]>([]);
 
@@ -345,23 +345,33 @@ export default function ComprobacionRutas() {
   useEffect(() => {
     const cargarCatalogos = async () => {
       setLoadingCatalogos(true);
+      const fallos: string[] = [];
 
       try {
-        const [rutasData, repartidoresData] = await Promise.all([
+        const [rutasResult, repartidoresResult] = await Promise.allSettled([
           rutasService.getRutas(),
-          getReportesService.getVendedoresReparto(true),
+          oDistribucionService.getRepartidores(),
         ]);
 
-        setRutas((rutasData ?? []).filter((r) => r.activo));
-        setRepartidores(
-          (repartidoresData ?? []).filter(
-            (v) => v.activo && v.slpName.trim().length > 0,
-          ),
-        );
-      } catch (err) {
-        console.error(err);
+        if (rutasResult.status === "fulfilled") {
+          setRutas((rutasResult.value ?? []).filter((r) => r.activo));
+        } else {
+          console.error(rutasResult.reason);
+          setRutas([]);
+          fallos.push("rutas");
+        }
 
-        setError("No se pudieron cargar rutas o repartidores.");
+        if (repartidoresResult.status === "fulfilled") {
+          setRepartidores(repartidoresResult.value ?? []);
+        } else {
+          console.error(repartidoresResult.reason);
+          setRepartidores([]);
+          fallos.push("repartidores");
+        }
+
+        if (fallos.length > 0) {
+          setError(`No se pudieron cargar ${fallos.join(" ni ")}.`);
+        }
       } finally {
         setLoadingCatalogos(false);
       }
@@ -372,7 +382,7 @@ export default function ComprobacionRutas() {
 
   useEffect(() => {
     if (loadingCatalogos || !repartidor) return;
-    const existe = repartidores.some((v) => v.slpName === repartidor);
+    const existe = repartidores.some((v) => v.nomUser === repartidor);
     if (!existe) setRepartidor("");
   }, [loadingCatalogos, repartidores, repartidor]);
 
@@ -388,12 +398,12 @@ export default function ComprobacionRutas() {
     [documentos, filtroEstatusSistema],
   );
 
-  /** Nombre legible del repartidor (el filtro guarda slpName / código). */
+  /** Nombre legible del repartidor (el filtro guarda NomUser de SAP). */
   const nombreRepartidor = useMemo(() => {
     const codigo = repartidor.trim();
     if (!codigo) return "";
-    const encontrado = repartidores.find((v) => v.slpName === codigo);
-    const nombre = encontrado?.nombre?.trim() ?? "";
+    const encontrado = repartidores.find((v) => v.nomUser === codigo);
+    const nombre = encontrado?.nombreUsuario?.trim() ?? "";
     return nombre || codigo;
   }, [repartidor, repartidores]);
 
@@ -437,8 +447,13 @@ export default function ComprobacionRutas() {
             >
               <option value="">Seleccione repartidor</option>
               {repartidores.map((v) => (
-                <option key={v.idVendedor} value={v.slpName}>
-                  {v.slpName ? `${v.slpName} — ${v.nombre}` : v.nombre}
+                <option
+                  key={`${v.idUsuario}-${v.nomUser}`}
+                  value={v.nomUser}
+                >
+                  {v.nombreUsuario
+                    ? `${v.nomUser} — ${v.nombreUsuario}`
+                    : v.nomUser}
                 </option>
               ))}
             </select>

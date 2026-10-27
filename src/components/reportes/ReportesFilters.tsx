@@ -266,8 +266,8 @@ export default function ReportesFilters({
             }
             className="w-full min-h-[40px] px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 sm:min-w-[120px]"
           >
-            <option value="pesos">Pesos</option>
             <option value="ulkp">ULKP</option>
+            <option value="pesos">Pesos</option>
           </select>
         </div>
         <button

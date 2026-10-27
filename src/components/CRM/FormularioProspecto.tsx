@@ -44,6 +44,10 @@ export type FormularioProspectoProps = {
   clienteExistente?: boolean;
   /** Si true, el lead ya es Cliente y no puede cambiar de etapa. */
   etapaBloqueada?: boolean;
+  /** Permite convertir el prospecto a etapa Cliente. */
+  puedeCrearCliente?: boolean;
+  /** Permite registrar seguimientos en la ficha. */
+  puedeOperarSeguimientos?: boolean;
   onGuardarContactos?: (
     contactos: ClienteAltaForm["contactos"],
   ) => void | Promise<void>;
@@ -86,6 +90,8 @@ export default function FormularioProspecto({
   onClienteAltaChange,
   clienteExistente = false,
   etapaBloqueada = false,
+  puedeCrearCliente = true,
+  puedeOperarSeguimientos = true,
   onGuardarContactos,
   onGuardarDireccion,
   onGuardarDescuentos,
@@ -125,6 +131,7 @@ export default function FormularioProspecto({
             actual: clienteAlta,
             nombre: form.nombre,
             aPaterno: form.aPaterno,
+            aMaterno: form.aMaterno,
             telefono: form.telefono,
             correo: form.correo,
           }),
@@ -138,6 +145,16 @@ export default function FormularioProspecto({
       setSeccionActiva("seguimientos");
     }
   }, [crearClienteActivo, seccionActiva]);
+
+  useEffect(() => {
+    if (
+      crearClienteActivo &&
+      (camposInvalidosCliente?.has("direccionEntrega") ||
+        camposInvalidosCliente?.has("direcciones"))
+    ) {
+      setSeccionActiva("cliente");
+    }
+  }, [crearClienteActivo, camposInvalidosCliente]);
 
   const setIdSelect = (key: keyof LeadPayload, value: string) => {
     onChange(key, value ? Number(value) : null);
@@ -171,6 +188,7 @@ export default function FormularioProspecto({
     const seraCliente = esEtapaCliente(nuevoId, etapas);
 
     if (!eraCliente && seraCliente) {
+      if (!puedeCrearCliente) return;
       setIdEtapaPendiente(value);
       setModalCrearCliente(true);
       return;
@@ -189,6 +207,7 @@ export default function FormularioProspecto({
         actual: clienteAlta,
         nombre: form.nombre,
         aPaterno: form.aPaterno,
+        aMaterno: form.aMaterno,
         telefono: form.telefono,
         correo: form.correo,
       }),
@@ -318,15 +337,29 @@ export default function FormularioProspecto({
                 }
               >
                 <option value="">Sin etapa</option>
-                {etapas.map((e) => (
-                  <option key={e.idEtapa} value={e.idEtapa}>
-                    {e.nombre}
-                  </option>
-                ))}
+                {etapas.map((e) => {
+                  const opcionCliente = esEtapaCliente(e.idEtapa, etapas);
+                  const yaEsCliente = esEtapaCliente(form.idEtapa, etapas);
+                  const bloquearCliente =
+                    opcionCliente && !yaEsCliente && !puedeCrearCliente;
+                  return (
+                    <option
+                      key={e.idEtapa}
+                      value={e.idEtapa}
+                      disabled={bloquearCliente}
+                    >
+                      {e.nombre}
+                    </option>
+                  );
+                })}
               </select>
               {etapaBloqueada ? (
                 <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                   Ya convertido a Cliente: la etapa quedó bloqueada.
+                </p>
+              ) : !puedeCrearCliente ? (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  No tiene permiso para convertir el prospecto en cliente.
                 </p>
               ) : null}
             </div>
@@ -482,7 +515,7 @@ export default function FormularioProspecto({
                         <input
                           type="checkbox"
                           checked={usarCodialub}
-                          disabled={clienteSoloLectura || enviadoCodialub}
+                          disabled={enviadoCodialub}
                           title={
                             enviadoCodialub
                               ? "Ya se envió a SAP Codialub"
@@ -506,11 +539,7 @@ export default function FormularioProspecto({
                         <input
                           type="checkbox"
                           checked={usarCodial}
-                          disabled={
-                            clienteSoloLectura ||
-                            enviadoCodial ||
-                            !enviadoCodialub
-                          }
+                          disabled={enviadoCodial || !enviadoCodialub}
                           title={
                             enviadoCodial
                               ? "Ya se envió a SAP Codial"
@@ -573,6 +602,7 @@ export default function FormularioProspecto({
                     idUsuarioCreacion={idUsuarioCreacion}
                     telefonoDefault={form.telefono || clienteAlta.phone1}
                     onGuardado={onSeguimientoGuardado}
+                    puedeOperar={puedeOperarSeguimientos}
                   />
                 </div>
               )}

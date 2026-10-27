@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { UserPlus } from "lucide-react";
 import {
   ClienteAltaForm,
+  codigoFormaPagoSap,
   FORMAS_PAGO_CFDI,
   METODOS_PAGO_CFDI,
   TipoPersonaCliente,
@@ -109,7 +110,7 @@ export default function TabGeneralCliente({
           activo: true,
         }));
 
-  const opcionesForma =
+  const opcionesFormaBase =
     formasPago.length > 0
       ? formasPago
       : FORMAS_PAGO_CFDI.filter((o) => o.value).map((o) => ({
@@ -118,15 +119,33 @@ export default function TabGeneralCliente({
           activo: true,
         }));
 
+  const formaPagoNorm =
+    codigoFormaPagoSap(datos.formaPagoCfdi) ?? datos.formaPagoCfdi.trim();
+  const formaEnCatalogo = opcionesFormaBase.find(
+    (o) =>
+      o.clave === datos.formaPagoCfdi ||
+      o.clave === formaPagoNorm ||
+      (codigoFormaPagoSap(o.clave) ?? o.clave) === formaPagoNorm,
+  );
+  const opcionesForma =
+    formaPagoNorm && !formaEnCatalogo
+      ? [
+          ...opcionesFormaBase,
+          { clave: formaPagoNorm, nombre: formaPagoNorm, activo: true },
+        ]
+      : opcionesFormaBase;
+  const valorFormaPago = formaEnCatalogo?.clave || formaPagoNorm;
+
   return (
     <fieldset
       disabled={soloLectura}
       className="min-w-0 space-y-5 border-0 p-0 disabled:opacity-90"
     >
       <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-        El Codigo de Cliente no se captura aquí. Lo asigna después un usuario
+        El Código de Cliente no se captura aquí. Lo asigna después un usuario
         con permiso{" "}
-        <span className="font-medium">cliente.asignar-cardcode</span>.
+        <span className="font-medium">CRM.Enviar.Cliente</span> al enviarlo a
+        SAP.
       </p>
 
       {errorFiscal ? (
@@ -372,8 +391,12 @@ export default function TabGeneralCliente({
           </label>
           <select
             id="cliente-forma-pago"
-            value={datos.formaPagoCfdi}
-            onChange={(e) => onChange({ formaPagoCfdi: e.target.value })}
+            value={valorFormaPago}
+            onChange={(e) =>
+              onChange({
+                formaPagoCfdi: codigoFormaPagoSap(e.target.value) ?? e.target.value,
+              })
+            }
             className={prospectoInputClassError(invalido("formaPagoCfdi"))}
             disabled={loadingFiscal && formasPago.length === 0}
           >

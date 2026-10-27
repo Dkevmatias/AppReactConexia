@@ -344,6 +344,20 @@ function normalizeVendedoresArray(raw: unknown): Vendedor[] {
     .filter((v) => v.idUsuario > 0);
 }
 
+function pickActivo(o: Record<string, unknown>): boolean {
+  const v = o.activo ?? o.Activo;
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v !== 0;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (["false", "0", "no", "n", "inactivo"].includes(s)) return false;
+    if (["true", "1", "si", "sí", "yes", "s", "activo"].includes(s)) {
+      return true;
+    }
+  }
+  return true;
+}
+
 function normalizeVendedorPrizma(raw: unknown): Vendedores {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<
     string,
@@ -354,15 +368,24 @@ function normalizeVendedorPrizma(raw: unknown): Vendedores {
     nombre: pickString(o, "nombre", "Nombre") ?? "",
     slpName: pickString(o, "slpName", "SlpName", "slPName") ?? "",
     salesPersonCode:
-      pickNumber(o, "salesPersonCode", "SalesPersonCode") ?? 0,
+      pickNumber(
+        o,
+        "salesPersonCode",
+        "SalesPersonCode",
+        "slpCode",
+        "SlpCode",
+        "salesPersonCode1",
+        "SalesPersonCode1",
+      ) ?? 0,
     salesPersonCode2:
-      pickNumber(o, "salesPersonCode2", "SalesPersonCode2") ?? 0,
+      pickNumber(o, "salesPersonCode2", "SalesPersonCode2", "slpCode2", "SlpCode2") ??
+      0,
     idUsuarioPrizma: pickNumber(o, "idUsuarioPrizma", "IdUsuarioPrizma") ?? 0,
     idUsuarioPrizma2:
       pickNumber(o, "idUsuarioPrizma2", "IdUsuarioPrizma2") ?? 0,
     idEmpresa: pickNumber(o, "idEmpresa", "IdEmpresa") ?? 0,
     idSucursal: pickNumber(o, "idSucursal", "IdSucursal") ?? 0,
-    activo: typeof o.activo === "boolean" ? o.activo : o.Activo === true,
+    activo: pickActivo(o),
   };
 }
 

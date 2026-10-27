@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { EyeCloseIcon, EyeIcon } from "../../icons";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
@@ -164,6 +164,12 @@ export default function SignInForm() {
                     Recordar
                   </span>
                 </div>
+                <Link
+                  to="/clientes/CambiarContrasena"
+                  className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
               </div>
               <div className="mb-6 flex flex-col items-center gap-3">
                 <h1

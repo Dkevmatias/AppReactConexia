@@ -60,6 +60,7 @@ import {
 } from "../../services/crmService";
 import { LeadPayload, leadsService, normalizeLead } from "../../services/leadsService";
 import { useAuth } from "../../hooks/useAuth";
+import { useCrmPermisos } from "../../hooks/useCrmPermisos";
 import { useModalAlerta } from "../../hooks/useModalAlerta";
 import { clienteService } from "../../services/clienteService";
 import {
@@ -87,6 +88,17 @@ export default function ProspectoFormPage() {
   const { idLead: idLeadParam } = useParams<{ idLead?: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const {
+    menuLoading: crmMenuLoading,
+    puedeVerProspectos,
+    puedeCrearProspecto,
+    puedeCrearCliente,
+    puedeEditarCliente,
+    puedeCrearDescuentos,
+    puedeEnviarCliente,
+    puedeEnviarDescuento,
+    puedeRegistrarSeguimiento,
+  } = useCrmPermisos();
   const { mostrarAdvertencia, mostrarError, AlertaHost } = useModalAlerta();
 
   const idLead = idLeadParam ? Number(idLeadParam) : null;
@@ -139,14 +151,22 @@ export default function ProspectoFormPage() {
     useState<number[]>([]);
 
   const clienteYaEnviadoSap = esClienteEnviadoSap(clienteEstatusSap);
-  // TODO(pruebas): restaurar → clienteYaEnviadoSap && !permisoActivo(..., PERMISO_CLIENTE_EDITAR_POST_SAP)
-  const clienteSoloLectura = false;
+  const clienteSoloLectura = clienteYaEnviadoSap;
   const empresaDestinoSap =
     form.idEmpresa && form.idEmpresa > 0 ? form.idEmpresa : null;
   const empresaDestinoYaEnviada =
     empresaDestinoSap != null &&
     empresasEnviadasSap.includes(empresaDestinoSap);
+  const etapaEsCliente = esEtapaCliente(form.idEtapa, etapas);
+  const puedeGuardarCliente =
+    !clienteSoloLectura &&
+    (puedeCrearCliente ||
+      (puedeEditarCliente && clienteGuardadoId != null));
+  const puedeGuardar = etapaEsCliente
+    ? puedeGuardarCliente
+    : puedeCrearProspecto;
   const puedeEnviarASap =
+    puedeEnviarCliente &&
     clienteGuardadoId != null &&
     empresaDestinoSap != null &&
     !empresaDestinoYaEnviada;
@@ -281,6 +301,7 @@ export default function ProspectoFormPage() {
                   actual: clienteAltaVacio(),
                   nombre: leadForm.nombre,
                   aPaterno: leadForm.aPaterno,
+                  aMaterno: leadForm.aMaterno,
                   telefono: leadForm.telefono,
                   correo: leadForm.correo,
                 }),
@@ -403,7 +424,7 @@ export default function ProspectoFormPage() {
       setIdVendedorSeleccionado(id);
     }
 
-    if (!form.idEmpresa || !id) return;
+    if (!id) return;
     aplicarVendedorSeleccionado(id, form.idEmpresa);
   }, [
     loading,
@@ -530,6 +551,7 @@ export default function ProspectoFormPage() {
       rfc: clienteAlta.rfc,
       esDefaultBillTo: fiscales[0]?.idLocal === direccion.idLocal,
       esDefaultShipTo: entregas[0]?.idLocal === direccion.idLocal,
+      idEmpresa: form.idEmpresa,
     });
 
     let idClienteDireccion = direccion.idClienteDireccion ?? 0;
@@ -575,6 +597,7 @@ export default function ProspectoFormPage() {
         rfc: formCliente.rfc,
         esDefaultBillTo: fiscales[0]?.idLocal === direccion.idLocal,
         esDefaultShipTo: entregas[0]?.idLocal === direccion.idLocal,
+        idEmpresa: form.idEmpresa,
       });
       if (direccion.idClienteDireccion && direccion.idClienteDireccion > 0) {
         await clienteService.actualizarDireccion(
@@ -641,13 +664,6 @@ export default function ProspectoFormPage() {
         "Seleccione Codialub o Codial en la pestaña Descuentos.",
       );
     }
-    if (!empresasEnviadasSap.includes(idEmpresaDescuentos)) {
-      throw new Error(
-        idEmpresaDescuentos === ID_EMPRESA_CODIAL
-          ? "Envíe primero el cliente a Codial."
-          : "Envíe primero el cliente a Codialub.",
-      );
-    }
     const payload = armarPayloadDescuentoLocal(clienteAlta.descuentos, {
       idCliente: clienteGuardadoId,
       idEmpresa: idEmpresaDescuentos,
@@ -689,12 +705,16 @@ export default function ProspectoFormPage() {
   };
 
   const abrirModalSapDescuentos = () => {
+    if (!puedeEnviarDescuento) return;
     setMensajeEnvioSapDescuentos(null);
     setErrorEnvioSapDescuentos(null);
     setJsonSapDescuentosVisible(true);
   };
 
   const enviarDescuentosSapDesdeTab = async () => {
+    if (!puedeEnviarDescuento) {
+      throw new Error("No tiene permiso para enviar descuentos a SAP.");
+    }
     if (!clienteGuardadoId) {
       throw new Error("Guarde el cliente en el CRM primero.");
     }
@@ -728,17 +748,28 @@ export default function ProspectoFormPage() {
       );
     }
 
-    const saved = await guardarDescuentosDesdeTab();
-    const idDescuento =
-      saved.idDescuento ||
+    const idDescuentoYaGuardado =
       clienteAlta.descuentos.find(
         (d) =>
           esDescuentoDeEmpresa(d.idEmpresa, idEmpresaDescuentos) &&
           (d.idClienteDescuento ?? 0) > 0,
-      )?.idClienteDescuento ||
-      0;
+      )?.idClienteDescuento || 0;
+    const saved = puedeCrearDescuentos
+      ? await guardarDescuentosDesdeTab()
+      : {
+          idDescuento: idDescuentoYaGuardado,
+          idEmpresa: idEmpresaDescuentos,
+          estatusSync: "",
+          absEntry: 0,
+          detalles: clienteAlta.descuentos.filter((d) =>
+            esDescuentoDeEmpresa(d.idEmpresa, idEmpresaDescuentos),
+          ),
+        };
+    const idDescuento = saved.idDescuento || idDescuentoYaGuardado;
     if (!idDescuento) {
-      throw new Error("No se obtuvo el descuento guardado para enviar a SAP.");
+      throw new Error(
+        "Los descuentos deben estar guardados en CRM antes de enviar a SAP.",
+      );
     }
     const detallesEmpresa = (saved.detalles ?? []).filter((d) =>
       esDescuentoDeEmpresa(d.idEmpresa, idEmpresaDescuentos),
@@ -749,9 +780,16 @@ export default function ProspectoFormPage() {
       );
     }
 
+    const payloadSap = armarPayloadSapDiscountGroup({
+      cardCode: code,
+      filas: clienteAlta.descuentos.filter((d) =>
+        esDescuentoDeEmpresa(d.idEmpresa, idEmpresaDescuentos),
+      ),
+    });
     const result = await clienteService.enviarDescuentosASap(
       idDescuento,
       idEmpresaDescuentos,
+      payloadSap,
     );
     let recargado: Awaited<ReturnType<typeof clienteService.getDescuentos>> =
       [];
@@ -813,7 +851,14 @@ export default function ProspectoFormPage() {
 
   const guardarClienteSiAplica = async (idLeadGuardado: number): Promise<boolean> => {
     if (!esEtapaCliente(form.idEtapa, etapas)) return false;
-    if (clienteSoloLectura) return false;
+    if (clienteSoloLectura) {
+      throw new Error(
+        "El cliente ya fue enviado a SAP; ya no se puede editar.",
+      );
+    }
+    if (!puedeCrearCliente && !puedeEditarCliente) {
+      throw new Error("No tiene permiso para guardar clientes.");
+    }
 
     const idEmpresa = form.idEmpresa && form.idEmpresa > 0 ? form.idEmpresa : 0;
     const vendedorSel =
@@ -823,6 +868,12 @@ export default function ProspectoFormPage() {
       vendedorSel,
       idEmpresa,
     );
+    if (idVendedorSeleccionado && vendedorSel && !slpDelVendedor) {
+      setMostrarErroresCliente(true);
+      throw new Error(
+        "El vendedor seleccionado no tiene SlpCode SAP para esta empresa. Elija otro vendedor.",
+      );
+    }
     const formCliente = slpDelVendedor
       ? { ...clienteAlta, salesPersonCode: slpDelVendedor }
       : clienteAlta;
@@ -891,6 +942,10 @@ export default function ProspectoFormPage() {
       setClienteCardCode(existente.cardCode);
       setClienteEstatusSap(existente.estatusSap);
       return true;
+    }
+
+    if (!puedeCrearCliente) {
+      throw new Error("No tiene permiso para crear clientes.");
     }
 
     const creado = await clienteService.crear(
@@ -969,6 +1024,17 @@ export default function ProspectoFormPage() {
   };
 
   const guardar = async () => {
+    if (!puedeGuardar) {
+      mostrarAdvertencia(
+        etapaEsCliente
+          ? clienteSoloLectura
+            ? "El cliente ya fue enviado a SAP; ya no se puede editar."
+            : "No tiene permiso para guardar clientes."
+          : "No tiene permiso para guardar prospectos.",
+        "Sin permiso",
+      );
+      return;
+    }
     if (!(form.nombre ?? "").trim()) {
       mostrarAdvertencia("El nombre es obligatorio.", "Dato requerido");
       return;
@@ -1038,6 +1104,7 @@ export default function ProspectoFormPage() {
       groupCode:
         gruposSAP.find((g) => g.idGrupo === form.idGrupo)?.groupCode ?? null,
       cardCode: cardCodeDraft.trim() || clienteCardCode,
+      idEmpresa: form.idEmpresa,
     }),
     null,
     2,
@@ -1058,6 +1125,7 @@ export default function ProspectoFormPage() {
     }),
   );
   const puedeEnviarDescuentosASap =
+    puedeEnviarDescuento &&
     clienteGuardadoId != null &&
     idEmpresaDescuentos != null &&
     !empresasEnviadasDescuentos.includes(idEmpresaDescuentos) &&
@@ -1116,7 +1184,7 @@ export default function ProspectoFormPage() {
   }, [form.idEmpresa, cardCodeCodialub, clienteCardCode]);
 
   const abrirModalSap = () => {
-    if (!puedeEnviarASap) return;
+    if (!puedeEnviarCliente || !puedeEnviarASap) return;
     setMensajeEnvioSap(null);
     setErrorEnvioSap(null);
     if (form.idEmpresa === ID_EMPRESA_CODIAL) {
@@ -1148,6 +1216,10 @@ export default function ProspectoFormPage() {
   };
 
   const enviarClienteASap = async () => {
+    if (!puedeEnviarCliente) {
+      setErrorEnvioSap("No tiene permiso para enviar el cliente a SAP.");
+      return;
+    }
     if (!clienteGuardadoId) return;
     const idEmpresa = form.idEmpresa && form.idEmpresa > 0 ? form.idEmpresa : 0;
     if (!idEmpresa) {
@@ -1187,6 +1259,12 @@ export default function ProspectoFormPage() {
           (v) => v.idVendedor === idVendedorSeleccionado,
         ) ?? vendedorSesion;
       const slp = salesPersonCodeSegunEmpresa(vendedorSel, idEmpresa);
+      if (idVendedorSeleccionado && vendedorSel && !slp) {
+        setErrorEnvioSap(
+          "El vendedor seleccionado no tiene SlpCode SAP para esta empresa. Elija otro vendedor.",
+        );
+        return;
+      }
       const formCliente = slp
         ? { ...clienteAlta, salesPersonCode: slp }
         : clienteAlta;
@@ -1194,7 +1272,11 @@ export default function ProspectoFormPage() {
         actualizarClienteAlta({ salesPersonCode: slp });
       }
 
-      if (idLead) {
+      if (
+        idLead &&
+        !clienteYaEnviadoSap &&
+        (puedeCrearCliente || puedeEditarCliente)
+      ) {
         const contexto = user?.idPersona
           ? await getContextoOperativoPersona(user.idPersona)
           : null;
@@ -1214,17 +1296,24 @@ export default function ProspectoFormPage() {
       }
 
       if (code !== (clienteCardCode ?? "").trim().toUpperCase()) {
-        const asignado = await clienteService.asignarCardCode(
-          clienteGuardadoId,
-          code,
-        );
-        setClienteCardCode(asignado.cardCode);
-        setCardCodeDraft(asignado.cardCode ?? code);
+        try {
+          const asignado = await clienteService.asignarCardCode(
+            clienteGuardadoId,
+            code,
+          );
+          setClienteCardCode(asignado.cardCode);
+          setCardCodeDraft(asignado.cardCode ?? code);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "";
+          if (!/no tiene permiso/i.test(msg)) throw err;
+          // El POST enviar-sap lleva el CardCode; no exige CRM.Crear.Cliente.
+        }
       }
 
       const result = await clienteService.enviarASap(
         clienteGuardadoId,
         idEmpresa,
+        code,
       );
       const nombreEmpresa =
         idEmpresa === ID_EMPRESA_CODIAL ? "Codial" : "Codialub";
@@ -1259,6 +1348,24 @@ export default function ProspectoFormPage() {
   };
 
   const titulo = esEdicion ? "Editar prospecto" : "Nuevo prospecto";
+  const sinPermisoFicha =
+    !crmMenuLoading &&
+    (esEdicion ? !puedeVerProspectos : !puedeCrearProspecto);
+
+  if (sinPermisoFicha) {
+    return (
+      <div className="space-y-2 p-6">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {titulo}
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {esEdicion
+            ? "No tiene permiso para consultar este prospecto."
+            : "No tiene permiso para crear prospectos."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -1324,12 +1431,20 @@ export default function ProspectoFormPage() {
               }}
               clienteExistente={clienteGuardadoId != null}
               etapaBloqueada={clienteGuardadoId != null}
+              puedeCrearCliente={puedeCrearCliente}
+              puedeOperarSeguimientos={puedeRegistrarSeguimiento}
               onGuardarContactos={guardarContactosDesdeModal}
               onGuardarDireccion={guardarDireccionDesdeTab}
-              onGuardarDescuentos={async () => {
-                await guardarDescuentosDesdeTab();
-              }}
-              onEnviarDescuentosSap={abrirModalSapDescuentos}
+              onGuardarDescuentos={
+                puedeCrearDescuentos
+                  ? async () => {
+                      await guardarDescuentosDesdeTab();
+                    }
+                  : undefined
+              }
+              onEnviarDescuentosSap={
+                puedeEnviarDescuento ? abrirModalSapDescuentos : undefined
+              }
               cardCodeCliente={
                 cardCodeDescuentos || clienteCardCode || cardCodeDraft
               }
@@ -1349,15 +1464,19 @@ export default function ProspectoFormPage() {
               idEmpresaDescuentos={idEmpresaDescuentos}
               onIdEmpresaDescuentosChange={setIdEmpresaDescuentos}
               empresasEnviadasDescuentos={empresasEnviadasDescuentos}
-              avisoClienteSap={
-                empresasEnviadasSap.includes(ID_EMPRESA_CODIALUB) &&
-                !empresasEnviadasSap.includes(ID_EMPRESA_CODIAL)
-                  ? `Enviado a Codialub${cardCodeCodialub ? ` (${cardCodeCodialub})` : ""}. Active Codial para enviar a esa sociedad.`
-                  : empresasEnviadasSap.includes(ID_EMPRESA_CODIALUB) &&
-                      empresasEnviadasSap.includes(ID_EMPRESA_CODIAL)
+              avisoClienteSap={(() => {
+                const avisoEnvio =
+                  empresasEnviadasSap.includes(ID_EMPRESA_CODIALUB) &&
+                  empresasEnviadasSap.includes(ID_EMPRESA_CODIAL)
                     ? `Cliente enviado a Codialub y Codial${clienteCardCode ? ` (${clienteCardCode})` : ""}.`
-                    : null
-              }
+                    : empresasEnviadasSap.includes(ID_EMPRESA_CODIALUB)
+                      ? `Enviado a Codialub${cardCodeCodialub ? ` (${cardCodeCodialub})` : ""}. Active Codial para enviar a esa sociedad.`
+                      : null;
+                if (!clienteSoloLectura) return avisoEnvio;
+                return avisoEnvio
+                  ? `El cliente ya fue enviado a SAP y no se puede editar. ${avisoEnvio}`
+                  : "El cliente ya fue enviado a SAP y no se puede editar.";
+              })()}
             />
 
             <div className="mt-6 flex flex-col-reverse justify-end gap-2 border-t border-gray-200 pt-4 sm:flex-row dark:border-gray-700">
@@ -1369,27 +1488,38 @@ export default function ProspectoFormPage() {
               >
                 Cancelar
               </button>
-              <button
-                type="button"
-                onClick={abrirModalSap}
-                disabled={!puedeEnviarASap}
-                title={
-                  !clienteGuardadoId
-                    ? "Guarde el cliente en CRM primero"
-                    : !empresaDestinoSap
-                      ? "Seleccione Codialub o Codial"
-                      : empresaDestinoYaEnviada
-                        ? "Esta empresa ya fue enviada a SAP"
-                        : "Revisar y enviar el cliente a SAP"
-                }
-                className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
-              >
-                {empresaDestinoYaEnviada ? "Enviado a SAP" : "Enviar a SAP"}
-              </button>
+              {puedeEnviarCliente ? (
+                <button
+                  type="button"
+                  onClick={abrirModalSap}
+                  disabled={!puedeEnviarASap}
+                  title={
+                    !clienteGuardadoId
+                      ? "Guarde el cliente en CRM primero"
+                      : !empresaDestinoSap
+                        ? "Seleccione Codialub o Codial"
+                        : empresaDestinoYaEnviada
+                          ? "Esta empresa ya fue enviada a SAP"
+                          : "Revisar y enviar el cliente a SAP"
+                  }
+                  className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                >
+                  {empresaDestinoYaEnviada ? "Enviado a SAP" : "Enviar a SAP"}
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void guardar()}
-                disabled={saving || !!error}
+                disabled={saving || !!error || !puedeGuardar}
+                title={
+                  puedeGuardar
+                    ? undefined
+                    : etapaEsCliente
+                      ? clienteSoloLectura
+                        ? "El cliente ya fue enviado a SAP; ya no se puede editar"
+                        : "No tiene permiso para guardar clientes"
+                      : "No tiene permiso para guardar prospectos"
+                }
                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}

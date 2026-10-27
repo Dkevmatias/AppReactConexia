@@ -52,6 +52,13 @@ api.interceptors.request.use((config) => {
   if (method === "get" || method === "head") {
     config.headers.delete("Content-Type");
   }
+  if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+    config.headers.delete("Content-Type");
+    config.headers.setContentType(false);
+    if (!config.timeout || config.timeout < 90_000) {
+      config.timeout = 90_000;
+    }
+  }
 
   const fallbackToken = getTokenFallback();
   if (fallbackToken) {

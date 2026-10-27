@@ -100,9 +100,13 @@ export default function App() {
           {/* Video público (sin login) — compartir: dominio.com/video */}
           <Route path="/video" element={<Video />} />
 
-          {/* Cambio de contraseña (sin login requerido) */}
+          {/* Recuperación de contraseña (sin login; con token usa ConfirmarPasswordReset) */}
           <Route
             path="/clientes/CambiarContrasena"
+            element={<CambiarContrasena />}
+          />
+          <Route
+            path="/restablecer-password"
             element={<CambiarContrasena />}
           />
 

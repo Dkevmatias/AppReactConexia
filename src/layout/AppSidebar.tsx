@@ -27,6 +27,7 @@ import {
   permisoActivo,
   permisoActivoPorClaveORuta,
 } from "../utils/permisosModulo";
+import { crmPermisosDesdeMenu } from "../hooks/useCrmPermisos";
 
 type NavItem = {
   name: string;
@@ -330,12 +331,21 @@ const AppSidebar: React.FC = () => {
         }
 
         if (item.name === "CRM" && item.subItems) {
-          const moduloCrm = menu.find(
-            (m) => (m.clave ?? "").trim().toLowerCase() === "crm",
-          );
-          if (!moduloCrm?.activo) return null;
-          if (!moduloCrm.permisos?.some((p) => p.activo)) return null;
-          return item;
+          const crm = crmPermisosDesdeMenu(menu);
+          const subItems = item.subItems.filter((sub) => {
+            if (sub.path === "/CRM/Configuración") {
+              return crm.puedeVerConfiguracion;
+            }
+            if (sub.path === "/CRM/Prospectos") return crm.puedeVerProspectos;
+            if (sub.path === "/CRM/Seguimientos") {
+              return crm.puedeVerSeguimientos;
+            }
+            if (sub.path === "/CRM/Clientes") return crm.puedeVerClientes;
+            if (sub.path === "/CRM/Catalogos") return crm.puedeVerCatalogos;
+            return false;
+          });
+          if (subItems.length === 0) return null;
+          return { ...item, subItems };
         }
 
         if (item.name === "Operaciones" && item.subItems) {

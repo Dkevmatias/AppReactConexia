@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, X } from "lucide-react";
+import { AlertTriangle, ImagePlus, Images, Loader2, X } from "lucide-react";
 import {
   DocODistribucionDetalle,
   oDistribucionService,
@@ -13,6 +13,7 @@ import {
   OBSERVACIONES_SIN_INCIDENCIAS_RUTA,
   procesarODService,
 } from "../../services/procesarODService";
+import { incidenciaDepositoService } from "../../services/incidenciaDepositoService";
 import { useComprobacionPermisos } from "../../hooks/useComprobacionPermisos";
 import { formatCurrency } from "../../utils/format";
 import { crearIncidenciasDevolucionAutomaticas } from "./crearIncidenciasDevolucionAutomaticas";
@@ -26,6 +27,9 @@ import {
   clasesFilaTraspasoTipoOD,
 } from "./constants";
 import DetalleDistribucionCard from "./DetalleDistribucionCard";
+import ModalImagenesDeposito, {
+  type ModoModalImagenesDeposito,
+} from "./ModalImagenesDeposito";
 import ModalVerIncidenciasEntrega, {
   BotonVerIncidencia,
 } from "./ModalVerIncidenciasEntrega";
@@ -108,6 +112,11 @@ export default function ModalDetalleOrdenDistribucion({
     idsIncidencia: number[];
     documento: DocODistribucionDetalle;
   } | null>(null);
+  const [modalImagenes, setModalImagenes] = useState<{
+    abierto: boolean;
+    modo: ModoModalImagenesDeposito;
+  }>({ abierto: false, modo: "adjuntar" });
+  const [fotosCount, setFotosCount] = useState(0);
   const total = useMemo(
     () => documentos.reduce((sum, item) => sum + item.total, 0),
     [documentos],
@@ -166,6 +175,15 @@ export default function ModalDetalleOrdenDistribucion({
     () => ordenarDocumentosPorCondicion(documentos),
     [documentos],
   );
+
+  const cargarFotosCount = useCallback(async (idFolio: number) => {
+    try {
+      const lista = await incidenciaDepositoService.listarPorOd(idFolio);
+      setFotosCount(lista.length);
+    } catch {
+      setFotosCount(0);
+    }
+  }, []);
 
   const cargarDetalle = useCallback(
     async (idFolio: number) => {
@@ -235,10 +253,13 @@ export default function ModalDetalleOrdenDistribucion({
       setProcesandoRCobranza(false);
       setProcesandoFinalizado(false);
       setVerIncidenciasCtx(null);
+      setModalImagenes({ abierto: false, modo: "adjuntar" });
+      setFotosCount(0);
       return;
     }
     void cargarDetalle(folio);
-  }, [abierto, folio, cargarDetalle]);
+    void cargarFotosCount(folio);
+  }, [abierto, folio, cargarDetalle, cargarFotosCount]);
 
   useEffect(() => {
     if (!detalleRefreshKey || !abierto || !folio || folio <= 0) {
@@ -248,13 +269,13 @@ export default function ModalDetalleOrdenDistribucion({
   }, [detalleRefreshKey, abierto, folio, cargarDetalle]);
 
   useEffect(() => {
-    if (!abierto || incidenciaModalAbierto) return;
+    if (!abierto || incidenciaModalAbierto || modalImagenes.abierto) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onCerrar();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [abierto, incidenciaModalAbierto, onCerrar]);
+  }, [abierto, incidenciaModalAbierto, modalImagenes.abierto, onCerrar]);
 
   const marcarSinIncidencias = async () => {
     if (!folio || folio <= 0) {
@@ -753,6 +774,34 @@ export default function ModalDetalleOrdenDistribucion({
 
             <button
               type="button"
+              onClick={() =>
+                setModalImagenes({ abierto: true, modo: "adjuntar" })
+              }
+              disabled={!folio || folio <= 0}
+              title="Adjuntar imágenes de depósito a este folio (máximo 3)"
+              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-3 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50 dark:bg-teal-700 dark:hover:bg-teal-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
+            >
+              <ImagePlus className="h-4 w-4 shrink-0" />
+              Adjuntar imágenes
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setModalImagenes({ abierto: true, modo: "ver" })}
+              disabled={!folio || folio <= 0 || fotosCount === 0}
+              title={
+                fotosCount === 0
+                  ? "No hay imágenes adjuntas a este folio"
+                  : "Ver imágenes adjuntas de este folio"
+              }
+              className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg border border-teal-600 bg-white px-3 py-2 text-sm font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50 dark:border-teal-500 dark:bg-gray-800 dark:text-teal-300 dark:hover:bg-teal-950/40 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"
+            >
+              <Images className="h-4 w-4 shrink-0" />
+              Ver imágenes{fotosCount > 0 ? ` (${fotosCount})` : ""}
+            </button>
+
+            <button
+              type="button"
               onClick={() => void marcarSinIncidencias()}
               disabled={procesandoEstatus || loading || sinIncidenciasInactivo}
               title={
@@ -948,6 +997,18 @@ export default function ModalDetalleOrdenDistribucion({
           </div>
         </div>
       ) : null}
+
+      <ModalImagenesDeposito
+        abierto={modalImagenes.abierto}
+        modo={modalImagenes.modo}
+        idODistribucion={folio}
+        onCerrar={() =>
+          setModalImagenes((prev) => ({ ...prev, abierto: false }))
+        }
+        onCambio={() => {
+          if (folio && folio > 0) void cargarFotosCount(folio);
+        }}
+      />
 
       <ModalVerIncidenciasEntrega
         abierto={verIncidenciasCtx !== null}

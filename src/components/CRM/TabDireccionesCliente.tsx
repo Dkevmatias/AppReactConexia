@@ -7,6 +7,10 @@ import {
   ESTADOS_MEXICO,
   etiquetaTipoDireccion,
   claveCampoDireccion,
+  IVA_DIRECCION_CODIAL,
+  ivaFijoEnEmpresa,
+  nombreDireccionPorTipo,
+  opcionesIvaDireccion,
   TipoDireccionCliente,
 } from "./clienteAltaUtils";
 import {
@@ -34,6 +38,8 @@ type TabDireccionesClienteProps = {
   ) => void | Promise<void>;
   soloLectura?: boolean;
   camposInvalidos?: Set<string>;
+  /** Codial: IVA fijo 16%. Codialub: IVAT16 / IVAT0 / IVAT8. */
+  idEmpresa?: number | null;
 };
 
 function actualizarDireccion(
@@ -75,6 +81,7 @@ function FormularioDireccion({
   onGuardarDireccion,
   soloLectura = false,
   camposInvalidos,
+  idEmpresa = null,
 }: {
   direccion: DireccionClienteForm;
   indice: number;
@@ -87,7 +94,10 @@ function FormularioDireccion({
   ) => void | Promise<void>;
   soloLectura?: boolean;
   camposInvalidos?: Set<string>;
+  idEmpresa?: number | null;
 }) {
+  const ivaFijo = ivaFijoEnEmpresa(idEmpresa);
+  const opcionesIva = opcionesIvaDireccion(idEmpresa);
   const paisClave = normalizarPaisClaveSat(
     direccion.paisSat || PAIS_SAT_DEFAULT,
   );
@@ -419,9 +429,10 @@ function FormularioDireccion({
           </span>
           <select
             value={direccion.tipo}
-            onChange={(e) =>
-              onChange({ tipo: e.target.value as TipoDireccionCliente })
-            }
+            onChange={(e) => {
+              const tipo = e.target.value as TipoDireccionCliente;
+              onChange({ tipo, nombre: nombreDireccionPorTipo(tipo) });
+            }}
             className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs font-medium dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="FISCAL">Fiscal</option>
@@ -492,7 +503,11 @@ function FormularioDireccion({
         ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {campo("nombre", "Nombre", `${direccion.idLocal}-nombre`)}
+          {campo(
+            "nombre",
+            nombreDireccionPorTipo(direccion.tipo),
+            `${direccion.idLocal}-nombre`,
+          )}
           {campo("calle", "Calle", `${direccion.idLocal}-calle`)}
           {campo("numero", "Número", `${direccion.idLocal}-numero`)}
 
@@ -665,7 +680,53 @@ function FormularioDireccion({
             />
           </div>
 
-          {campo("iva", "IVA", `${direccion.idLocal}-iva`)}
+          <div>
+            <label
+              className={prospectoLabelClassError(
+                Boolean(
+                  camposInvalidos?.has(
+                    claveCampoDireccion(direccion.idLocal, "iva"),
+                  ),
+                ),
+              )}
+              htmlFor={`${direccion.idLocal}-iva`}
+            >
+              IVA
+              <span className="ml-0.5 text-red-500" aria-hidden="true">
+                *
+              </span>
+            </label>
+            <select
+              id={`${direccion.idLocal}-iva`}
+              value={ivaFijo ? IVA_DIRECCION_CODIAL : direccion.iva}
+              onChange={(e) => onChange({ iva: e.target.value })}
+              disabled={ivaFijo}
+              title={
+                ivaFijo
+                  ? "En Codial el IVA de la dirección es IVAT16."
+                  : undefined
+              }
+              className={`${prospectoInputClassError(
+                Boolean(
+                  camposInvalidos?.has(
+                    claveCampoDireccion(direccion.idLocal, "iva"),
+                  ),
+                ),
+              )}${ivaFijo ? " bg-gray-50 dark:bg-gray-900/40" : ""}`}
+            >
+              {ivaFijo ? null : <option value="">Seleccione IVA</option>}
+              {opcionesIva.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+              {!ivaFijo &&
+              direccion.iva &&
+              !opcionesIva.some((o) => o.value === direccion.iva) ? (
+                <option value={direccion.iva}>{direccion.iva}</option>
+              ) : null}
+            </select>
+          </div>
           {campo("referencia", "Referencia", `${direccion.idLocal}-ref`, false)}
         </div>
 
@@ -820,7 +881,22 @@ export default function TabDireccionesCliente({
   onGuardarDireccion,
   soloLectura = false,
   camposInvalidos,
+  idEmpresa = null,
 }: TabDireccionesClienteProps) {
+  const ivaFijo = ivaFijoEnEmpresa(idEmpresa);
+
+  useEffect(() => {
+    if (soloLectura || !ivaFijo) return;
+    if (direcciones.every((d) => d.iva === IVA_DIRECCION_CODIAL)) return;
+    onChange(
+      direcciones.map((d) =>
+        d.iva === IVA_DIRECCION_CODIAL ? d : { ...d, iva: IVA_DIRECCION_CODIAL },
+      ),
+    );
+    // Solo al pasar a Codial; no reejecutar en cada tecla de la dirección.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ivaFijo, soloLectura]);
+
   const agregar = (tipo: TipoDireccionCliente) => {
     onChange([...direcciones, direccionVacia(tipo)]);
   };
@@ -837,12 +913,38 @@ export default function TabDireccionesCliente({
   };
 
   const clonarEntrega = (origen: DireccionClienteForm) => {
-    onChange([...direcciones, clonarDireccionComoEntrega(origen)]);
+    const copia = clonarDireccionComoEntrega(origen);
+    onChange([
+      ...direcciones,
+      ivaFijo ? { ...copia, iva: IVA_DIRECCION_CODIAL } : copia,
+    ]);
   };
+
+  const faltaEntrega = !direcciones.some((d) => d.tipo === "ENTREGA");
+  const resaltarEntrega =
+    faltaEntrega &&
+    Boolean(
+      camposInvalidos?.has("direccionEntrega") ||
+        camposInvalidos?.has("direcciones"),
+    );
 
   return (
     <div className="space-y-4">
-      {camposInvalidos?.has("direcciones") ? (
+      {faltaEntrega && !soloLectura ? (
+        <p
+          className={`rounded-lg border px-3 py-2 text-xs ${
+            resaltarEntrega
+              ? "border-amber-400 bg-amber-50 text-amber-900 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200"
+              : "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200"
+          }`}
+        >
+          Capture una dirección de entrega antes de guardar. Use{" "}
+          <span className="font-medium">Agregar entrega</span>
+          {direcciones.some((d) => d.tipo === "FISCAL")
+            ? " o clone la fiscal."
+            : "."}
+        </p>
+      ) : camposInvalidos?.has("direcciones") ? (
         <p className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200">
           Debe agregar al menos una dirección (solo Referencia es opcional).
         </p>
@@ -861,7 +963,11 @@ export default function TabDireccionesCliente({
             <button
               type="button"
               onClick={() => agregar("ENTREGA")}
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+              className={`inline-flex min-h-[40px] items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium ${
+                resaltarEntrega
+                  ? "border-amber-500 bg-amber-50 text-amber-950 ring-2 ring-amber-300 hover:bg-amber-100 dark:border-amber-500 dark:bg-amber-950/50 dark:text-amber-100 dark:ring-amber-700 dark:hover:bg-amber-900/60"
+                  : "border-gray-300 bg-white text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+              }`}
             >
               <Plus className="h-4 w-4" />
               Agregar entrega
@@ -879,7 +985,8 @@ export default function TabDireccionesCliente({
 
       {direcciones.length === 0 ? (
         <p className="rounded-lg border border-dashed border-gray-300 py-10 text-center text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400">
-          No hay direcciones. Agregue al menos una fiscal o de entrega.
+          No hay direcciones. Agregue una dirección de entrega para poder
+          guardar el cliente.
         </p>
       ) : (
         <div className="space-y-4">
@@ -899,6 +1006,7 @@ export default function TabDireccionesCliente({
               onGuardarDireccion={soloLectura ? undefined : onGuardarDireccion}
               soloLectura={soloLectura}
               camposInvalidos={camposInvalidos}
+              idEmpresa={idEmpresa}
             />
           ))}
         </div>

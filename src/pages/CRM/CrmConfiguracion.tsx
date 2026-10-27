@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import { useModalAlerta } from "../../hooks/useModalAlerta";
+import { useCrmPermisos } from "../../hooks/useCrmPermisos";
 import {
   crmService,
   ESTATUS_ACTIVO,
@@ -73,6 +74,7 @@ function funnelOrdenado(items: EtapaConfiguracion[]): EtapaConfiguracion[] {
 }
 
 export default function CrmConfiguracion() {
+  const { puedeOperarConfiguracion } = useCrmPermisos();
   const { mostrarAdvertencia, mostrarError, AlertaHost } = useModalAlerta();
   const [tab, setTab] = useState<TabId>("negocio");
   const [loading, setLoading] = useState(true);
@@ -338,6 +340,19 @@ export default function CrmConfiguracion() {
             ? "Agregar etapa al funnel"
             : "Nueva fuente"
       : "Editar registro";
+
+  if (!puedeOperarConfiguracion) {
+    return (
+      <div className="space-y-2 p-6">
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          Configuración CRM
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          No tiene permiso para operar la configuración del CRM.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">

@@ -31,6 +31,7 @@ type TabSeguimientosLeadProps = {
   idUsuarioCreacion?: number | null;
   telefonoDefault?: string | null;
   onGuardado?: () => void | Promise<void>;
+  puedeOperar?: boolean;
 };
 
 type FormMensaje = {
@@ -157,6 +158,7 @@ export default function TabSeguimientosLead({
   idUsuarioCreacion = null,
   telefonoDefault = "",
   onGuardado,
+  puedeOperar = true,
 }: TabSeguimientosLeadProps) {
   const [subTab, setSubTab] = useState<TipoActividadTimeline>("mensaje");
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -186,7 +188,8 @@ export default function TabSeguimientosLead({
     [items, subTab],
   );
 
-  const puedeRegistrar = (idLead ?? 0) > 0 && (idUsuarioCreacion ?? 0) > 0;
+  const puedeRegistrar =
+    puedeOperar && (idLead ?? 0) > 0 && (idUsuarioCreacion ?? 0) > 0;
 
   const cerrarForm = () => {
     setMostrarForm(false);
@@ -1177,19 +1180,23 @@ export default function TabSeguimientosLead({
       <div className="p-4 sm:p-5" role="tabpanel">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {puedeRegistrar
-              ? `Registre ${etiquetaTipoActividad(subTab).toLowerCase()}s del prospecto. Doble clic en un registro para ver el detalle.`
-              : "Guarde el prospecto para habilitar el registro de seguimientos."}
+            {!puedeOperar
+              ? "Solo consulta. No tiene permiso para registrar seguimientos."
+              : puedeRegistrar
+                ? `Registre ${etiquetaTipoActividad(subTab).toLowerCase()}s del prospecto. Doble clic en un registro para ver el detalle.`
+                : "Guarde el prospecto para habilitar el registro de seguimientos."}
           </p>
-          <button
-            type="button"
-            onClick={() => abrirForm(subTab)}
-            disabled={!puedeRegistrar || (mostrarForm && !modoVista)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Agregar {etiquetaTipoActividad(subTab).toLowerCase()}
-          </button>
+          {puedeOperar ? (
+            <button
+              type="button"
+              onClick={() => abrirForm(subTab)}
+              disabled={!puedeRegistrar || (mostrarForm && !modoVista)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Agregar {etiquetaTipoActividad(subTab).toLowerCase()}
+            </button>
+          ) : null}
         </div>
 
         {mostrarForm ? formActual : null}
