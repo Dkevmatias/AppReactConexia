@@ -2,6 +2,7 @@ import type { DocODistribucionDetalle } from "../../services/oDistribucionServic
 import {
   ESTATUS_COBRANZA,
   ESTATUS_FINALIZADO,
+  ESTATUS_PENDIENTE,
   ESTATUS_PROCESADO,
 } from "../../services/procesarODService";
 
@@ -169,6 +170,24 @@ export function bloquearFinalizadoPorEstatus(
 ): boolean {
   const estatus = (estatusS ?? "").trim().toUpperCase();
   return estatus !== ESTATUS_COBRANZA;
+}
+
+/** Badge de Estatus Sistema en el listado: PDT rojo, R-F verde (como cobranza Creado). */
+export function claseBadgeEstatusSistema(
+  estatusS: string | null | undefined,
+): string {
+  const valor = (estatusS ?? "").trim().toUpperCase();
+  const codigo = valor === "RF" ? ESTATUS_FINALIZADO : valor || ESTATUS_PENDIENTE;
+
+  if (codigo === ESTATUS_FINALIZADO) {
+    return "inline-flex rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";
+  }
+
+  if (codigo === ESTATUS_PENDIENTE) {
+    return "inline-flex rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-800 dark:bg-red-900/40 dark:text-red-200";
+  }
+
+  return "text-sm font-medium text-gray-800 dark:text-gray-200";
 }
 
 function tieneValorDocumentoRelacionado(

@@ -3,6 +3,7 @@ import { Loader2, Search } from "lucide-react";
 import PageMeta from "../../components/common/PageMeta";
 import {
   DocumentoDistribucionCard,
+  claseBadgeEstatusSistema,
   formatearFecha,
   ModalDetalleOrdenDistribucion,
   ModalIncidenciaDistribucion,
@@ -682,7 +683,11 @@ export default function ComprobacionRutas() {
 
                         <td className="px-4 py-2">{doc.estatus ?? "—"}</td>
 
-                        <td className="px-4 py-2">{doc.estatusS ?? "—"}</td>
+                        <td className="px-4 py-2">
+                          <span className={claseBadgeEstatusSistema(doc.estatusS)}>
+                            {doc.estatusS ?? "—"}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

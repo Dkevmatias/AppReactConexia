@@ -167,6 +167,71 @@ export interface CambiarPasswordResponse {
   message: string;
 }
 
+function messageFromAuthBody(data: unknown, fallback: string): string {
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    if (typeof o.message === "string" && o.message.trim()) return o.message.trim();
+    if (typeof o.mensaje === "string" && o.mensaje.trim()) return o.mensaje.trim();
+  }
+  return fallback;
+}
+
+/** Olvido de contraseña (anónimo). POST /api/Acceso/SolicitarPasswordReset */
+export const solicitarPasswordResetService = async (
+  email: string,
+): Promise<CambiarPasswordResponse> => {
+  const res = await api.post<{ success?: boolean; message?: string }>(
+    "/api/Acceso/SolicitarPasswordReset",
+    { email: email.trim() },
+    {
+      validateStatus: (status) => status < 500,
+    },
+  );
+
+  const message = messageFromAuthBody(
+    res.data,
+    "Si el correo existe, se envió un enlace de recuperación.",
+  );
+
+  if (res.status >= 200 && res.status < 300) {
+    return { success: true, message };
+  }
+
+  return { success: false, message };
+};
+
+/** Enlace del correo (anónimo). POST /api/Acceso/ConfirmarPasswordReset */
+export const confirmarPasswordResetService = async (
+  token: string,
+  newPassword: string,
+  confirmPassword: string,
+): Promise<CambiarPasswordResponse> => {
+  const res = await api.post<{ message?: string }>(
+    "/api/Acceso/ConfirmarPasswordReset",
+    {
+      token: token.trim(),
+      newPassword,
+      confirmPassword,
+    },
+    {
+      validateStatus: (status) => status < 500,
+    },
+  );
+
+  const message = messageFromAuthBody(
+    res.data,
+    res.status >= 200 && res.status < 300
+      ? "Contraseña actualizada. Inicia sesión de nuevo."
+      : "No se pudo restablecer la contraseña",
+  );
+
+  if (res.status >= 200 && res.status < 300) {
+    return { success: true, message };
+  }
+
+  return { success: false, message };
+};
+
 /** Requiere sesión (cookie o Bearer). No uses ActualizarPassword: es solo Admin. */
 export const cambiarPasswordService = async (
   currentPassword: string,

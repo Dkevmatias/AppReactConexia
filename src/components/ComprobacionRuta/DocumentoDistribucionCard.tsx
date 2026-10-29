@@ -1,5 +1,5 @@
 import { ODistribucionDocumento } from "../../services/oDistribucionService";
-import { formatearFecha } from "./utils";
+import { claseBadgeEstatusSistema, formatearFecha } from "./utils";
 
 export interface DocumentoDistribucionCardProps {
   doc: ODistribucionDocumento;
@@ -56,6 +56,16 @@ export default function DocumentoDistribucionCard({
           <dt className="text-xs text-gray-500 dark:text-gray-400">Ruta</dt>
           <dd className="font-medium text-gray-800 dark:text-gray-200">
             {doc.ruta ?? "—"}
+          </dd>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <dt className="text-xs text-gray-500 dark:text-gray-400">
+            Estatus Sistema
+          </dt>
+          <dd>
+            <span className={claseBadgeEstatusSistema(doc.estatusS)}>
+              {doc.estatusS ?? "—"}
+            </span>
           </dd>
         </div>
       </dl>

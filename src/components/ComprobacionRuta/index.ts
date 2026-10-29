@@ -9,4 +9,4 @@ export type {
   ContextoIncidenciaDistribucion,
   ModoModalIncidencia,
 } from "./ModalIncidenciaDistribucion";
-export { formatearFecha } from "./utils";
+export { formatearFecha, claseBadgeEstatusSistema } from "./utils";

@@ -36,7 +36,9 @@ const isAuthBypassUrl = (url?: string) => {
   return (
     u.includes("/api/acceso/login") ||
     u.includes("/api/acceso/refresh") ||
-    u.includes("/api/acceso/logout")
+    u.includes("/api/acceso/logout") ||
+    u.includes("/api/acceso/solicitarpasswordreset") ||
+    u.includes("/api/acceso/confirmarpasswordreset")
   );
 };
 

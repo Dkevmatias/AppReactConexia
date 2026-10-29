@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react";
-import { api } from "../../services/apiServices";
+import {
+  confirmarPasswordResetService,
+  solicitarPasswordResetService,
+} from "../../services/authService";
 
 export default function CambiarContrasena() {
   const navigate = useNavigate();
@@ -72,19 +75,24 @@ export default function CambiarContrasena() {
       if (!validarConfirmacion()) return;
       setLoading(true);
       try {
-        await api.post("/api/Acceso/ConfirmarPasswordReset", {
+        const result = await confirmarPasswordResetService(
           token,
-          newPassword: passwordNueva,
-          confirmPassword: passwordConfirmar,
-        });
-        setMensajeExito("Contraseña actualizada. Redirigiendo al login...");
+          passwordNueva,
+          passwordConfirmar,
+        );
+        if (!result.success) {
+          setError(result.message);
+          return;
+        }
+        setMensajeExito(
+          result.message || "Contraseña actualizada. Redirigiendo al login...",
+        );
         setSuccess(true);
         setTimeout(() => {
           navigate("/signin");
         }, 2000);
-      } catch (err: unknown) {
-        const axiosError = err as { response?: { data?: { message?: string } } };
-        setError(axiosError.response?.data?.message || "No se pudo restablecer la contraseña");
+      } catch {
+        setError("No se pudo restablecer la contraseña");
       } finally {
         setLoading(false);
       }
@@ -94,16 +102,18 @@ export default function CambiarContrasena() {
     if (!validarSolicitud()) return;
     setLoading(true);
     try {
-      await api.post("/api/Acceso/SolicitarPasswordReset", {
-        email: email.trim(),
-      });
+      const result = await solicitarPasswordResetService(email);
+      if (!result.success) {
+        setError(result.message);
+        return;
+      }
       setMensajeExito(
-        "Si el correo existe, se envió un enlace de recuperación. Revisa tu bandeja."
+        result.message ||
+          "Si el correo existe, se envió un enlace de recuperación. Revisa tu bandeja.",
       );
       setSuccess(true);
-    } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
-      setError(axiosError.response?.data?.message || "No se pudo solicitar el restablecimiento");
+    } catch {
+      setError("No se pudo solicitar el restablecimiento");
     } finally {
       setLoading(false);
     }
