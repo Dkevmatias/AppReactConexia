@@ -184,6 +184,7 @@ export const solicitarPasswordResetService = async (
     "/api/Acceso/SolicitarPasswordReset",
     { email: email.trim() },
     {
+      timeout: 60_000,
       validateStatus: (status) => status < 500,
     },
   );
