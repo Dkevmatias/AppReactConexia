@@ -116,9 +116,10 @@ export function cardCodeParaCodial(
 
 /**
  * Empresas ya enviadas, inferidas del estatus CRM.
- * Un solo EstatusSap / CardCode: "Enviado" + C… o CC… solo confirma Codialub.
- * Codial se marca al tener éxito real (sessionStorage), no por el prefijo CC
- * (ese CardCode se asigna ANTES del POST y queda si el envío a Codial falla).
+ * Un solo EstatusSap / CardCode para las dos sociedades:
+ * - Enviado + C… (no CC) → solo Codialub
+ * - Enviado + CC… → Codialub y Codial
+ * Si Codial falla, el CardCode se revierte a C… para no marcar las dos.
  */
 export function empresasSapEnviadasDesdeCliente(opts: {
   estatusSap?: string | null;
@@ -128,8 +129,11 @@ export function empresasSapEnviadasDesdeCliente(opts: {
     (opts.estatusSap ?? "").trim().toLowerCase() === "enviado";
   if (!enviado) return [];
   const code = (opts.cardCode ?? "").trim().toUpperCase();
-  if (!code.startsWith("C")) return [];
-  return [ID_EMPRESA_CODIALUB];
+  if (code.startsWith("CC")) {
+    return [ID_EMPRESA_CODIALUB, ID_EMPRESA_CODIAL];
+  }
+  if (code.startsWith("C")) return [ID_EMPRESA_CODIALUB];
+  return [];
 }
 
 const empresasSapStorageKey = (idCliente: number) =>
