@@ -8,6 +8,7 @@ import {
   etiquetaTipoDireccion,
   claveCampoDireccion,
   IVA_DIRECCION_CODIAL,
+  aplicarIvaDireccionesPorEmpresa,
   ivaFijoEnEmpresa,
   nombreDireccionPorTipo,
   opcionesIvaDireccion,
@@ -886,16 +887,12 @@ export default function TabDireccionesCliente({
   const ivaFijo = ivaFijoEnEmpresa(idEmpresa);
 
   useEffect(() => {
-    if (soloLectura || !ivaFijo) return;
+    if (!ivaFijo) return;
     if (direcciones.every((d) => d.iva === IVA_DIRECCION_CODIAL)) return;
-    onChange(
-      direcciones.map((d) =>
-        d.iva === IVA_DIRECCION_CODIAL ? d : { ...d, iva: IVA_DIRECCION_CODIAL },
-      ),
-    );
+    onChange(aplicarIvaDireccionesPorEmpresa(direcciones, idEmpresa));
     // Solo al pasar a Codial; no reejecutar en cada tecla de la dirección.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ivaFijo, soloLectura]);
+  }, [ivaFijo]);
 
   const agregar = (tipo: TipoDireccionCliente) => {
     onChange([...direcciones, direccionVacia(tipo)]);

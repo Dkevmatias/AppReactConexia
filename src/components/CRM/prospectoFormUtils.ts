@@ -114,7 +114,12 @@ export function cardCodeParaCodial(
   return `C${base}`;
 }
 
-/** Empresas ya enviadas a SAP, inferidas del estatus y del CardCode. */
+/**
+ * Empresas ya enviadas, inferidas del estatus CRM.
+ * Un solo EstatusSap / CardCode: "Enviado" + C… o CC… solo confirma Codialub.
+ * Codial se marca al tener éxito real (sessionStorage), no por el prefijo CC
+ * (ese CardCode se asigna ANTES del POST y queda si el envío a Codial falla).
+ */
 export function empresasSapEnviadasDesdeCliente(opts: {
   estatusSap?: string | null;
   cardCode?: string | null;
@@ -123,10 +128,49 @@ export function empresasSapEnviadasDesdeCliente(opts: {
     (opts.estatusSap ?? "").trim().toLowerCase() === "enviado";
   if (!enviado) return [];
   const code = (opts.cardCode ?? "").trim().toUpperCase();
-  if (code.startsWith("CC")) {
-    return [ID_EMPRESA_CODIALUB, ID_EMPRESA_CODIAL];
-  }
+  if (!code.startsWith("C")) return [];
   return [ID_EMPRESA_CODIALUB];
+}
+
+const empresasSapStorageKey = (idCliente: number) =>
+  `crm:cliente:${idCliente}:empresasSap`;
+
+export function leerEmpresasSapEnviadasLocal(idCliente: number): number[] {
+  if (!idCliente || idCliente <= 0) return [];
+  try {
+    const raw = sessionStorage.getItem(empresasSapStorageKey(idCliente));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((n) => Number(n))
+      .filter((n) => n === ID_EMPRESA_CODIALUB || n === ID_EMPRESA_CODIAL);
+  } catch {
+    return [];
+  }
+}
+
+export function guardarEmpresasSapEnviadasLocal(
+  idCliente: number,
+  empresas: number[],
+): void {
+  if (!idCliente || idCliente <= 0) return;
+  try {
+    sessionStorage.setItem(
+      empresasSapStorageKey(idCliente),
+      JSON.stringify([...new Set(empresas)]),
+    );
+  } catch {
+    /* quota / modo privado */
+  }
+}
+
+export function fusionarEmpresasSapEnviadas(
+  ...listas: number[][]
+): number[] {
+  return [...new Set(listas.flat())].filter(
+    (n) => n === ID_EMPRESA_CODIALUB || n === ID_EMPRESA_CODIAL,
+  );
 }
 
 export function descuentoEnviadoSap(

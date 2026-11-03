@@ -17,6 +17,7 @@ import {
   armarPayloadsContactos,
   armarPayloadContacto,
   armarPayloadDireccion,
+  aplicarIvaDireccionesPorEmpresa,
   armarPayloadSapBusinessPartner,
   armarPayloadSapDiscountGroup,
   stringifyPayloadSapDiscountGroup,
@@ -46,6 +47,9 @@ import {
   cardCodeBaseCodialub,
   cardCodeParaCodial,
   empresasSapEnviadasDesdeCliente,
+  leerEmpresasSapEnviadasLocal,
+  guardarEmpresasSapEnviadasLocal,
+  fusionarEmpresasSapEnviadas,
   empresasDescuentosEnviadasDesdeDocs,
   ID_EMPRESA_CODIAL,
   ID_EMPRESA_CODIALUB,
@@ -150,7 +154,8 @@ export default function ProspectoFormPage() {
   const [empresasEnviadasDescuentos, setEmpresasEnviadasDescuentos] =
     useState<number[]>([]);
 
-  const clienteYaEnviadoSap = esClienteEnviadoSap(clienteEstatusSap);
+  const clienteYaEnviadoSap =
+    esClienteEnviadoSap(clienteEstatusSap) || empresasEnviadasSap.length > 0;
   const clienteSoloLectura = clienteYaEnviadoSap;
   const empresaDestinoSap =
     form.idEmpresa && form.idEmpresa > 0 ? form.idEmpresa : null;
@@ -246,12 +251,17 @@ export default function ProspectoFormPage() {
               setClienteGuardadoId(existente.idCliente);
               setClienteCardCode(existente.cardCode);
               setClienteEstatusSap(existente.estatusSap);
-              setEmpresasEnviadasSap(
-                empresasSapEnviadasDesdeCliente({
-                  estatusSap: existente.estatusSap,
-                  cardCode: existente.cardCode,
-                }),
-              );
+              {
+                const empresas = fusionarEmpresasSapEnviadas(
+                  empresasSapEnviadasDesdeCliente({
+                    estatusSap: existente.estatusSap,
+                    cardCode: existente.cardCode,
+                  }),
+                  leerEmpresasSapEnviadasLocal(existente.idCliente),
+                );
+                setEmpresasEnviadasSap(empresas);
+                guardarEmpresasSapEnviadasLocal(existente.idCliente, empresas);
+              }
               setCardCodeCodialub(
                 cardCodeBaseCodialub(existente.cardCode),
               );
@@ -1253,6 +1263,9 @@ export default function ProspectoFormPage() {
     setEnviandoSap(true);
     setErrorEnvioSap(null);
     setMensajeEnvioSap(null);
+    const cardCodeCodialubActual = cardCodeBaseCodialub(
+      cardCodeCodialub || clienteCardCode,
+    );
     try {
       const vendedorSel =
         catalogoVendedores.find(
@@ -1268,8 +1281,22 @@ export default function ProspectoFormPage() {
       const formCliente = slp
         ? { ...clienteAlta, salesPersonCode: slp }
         : clienteAlta;
+      const formParaEnvio =
+        idEmpresa === ID_EMPRESA_CODIAL
+          ? {
+              ...formCliente,
+              direcciones: aplicarIvaDireccionesPorEmpresa(
+                formCliente.direcciones,
+                idEmpresa,
+              ),
+            }
+          : formCliente;
       if (slp && clienteAlta.salesPersonCode !== slp) {
         actualizarClienteAlta({ salesPersonCode: slp });
+      }
+      if (idEmpresa === ID_EMPRESA_CODIAL) {
+        actualizarClienteAlta({ direcciones: formParaEnvio.direcciones });
+        await sincronizarDirecciones(clienteGuardadoId, formParaEnvio);
       }
 
       if (
@@ -1283,7 +1310,7 @@ export default function ProspectoFormPage() {
         await clienteService.actualizar(
           clienteGuardadoId,
           armarPayloadClienteUpdate({
-            form: formCliente,
+            form: formParaEnvio,
             idEmpresa,
             idSucursal: contexto?.idSucursal ?? null,
             idLeadOrigen: idLead,
@@ -1332,13 +1359,29 @@ export default function ProspectoFormPage() {
       if (idEmpresa === ID_EMPRESA_CODIALUB) {
         setCardCodeCodialub(cardCodeBaseCodialub(codeFinal));
       }
-      setEmpresasEnviadasSap((prev) =>
-        prev.includes(idEmpresa) ? prev : [...prev, idEmpresa],
-      );
+      const empresasOk = fusionarEmpresasSapEnviadas(empresasEnviadasSap, [
+        idEmpresa,
+      ]);
+      setEmpresasEnviadasSap(empresasOk);
+      guardarEmpresasSapEnviadasLocal(clienteGuardadoId, empresasOk);
       setClienteEstatusSap(
         result.estatusSap?.trim() || "Enviado",
       );
     } catch (err) {
+      if (idEmpresa === ID_EMPRESA_CODIAL && cardCodeCodialubActual) {
+        try {
+          const revertido = await clienteService.asignarCardCode(
+            clienteGuardadoId,
+            cardCodeCodialubActual,
+          );
+          setClienteCardCode(
+            revertido.cardCode ?? cardCodeCodialubActual,
+          );
+          setCardCodeDraft(cardCodeParaCodial(cardCodeCodialubActual));
+        } catch {
+          /* el error de IVA / SAP es el que importa */
+        }
+      }
       setErrorEnvioSap(
         err instanceof Error ? err.message : "No se pudo enviar el cliente a SAP.",
       );

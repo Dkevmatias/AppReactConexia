@@ -230,6 +230,17 @@ export function ivaDireccionParaEmpresa(
   return ivaFijoEnEmpresa(idEmpresa) ? IVA_DIRECCION_CODIAL : iva;
 }
 
+/** Codial siempre IVAT16, aunque el CRM tenga IVAT8 de Codialub. */
+export function aplicarIvaDireccionesPorEmpresa(
+  direcciones: DireccionClienteForm[],
+  idEmpresa: number | null | undefined,
+): DireccionClienteForm[] {
+  if (!ivaFijoEnEmpresa(idEmpresa)) return direcciones;
+  return direcciones.map((d) =>
+    d.iva === IVA_DIRECCION_CODIAL ? d : { ...d, iva: IVA_DIRECCION_CODIAL },
+  );
+}
+
 export function opcionesIvaDireccion(
   idEmpresa: number | null | undefined,
 ): ReadonlyArray<{ value: string; label: string }> {
