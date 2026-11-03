@@ -3,10 +3,12 @@ import PageMeta from "../../components/common/PageMeta";
 import ReportesTabs from "../../components/reportes/ReportesTabs";
 import ReportesPorSurtir from "../Dashboard/reportes/ReportesPorSurtir";
 import ReportesTraspasos from "../Dashboard/reportes/ReportesTraspasos";
+import ReportesEfectividad from "../Dashboard/reportes/ReportesEfectividad";
 
 const tabs = [
   { id: "por-surtir", label: "Por surtir", icon: "🚚" },
   { id: "traspasos", label: "Traspasos", icon: "📦" },
+  { id: "efectividad", label: "Efectividad", icon: "🎯" },
 ];
 
 export default function ReportesOperaciones() {
@@ -16,14 +18,14 @@ export default function ReportesOperaciones() {
     <div className="min-w-0 space-y-6">
       <PageMeta
         title="Reportes Operaciones"
-        description="Por surtir y estatus de traspasos"
+        description="Por surtir, traspasos y efectividad a la primera entrega"
       />
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Reportes Operaciones
         </h1>
         <p className="mt-1 text-gray-500 dark:text-gray-400">
-          Por surtir global y traspasos (mes pasado a la fecha).
+          Por surtir, traspasos y efectividad a la primera entrega.
         </p>
       </div>
 
@@ -35,6 +37,8 @@ export default function ReportesOperaciones() {
 
       {activeTab === "traspasos" ? (
         <ReportesTraspasos />
+      ) : activeTab === "efectividad" ? (
+        <ReportesEfectividad />
       ) : (
         <ReportesPorSurtir />
       )}

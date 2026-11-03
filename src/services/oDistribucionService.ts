@@ -20,7 +20,7 @@ export interface ODistribucionParams {
   fechaHasta: string;
 }
 
-/** Catálogo VW_REPARTO: NomUser es el filtro de órdenes de distribución. */
+/** Catálogo /api/Vendedores/reparto. `nomUser` = SlpName (filtro de OD). */
 export type RepartidorCatalogo = {
   idUsuario: number;
   nombreUsuario: string;
@@ -143,18 +143,38 @@ function normalizeList(raw: unknown): ODistribucionDocumento[] {
   return normalizeArray(raw, normalizeDocumento);
 }
 
-function normalizeRepartidor(raw: unknown): RepartidorCatalogo {
+function normalizeRepartidorDesdeVendedor(raw: unknown): RepartidorCatalogo {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<
     string,
     unknown
   >;
   return {
-    idUsuario: pickNumber(o, "idUsuario", "IdUsuario") ?? 0,
-    nombreUsuario:
-      pickString(o, "nombreUsuario", "NombreUsuario", "nombre", "Nombre") ??
-      "",
-    nomUser: pickString(o, "nomUser", "NomUser") ?? "",
+    idUsuario: pickNumber(o, "idVendedor", "IdVendedor") ?? 0,
+    nombreUsuario: pickString(o, "nombre", "Nombre") ?? "",
+    nomUser: pickString(o, "slpName", "SlpName", "slPName") ?? "",
   };
+}
+
+function claveReparto(valor: string | null | undefined): string {
+  return (valor ?? "").trim().toLowerCase();
+}
+
+function dedupeRepartidores(lista: RepartidorCatalogo[]): RepartidorCatalogo[] {
+  const vistos = new Set<string>();
+  return lista
+    .filter((r) => {
+      const clave = claveReparto(r.nomUser);
+      if (!clave || vistos.has(clave)) return false;
+      vistos.add(clave);
+      return true;
+    })
+    .sort((a, b) =>
+      (a.nombreUsuario || a.nomUser).localeCompare(
+        b.nombreUsuario || b.nomUser,
+        "es",
+        { sensitivity: "base" },
+      ),
+    );
 }
 
 function normalizeDetalle(raw: unknown): DocODistribucionDetalle {
@@ -255,26 +275,14 @@ export const filtrosODistribucionPorDefecto = () => ({
 
 export const oDistribucionService = {
   getRepartidores: async (): Promise<RepartidorCatalogo[]> => {
-    const response = await api.get<unknown>("/api/Reparto");
+    const response = await api.get<unknown>(
+      "/api/Vendedores/reparto?soloActivos=true",
+    );
     const lista = normalizeArray(
       assertOk(response, "No se pudieron cargar los repartidores."),
-      normalizeRepartidor,
+      normalizeRepartidorDesdeVendedor,
     );
-    const vistos = new Set<string>();
-    return lista
-      .filter((r) => {
-        const clave = r.nomUser.trim().toLowerCase();
-        if (!clave || vistos.has(clave)) return false;
-        vistos.add(clave);
-        return true;
-      })
-      .sort((a, b) =>
-        (a.nombreUsuario || a.nomUser).localeCompare(
-          b.nombreUsuario || b.nomUser,
-          "es",
-          { sensitivity: "base" },
-        ),
-      );
+    return dedupeRepartidores(lista);
   },
 
   getDocumentos: async (

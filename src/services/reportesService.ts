@@ -164,6 +164,66 @@ export interface TransferStatusItem {
   status: string;
 }
 
+export type TipoDocumentoEfectividad =
+  | "Orden de Venta"
+  | "Factura de Reserva";
+
+export type SociedadEfectividad = "CODIALUB" | "CODIAL";
+
+export interface EfectividadPrimeraEntregaGrupo {
+  sociedad: string;
+  tipoDocumento: string;
+  whsCode: string;
+  whsName: string | null;
+  totalDocumentos: number;
+  completasALaPrimera: number;
+  otif: number;
+  conDesviacion: number;
+  pctCompletaALaPrimera: number;
+  pctOtif: number;
+}
+
+export interface EfectividadPrimeraEntregaDetalle {
+  sociedad: string;
+  tipoDocumento: string;
+  docEntryOrigen: number;
+  folioOrigen: number;
+  fechaDocumento: string | null;
+  fechaCompromiso: string | null;
+  fechaPrimeraEntrega: string | null;
+  cardCode: string | null;
+  cardName: string | null;
+  slpCode: number | null;
+  bplId: number | null;
+  whsCode: string | null;
+  whsName: string | null;
+  totalSolicitado: number;
+  totalEntregado: number;
+  cantidadEntregas: number;
+  esCompletaALaPrimera: number;
+  esOtif: number;
+}
+
+export interface EfectividadPrimeraEntregaResult {
+  fechaInicio: string;
+  fechaFin: string;
+  sociedad: string | null;
+  almacen: string | null;
+  kpis: EfectividadPrimeraEntregaGrupo[];
+  totales: EfectividadPrimeraEntregaGrupo;
+  detalle: EfectividadPrimeraEntregaDetalle[] | null;
+}
+
+export interface EfectividadPrimeraEntregaParams {
+  fechaInicio: string;
+  fechaFin: string;
+  almacen?: string | null;
+  tipoDocumento?: TipoDocumentoEfectividad | "" | null;
+  sociedad?: SociedadEfectividad | "" | null;
+  idEmpresa?: number | null;
+  detalle?: boolean;
+}
+
 export interface ComparativoAnual {
   AnioActual: number;
   AnioAnterior: number;
@@ -595,6 +655,127 @@ function normalizeTransferStatusList(raw: unknown): TransferStatusItem[] {
   return list
     .map(normalizeTransferStatusItem)
     .filter((r): r is TransferStatusItem => r !== null);
+}
+
+function fechaApiEfectividad(value?: string | null): string {
+  const t = (value ?? "").trim();
+  const m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}/${m[2]}/${m[3]}`;
+  return t;
+}
+
+function normalizeEfectividadGrupo(
+  raw: unknown,
+): EfectividadPrimeraEntregaGrupo | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const tipoDocumento =
+    pickString(o, "tipoDocumento", "TipoDocumento") ?? "";
+  const totalDocumentos =
+    pickNumber(o, "totalDocumentos", "TotalDocumentos") ?? 0;
+  if (!tipoDocumento && totalDocumentos <= 0 && !pickString(o, "whsCode", "WhsCode")) {
+    return null;
+  }
+  return {
+    sociedad: pickString(o, "sociedad", "Sociedad") ?? "",
+    tipoDocumento,
+    whsCode: pickString(o, "whsCode", "WhsCode") ?? "",
+    whsName: pickString(o, "whsName", "WhsName") ?? null,
+    totalDocumentos,
+    completasALaPrimera:
+      pickNumber(o, "completasALaPrimera", "CompletasALaPrimera") ?? 0,
+    otif: pickNumber(o, "otif", "Otif") ?? 0,
+    conDesviacion: pickNumber(o, "conDesviacion", "ConDesviacion") ?? 0,
+    pctCompletaALaPrimera:
+      pickNumber(o, "pctCompletaALaPrimera", "PctCompletaALaPrimera") ?? 0,
+    pctOtif: pickNumber(o, "pctOtif", "PctOtif") ?? 0,
+  };
+}
+
+function normalizeEfectividadDetalle(
+  raw: unknown,
+): EfectividadPrimeraEntregaDetalle | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const folioOrigen = pickNumber(o, "folioOrigen", "FolioOrigen") ?? 0;
+  const docEntryOrigen =
+    pickNumber(o, "docEntryOrigen", "DocEntryOrigen") ?? 0;
+  if (folioOrigen <= 0 && docEntryOrigen <= 0) return null;
+  return {
+    sociedad: pickString(o, "sociedad", "Sociedad") ?? "",
+    tipoDocumento: pickString(o, "tipoDocumento", "TipoDocumento") ?? "",
+    docEntryOrigen,
+    folioOrigen,
+    fechaDocumento:
+      pickString(o, "fechaDocumento", "FechaDocumento") ?? null,
+    fechaCompromiso:
+      pickString(o, "fechaCompromiso", "FechaCompromiso") ?? null,
+    fechaPrimeraEntrega:
+      pickString(o, "fechaPrimeraEntrega", "FechaPrimeraEntrega") ?? null,
+    cardCode: pickString(o, "cardCode", "CardCode") ?? null,
+    cardName: pickString(o, "cardName", "CardName") ?? null,
+    slpCode: pickNumber(o, "slpCode", "SlpCode") ?? null,
+    bplId: pickNumber(o, "bplId", "BplId") ?? null,
+    whsCode: pickString(o, "whsCode", "WhsCode") ?? null,
+    whsName: pickString(o, "whsName", "WhsName") ?? null,
+    totalSolicitado: pickNumber(o, "totalSolicitado", "TotalSolicitado") ?? 0,
+    totalEntregado: pickNumber(o, "totalEntregado", "TotalEntregado") ?? 0,
+    cantidadEntregas:
+      pickNumber(o, "cantidadEntregas", "CantidadEntregas") ?? 0,
+    esCompletaALaPrimera:
+      pickNumber(o, "esCompletaALaPrimera", "EsCompletaALaPrimera") ?? 0,
+    esOtif: pickNumber(o, "esOtif", "EsOtif") ?? 0,
+  };
+}
+
+function grupoEfectividadVacio(): EfectividadPrimeraEntregaGrupo {
+  return {
+    sociedad: "",
+    tipoDocumento: "Todos",
+    whsCode: "",
+    whsName: null,
+    totalDocumentos: 0,
+    completasALaPrimera: 0,
+    otif: 0,
+    conDesviacion: 0,
+    pctCompletaALaPrimera: 0,
+    pctOtif: 0,
+  };
+}
+
+function normalizeEfectividadResult(
+  raw: unknown,
+): EfectividadPrimeraEntregaResult {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const kpisRaw = o.kpis ?? o.Kpis;
+  const kpis = (Array.isArray(kpisRaw) ? kpisRaw : [])
+    .map(normalizeEfectividadGrupo)
+    .filter((r): r is EfectividadPrimeraEntregaGrupo => r != null);
+  const totales =
+    normalizeEfectividadGrupo(o.totales ?? o.Totales) ??
+    grupoEfectividadVacio();
+  const detalleRaw = o.detalle ?? o.Detalle;
+  const detalle = Array.isArray(detalleRaw)
+    ? detalleRaw
+        .map(normalizeEfectividadDetalle)
+        .filter((r): r is EfectividadPrimeraEntregaDetalle => r != null)
+    : null;
+  return {
+    fechaInicio: pickString(o, "fechaInicio", "FechaInicio") ?? "",
+    fechaFin: pickString(o, "fechaFin", "FechaFin") ?? "",
+    sociedad: pickString(o, "sociedad", "Sociedad") ?? null,
+    almacen: pickString(o, "almacen", "Almacen") ?? null,
+    kpis,
+    totales,
+    detalle,
+  };
 }
 
 const appendFechas = (
@@ -1078,6 +1259,54 @@ export const getReportesService = {
   getFechasTraspasosDefault: () => {
     const fin = new Date();
     const inicio = new Date(fin.getFullYear(), fin.getMonth() - 1, 1);
+    return {
+      fechaInicio: formatDate(inicio),
+      fechaFin: formatDate(fin),
+    };
+  },
+
+  /**
+   * GET /api/Reportes/EfectividadPrimeraEntrega
+   * Fechas en yyyy/MM/dd. detalle=false devuelve KPIs por almacén/tipo.
+   */
+  getEfectividadPrimeraEntrega: async (
+    opts: EfectividadPrimeraEntregaParams,
+  ): Promise<EfectividadPrimeraEntregaResult> => {
+    const params = new URLSearchParams();
+    const inicio = fechaApiEfectividad(opts.fechaInicio);
+    const fin = fechaApiEfectividad(opts.fechaFin);
+    if (inicio) params.set("fechaInicio", inicio);
+    if (fin) params.set("fechaFin", fin);
+    const almacen = opts.almacen?.trim() ?? "";
+    if (almacen) params.set("almacen", almacen);
+    const tipo = opts.tipoDocumento?.trim() ?? "";
+    if (tipo) params.set("tipoDocumento", tipo);
+    const sociedad = opts.sociedad?.trim() ?? "";
+    if (sociedad) params.set("sociedad", sociedad);
+    if (opts.idEmpresa != null && opts.idEmpresa > 0) {
+      params.set("idEmpresa", String(opts.idEmpresa));
+    }
+    params.set("detalle", opts.detalle ? "true" : "false");
+
+    const response = await api.get<unknown>(
+      `/api/Reportes/EfectividadPrimeraEntrega?${params.toString()}`,
+      { timeout: 90_000 },
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        mensajeErrorReporte(
+          response.data,
+          `No se pudo cargar Efectividad (HTTP ${response.status}).`,
+        ),
+      );
+    }
+    return normalizeEfectividadResult(response.data);
+  },
+
+  /** Rango efectividad: 1er día del mes actual → hoy. */
+  getFechasEfectividadDefault: () => {
+    const fin = new Date();
+    const inicio = new Date(fin.getFullYear(), fin.getMonth(), 1);
     return {
       fechaInicio: formatDate(inicio),
       fechaFin: formatDate(fin),
