@@ -68,7 +68,7 @@ const Home: React.FC = () => {
     },
     {
       id: 2,
-      src: "/images/publicidad/kwxbanner.png",
+      src: "/images/publicidad/bannerbuenfin.jpeg",
       alt: "Productos destacados",
     },
 
