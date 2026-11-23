@@ -40,7 +40,7 @@ import {
   bloquearSinIncidenciasPorEstatus,
   documentoTieneIncidencia,
   esCodSinPago,
-  esEstatusFinalizado,
+  esEstatusPermiteGenerarCorte,
   esTipoODTraspaso,
   formatearDocRelacionado,
   formatearFecha,
@@ -160,7 +160,7 @@ export default function ModalDetalleOrdenDistribucion({
   );
 
   const generarCorteInactivo = useMemo(
-    () => !esEstatusFinalizado(estatusSistema),
+    () => !esEstatusPermiteGenerarCorte(estatusSistema),
     [estatusSistema],
   );
 
@@ -411,7 +411,7 @@ export default function ModalDetalleOrdenDistribucion({
       setError(
         documentos.length === 0
           ? "No hay documentos para generar el corte."
-          : "El corte solo está disponible cuando la orden está en R-F.",
+          : "El corte está disponible desde R-AM (revisada por almacén).",
       );
       return;
     }
@@ -870,7 +870,7 @@ export default function ModalDetalleOrdenDistribucion({
                 }
                 title={
                   generarCorteInactivo
-                    ? "Disponible cuando la orden esté finalizada (R-F)"
+                    ? "Disponible cuando la orden esté en R-AM, R-COD o R-F"
                     : "Generar PDF de corte de la orden"
                 }
                 className="inline-flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-700 dark:hover:bg-indigo-600 touch-manipulation sm:min-h-[44px] sm:w-auto sm:px-4"

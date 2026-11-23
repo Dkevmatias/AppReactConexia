@@ -190,6 +190,18 @@ export function esEstatusFinalizado(
   return normalizarCodigoEstatusSistema(estatusS) === ESTATUS_FINALIZADO;
 }
 
+/** Generar Corte: desde R-AM (almacén) en adelante. */
+export function esEstatusPermiteGenerarCorte(
+  estatusS: string | null | undefined,
+): boolean {
+  const estatus = normalizarCodigoEstatusSistema(estatusS);
+  return (
+    estatus === ESTATUS_PROCESADO ||
+    estatus === ESTATUS_COBRANZA ||
+    estatus === ESTATUS_FINALIZADO
+  );
+}
+
 /** Badge de Estatus Sistema en el listado: PDT rojo, R-F verde (como cobranza Creado). */
 export function claseBadgeEstatusSistema(
   estatusS: string | null | undefined,
