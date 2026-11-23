@@ -224,6 +224,83 @@ export interface EfectividadPrimeraEntregaParams {
   detalle?: boolean;
 }
 
+/** Fila de GET /api/ClientesChurn (VW_CLIENTESCHURN). */
+export interface ClienteChurn {
+  sociedad: string;
+  cardCode: string;
+  cardName: string;
+  slpCode: number;
+  uDiaVisita: string | null;
+  diasSinComprar: number;
+  comprasAnuales: number;
+  ventaAnual: number;
+  rScore: number;
+  fScore: number;
+  mScore: number;
+  rfmCell: string;
+  categoriaSegmento: string;
+}
+
+export interface ClientesChurnParams {
+  sociedad?: SociedadEfectividad | "" | null;
+  slpCode?: number | null;
+  diaVisita?: string | string[] | null;
+}
+
+/** Fila KPI de GET /api/Reportes/CancelacionDocumentos */
+export interface CancelacionDocumentosGrupo {
+  sociedad: string;
+  tipoDocumento: string;
+  totalDocumentos: number;
+  canceladosDirectos: number;
+  canceladosPorNc: number;
+  cancelados: number;
+  pctCancelacion: number;
+  pctCancelacionDirecta: number;
+  pctCancelacionPorNc: number;
+}
+
+export interface CancelacionDocumentosDetalle {
+  sociedad: string;
+  tipoDocumento: string;
+  docEntry: number;
+  folio: number;
+  fechaDocumento: string | null;
+  fechaCompromiso: string | null;
+  docStatus: string | null;
+  canceled: string | null;
+  cardCode: string | null;
+  cardName: string | null;
+  slpCode: number | null;
+  bplId: number | null;
+  docTotal: number;
+  totalNc: number;
+  esCanceladoDirecto: number;
+  esCanceladoPorNc: number;
+  esCancelado: number;
+}
+
+export interface CancelacionDocumentosResult {
+  fechaInicio: string;
+  fechaFin: string;
+  sociedad: string | null;
+  tipoDocumento: string | null;
+  kpis: CancelacionDocumentosGrupo[];
+  totales: CancelacionDocumentosGrupo;
+  detalle: CancelacionDocumentosDetalle[] | null;
+}
+
+export interface CancelacionDocumentosParams {
+  fechaInicio: string;
+  fechaFin: string;
+  tipoDocumento?: TipoDocumentoEfectividad | "" | null;
+  sociedad?: SociedadEfectividad | "" | null;
+  idEmpresa?: number | null;
+  slpCode?: number | null;
+  bplId?: number | null;
+  detalle?: boolean;
+}
+
 export interface ComparativoAnual {
   AnioActual: number;
   AnioAnterior: number;
@@ -778,6 +855,158 @@ function normalizeEfectividadResult(
   };
 }
 
+function normalizeClienteChurn(raw: unknown): ClienteChurn | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const cardCode = pickString(o, "cardCode", "CardCode") ?? "";
+  const cardName = pickString(o, "cardName", "CardName") ?? "";
+  if (!cardCode && !cardName) return null;
+  return {
+    sociedad: pickString(o, "sociedad", "Sociedad") ?? "",
+    cardCode,
+    cardName,
+    slpCode: pickNumber(o, "slpCode", "SlpCode") ?? 0,
+    uDiaVisita:
+      pickString(o, "uDiaVisita", "UDiaVisita", "u_DiaVisita", "U_DiaVisita") ??
+      null,
+    diasSinComprar:
+      pickNumber(o, "diasSinComprar", "DiasSinComprar") ?? 0,
+    comprasAnuales:
+      pickNumber(o, "comprasAnuales", "ComprasAnuales") ?? 0,
+    ventaAnual: pickNumber(o, "ventaAnual", "VentaAnual") ?? 0,
+    rScore: pickNumber(o, "rScore", "RScore", "r_Score", "R_Score") ?? 0,
+    fScore: pickNumber(o, "fScore", "FScore", "f_Score", "F_Score") ?? 0,
+    mScore: pickNumber(o, "mScore", "MScore", "m_Score", "M_Score") ?? 0,
+    rfmCell:
+      pickString(o, "rfmCell", "RfmCell", "rfm_Cell", "RFM_Cell") ?? "",
+    categoriaSegmento:
+      pickString(o, "categoriaSegmento", "CategoriaSegmento") ?? "",
+  };
+}
+
+function normalizeClientesChurnList(raw: unknown): ClienteChurn[] {
+  const lista = unwrapList(raw);
+  if (lista.length > 0) {
+    return lista
+      .map(normalizeClienteChurn)
+      .filter((r): r is ClienteChurn => r != null);
+  }
+  const uno = normalizeClienteChurn(raw);
+  return uno ? [uno] : [];
+}
+
+function normalizeCancelacionGrupo(
+  raw: unknown,
+): CancelacionDocumentosGrupo | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const tipoDocumento =
+    pickString(o, "tipoDocumento", "TipoDocumento") ?? "";
+  const totalDocumentos =
+    pickNumber(o, "totalDocumentos", "TotalDocumentos") ?? 0;
+  if (!tipoDocumento && totalDocumentos <= 0) return null;
+  return {
+    sociedad: pickString(o, "sociedad", "Sociedad") ?? "",
+    tipoDocumento,
+    totalDocumentos,
+    canceladosDirectos:
+      pickNumber(o, "canceladosDirectos", "CanceladosDirectos") ?? 0,
+    canceladosPorNc:
+      pickNumber(o, "canceladosPorNc", "CanceladosPorNc") ?? 0,
+    cancelados: pickNumber(o, "cancelados", "Cancelados") ?? 0,
+    pctCancelacion:
+      pickNumber(o, "pctCancelacion", "PctCancelacion") ?? 0,
+    pctCancelacionDirecta:
+      pickNumber(o, "pctCancelacionDirecta", "PctCancelacionDirecta") ?? 0,
+    pctCancelacionPorNc:
+      pickNumber(o, "pctCancelacionPorNc", "PctCancelacionPorNc") ?? 0,
+  };
+}
+
+function normalizeCancelacionDetalle(
+  raw: unknown,
+): CancelacionDocumentosDetalle | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const folio = pickNumber(o, "folio", "Folio") ?? 0;
+  const docEntry = pickNumber(o, "docEntry", "DocEntry") ?? 0;
+  if (folio <= 0 && docEntry <= 0) return null;
+  return {
+    sociedad: pickString(o, "sociedad", "Sociedad") ?? "",
+    tipoDocumento: pickString(o, "tipoDocumento", "TipoDocumento") ?? "",
+    docEntry,
+    folio,
+    fechaDocumento:
+      pickString(o, "fechaDocumento", "FechaDocumento") ?? null,
+    fechaCompromiso:
+      pickString(o, "fechaCompromiso", "FechaCompromiso") ?? null,
+    docStatus: pickString(o, "docStatus", "DocStatus") ?? null,
+    canceled: pickString(o, "canceled", "Canceled") ?? null,
+    cardCode: pickString(o, "cardCode", "CardCode") ?? null,
+    cardName: pickString(o, "cardName", "CardName") ?? null,
+    slpCode: pickNumber(o, "slpCode", "SlpCode") ?? null,
+    bplId: pickNumber(o, "bplId", "BplId") ?? null,
+    docTotal: pickNumber(o, "docTotal", "DocTotal") ?? 0,
+    totalNc: pickNumber(o, "totalNc", "TotalNc") ?? 0,
+    esCanceladoDirecto:
+      pickNumber(o, "esCanceladoDirecto", "EsCanceladoDirecto") ?? 0,
+    esCanceladoPorNc:
+      pickNumber(o, "esCanceladoPorNc", "EsCanceladoPorNc") ?? 0,
+    esCancelado: pickNumber(o, "esCancelado", "EsCancelado") ?? 0,
+  };
+}
+
+function grupoCancelacionVacio(): CancelacionDocumentosGrupo {
+  return {
+    sociedad: "",
+    tipoDocumento: "Todos",
+    totalDocumentos: 0,
+    canceladosDirectos: 0,
+    canceladosPorNc: 0,
+    cancelados: 0,
+    pctCancelacion: 0,
+    pctCancelacionDirecta: 0,
+    pctCancelacionPorNc: 0,
+  };
+}
+
+function normalizeCancelacionResult(
+  raw: unknown,
+): CancelacionDocumentosResult {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const kpisRaw = o.kpis ?? o.Kpis;
+  const kpis = (Array.isArray(kpisRaw) ? kpisRaw : [])
+    .map(normalizeCancelacionGrupo)
+    .filter((r): r is CancelacionDocumentosGrupo => r != null);
+  const totales =
+    normalizeCancelacionGrupo(o.totales ?? o.Totales) ??
+    grupoCancelacionVacio();
+  const detalleRaw = o.detalle ?? o.Detalle;
+  const detalle = Array.isArray(detalleRaw)
+    ? detalleRaw
+        .map(normalizeCancelacionDetalle)
+        .filter((r): r is CancelacionDocumentosDetalle => r != null)
+    : null;
+  return {
+    fechaInicio: pickString(o, "fechaInicio", "FechaInicio") ?? "",
+    fechaFin: pickString(o, "fechaFin", "FechaFin") ?? "",
+    sociedad: pickString(o, "sociedad", "Sociedad") ?? null,
+    tipoDocumento: pickString(o, "tipoDocumento", "TipoDocumento") ?? null,
+    kpis,
+    totales,
+    detalle,
+  };
+}
+
 const appendFechas = (
   params: URLSearchParams,
   fechaInicio?: string,
@@ -1311,5 +1540,87 @@ export const getReportesService = {
       fechaInicio: formatDate(inicio),
       fechaFin: formatDate(fin),
     };
+  },
+
+  /**
+   * GET /api/ClientesChurn?sociedad=&slpCode=&diaVisita=
+   * Segmentación RFM / churn (VW_CLIENTESCHURN).
+   */
+  getClientesChurn: async (
+    opts: ClientesChurnParams = {},
+  ): Promise<ClienteChurn[]> => {
+    const params = new URLSearchParams();
+    const sociedad = (opts.sociedad ?? "").trim().toUpperCase();
+    if (sociedad) params.set("sociedad", sociedad);
+    if (opts.slpCode != null && opts.slpCode > 0) {
+      params.set("slpCode", String(opts.slpCode));
+    }
+    const dias = (
+      Array.isArray(opts.diaVisita)
+        ? opts.diaVisita
+        : opts.diaVisita
+          ? [opts.diaVisita]
+          : []
+    )
+      .map((d) => d.trim())
+      .filter(Boolean);
+    for (const dia of dias) params.append("diaVisita", dia);
+
+    const qs = params.toString();
+    const response = await api.get<unknown>(
+      `/api/ClientesChurn${qs ? `?${qs}` : ""}`,
+      { timeout: 90_000 },
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        mensajeErrorReporte(
+          response.data,
+          `No se pudo cargar CCV Zero (HTTP ${response.status}).`,
+        ),
+      );
+    }
+    return normalizeClientesChurnList(response.data);
+  },
+
+  /**
+   * GET /api/Reportes/CancelacionDocumentos
+   * Fechas en yyyy/MM/dd. detalle=false devuelve KPIs por sociedad/tipo.
+   */
+  getCancelacionDocumentos: async (
+    opts: CancelacionDocumentosParams,
+  ): Promise<CancelacionDocumentosResult> => {
+    const params = new URLSearchParams();
+    const inicio = fechaApiEfectividad(opts.fechaInicio);
+    const fin = fechaApiEfectividad(opts.fechaFin);
+    if (inicio) params.set("fechaInicio", inicio);
+    if (fin) params.set("fechaFin", fin);
+    const tipo = opts.tipoDocumento?.trim() ?? "";
+    if (tipo) params.set("tipoDocumento", tipo);
+    const sociedad = opts.sociedad?.trim() ?? "";
+    if (sociedad) params.set("sociedad", sociedad);
+    if (opts.idEmpresa != null && opts.idEmpresa > 0) {
+      params.set("idEmpresa", String(opts.idEmpresa));
+    }
+    if (opts.slpCode != null && opts.slpCode > 0) {
+      params.set("slpCode", String(opts.slpCode));
+    }
+    if (opts.bplId != null && opts.bplId > 0) {
+      params.set("bplId", String(opts.bplId));
+    }
+    params.set("detalle", opts.detalle ? "true" : "false");
+
+    const response = await api.get<unknown>(
+      `/api/Reportes/CancelacionDocumentos?${params.toString()}`,
+      { timeout: 90_000 },
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        mensajeErrorReporte(
+          response.data,
+          `No se pudo cargar % de cancelaciones (HTTP ${response.status}).`,
+        ),
+      );
+    }
+    return normalizeCancelacionResult(response.data);
   },
 };

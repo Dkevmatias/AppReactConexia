@@ -16,6 +16,22 @@ export type IncidenciaDeposito = {
   activo: boolean | null;
 };
 
+export type RelacionFotosODistribucion = {
+  folio: number;
+  idSucursal: number | null;
+  sucursal: string | null;
+  totalEfectivo: number;
+  cantidadFotos: number;
+  fechaUltimaFoto: string | null;
+  fotos: IncidenciaDeposito[];
+};
+
+export type RelacionFotosODistribucionParams = {
+  fechaInicio?: string | null;
+  fechaFin?: string | null;
+  idSucursal?: number | null;
+};
+
 function errorDesdeRespuesta(data: unknown, fallback: string): string {
   if (data && typeof data === "object") {
     const o = data as Record<string, unknown>;
@@ -89,15 +105,44 @@ function normalizeItem(raw: unknown): IncidenciaDeposito | null {
   };
 }
 
+function unwrapArray(raw: unknown): unknown[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    for (const key of ["data", "items", "resultado"]) {
+      const list = o[key];
+      if (Array.isArray(list)) return list;
+    }
+  }
+  return [];
+}
+
 function normalizeList(raw: unknown): IncidenciaDeposito[] {
-  const arr = Array.isArray(raw)
-    ? raw
-    : raw && typeof raw === "object"
-      ? (((raw as Record<string, unknown>).data as unknown[]) ?? [])
-      : [];
-  return arr
+  return unwrapArray(raw)
     .map(normalizeItem)
     .filter((x): x is IncidenciaDeposito => x != null);
+}
+
+function normalizeRelacion(
+  raw: unknown,
+): RelacionFotosODistribucion | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const folio = pickNumber(o, "folio", "Folio") ?? 0;
+  if (folio <= 0) return null;
+  const fotosRaw = o.fotos ?? o.Fotos;
+  return {
+    folio,
+    idSucursal: pickNumber(o, "idSucursal", "IdSucursal"),
+    sucursal: pickString(o, "sucursal", "Sucursal"),
+    totalEfectivo: pickNumber(o, "totalEfectivo", "TotalEfectivo") ?? 0,
+    cantidadFotos: pickNumber(o, "cantidadFotos", "CantidadFotos") ?? 0,
+    fechaUltimaFoto:
+      pickString(o, "fechaUltimaFoto", "FechaUltimaFoto") ?? null,
+    fotos: normalizeList(fotosRaw),
+  };
 }
 
 export function extensionArchivo(nombre: string): string {
@@ -121,6 +166,36 @@ export function validarArchivoDeposito(file: File): string | null {
 }
 
 export const incidenciaDepositoService = {
+  listarRelacion: async (
+    opts: RelacionFotosODistribucionParams = {},
+  ): Promise<RelacionFotosODistribucion[]> => {
+    const params = new URLSearchParams();
+    const inicio = (opts.fechaInicio ?? "").trim();
+    const fin = (opts.fechaFin ?? "").trim();
+    if (inicio) params.set("fechaInicio", inicio);
+    if (fin) params.set("fechaFin", fin);
+    if (opts.idSucursal != null && opts.idSucursal > 0) {
+      params.set("idSucursal", String(opts.idSucursal));
+    }
+    const qs = params.toString();
+    const response = await api.get<unknown>(
+      `/api/IncidenciaDeposito/relacion${qs ? `?${qs}` : ""}`,
+      { timeout: 90_000 },
+    );
+    if (response.status === 404 || response.status === 204) return [];
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        errorDesdeRespuesta(
+          response.data,
+          "No se pudo cargar la relación de fotos.",
+        ),
+      );
+    }
+    return unwrapArray(response.data)
+      .map(normalizeRelacion)
+      .filter((x): x is RelacionFotosODistribucion => x != null);
+  },
+
   listarPorOd: async (idODistribucion: number): Promise<IncidenciaDeposito[]> => {
     const response = await api.get<unknown>(
       `/api/IncidenciaDeposito/od/${Math.trunc(idODistribucion)}`,

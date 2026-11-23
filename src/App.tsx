@@ -36,6 +36,7 @@ import BitacoraCobranza from "./pages/Operaciones/BitacoraCobranza";
 import ListaBitacorasCobranza from "./pages/Operaciones/ListaBitacorasCobranza";
 import ComprobacionRutas from "./pages/Operaciones/ComprobacionRutas";
 import ManagerComprobacionRuta from "./pages/Operaciones/ListadoIncidencias";
+import ListadoFotosDistribucion from "./pages/Operaciones/ListadoFotosDistribucion";
 import ReportesOperaciones from "./pages/Operaciones/Reportes";
 import ControlCedis from "./pages/Operaciones/ControlCedis";
 import ListaEntregasMercancia from "./pages/Operaciones/ListaEntregasMercancia";
@@ -190,6 +191,10 @@ export default function App() {
             <Route
               path="/operaciones/ManagerComprobacionRuta"
               element={<ManagerComprobacionRuta />}
+            />
+            <Route
+              path="/operaciones/ListadoFotosDistribucion"
+              element={<ListadoFotosDistribucion />}
             />
             <Route
               path="/operaciones/Reportes"

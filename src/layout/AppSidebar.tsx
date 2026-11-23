@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { VscCommentDiscussionSparkle } from "react-icons/vsc";
-import { MdOutlineCrisisAlert, MdViewList } from "react-icons/md";
+import { MdOutlineCrisisAlert, MdPhotoLibrary, MdViewList } from "react-icons/md";
 import { TbTruckDelivery } from "react-icons/tb";
 import AppLogo from "../components/logo/AppLogo";
 import { SiCivicrm } from "react-icons/si";
@@ -146,6 +146,12 @@ const navItems: NavItem[] = [
         name: "Listado de Incidencias",
         path: "/operaciones/ManagerComprobacionRuta",
         icon: <HiMiniClipboardDocumentCheck className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Fotos por orden de distribución",
+        path: "/operaciones/ListadoFotosDistribucion",
+        icon: <MdPhotoLibrary className="w-4 h-4 shrink-0" />,
         pro: false,
       },
       {
@@ -399,9 +405,18 @@ const AppSidebar: React.FC = () => {
               entry: item.subItems[3],
             },
             {
+              claves: [
+                "comprobacion.ver",
+                "comprobacion.operar",
+                "comprobacion.manager",
+              ],
+              ruta: "/operaciones/ListadoFotosDistribucion",
+              entry: item.subItems[4],
+            },
+            {
               claves: ["Reportes.Ver"],
               ruta: "/operaciones/Reportes",
-              entry: item.subItems[4],
+              entry: item.subItems[5],
             },
             {
               claves: [
@@ -412,7 +427,7 @@ const AppSidebar: React.FC = () => {
               ],
               ruta: "/operaciones/ControlCedis",
               rutasAlt: ["/control-cedis"],
-              entry: item.subItems[5],
+              entry: item.subItems[6],
               permisosExtra: moduloCedis?.activo
                 ? moduloCedis.permisos
                 : undefined,
@@ -426,7 +441,7 @@ const AppSidebar: React.FC = () => {
               ],
               ruta: "/operaciones/ListaEntregasMercancia",
               rutasAlt: ["/control-cedis", "/operaciones/ControlCedis"],
-              entry: item.subItems[6],
+              entry: item.subItems[7],
               permisosExtra: moduloCedis?.activo
                 ? moduloCedis.permisos
                 : undefined,

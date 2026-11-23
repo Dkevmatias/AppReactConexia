@@ -40,6 +40,7 @@ import {
   bloquearSinIncidenciasPorEstatus,
   documentoTieneIncidencia,
   esCodSinPago,
+  esEstatusFinalizado,
   esTipoODTraspaso,
   formatearDocRelacionado,
   formatearFecha,
@@ -158,10 +159,10 @@ export default function ModalDetalleOrdenDistribucion({
     [estatusSistema],
   );
 
-  const generarCorteInactivo = useMemo(() => {
-    const estatus = (estatusSistema ?? "").trim().toUpperCase();
-    return estatus !== ESTATUS_FINALIZADO;
-  }, [estatusSistema]);
+  const generarCorteInactivo = useMemo(
+    () => !esEstatusFinalizado(estatusSistema),
+    [estatusSistema],
+  );
 
   const crearIncidenciaInactivo = useMemo(
     () => bloquearCrearIncidenciaPorEstatus(estatusSistema),

@@ -7,8 +7,10 @@ import {
   formatearFecha,
   ModalDetalleOrdenDistribucion,
   ModalIncidenciaDistribucion,
+  normalizarCodigoEstatusSistema,
   type ContextoIncidenciaDistribucion,
 } from "../../components/ComprobacionRuta";
+import BasicDatePicker from "../../components/ui/datepicker/datepicker";
 
 import {
   DocODistribucionDetalle,
@@ -21,10 +23,16 @@ import {
 
 import { rutasService, Ruta } from "../../services/rutasService";
 import {
+  bitacoraCobranzaService,
+  type Sucursal,
+} from "../../services/bitacoraCobranzaService";
+import {
   ContextoOperativoPersona,
   getContextoOperativoPersona,
 } from "../../services/authService";
 import { useAuth } from "../../hooks/useAuth";
+import { useListadoOperacionesPermisos } from "../../hooks/useListadoOperacionesPermisos";
+import { empresaVisibleEnCombo } from "../../utils/sucursalOperativa";
 
 const inputClass =
   "box-border w-full max-w-full min-w-0 min-h-[44px] rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base sm:text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-white touch-manipulation";
@@ -50,17 +58,12 @@ const ESTATUS_SISTEMA_TODOS = new Set<EstatusSistemaFiltro>(
   ESTATUS_SISTEMA_OPCIONES.map((opcion) => opcion.value),
 );
 
-function normalizarEstatusSistema(estatusS: string | null | undefined): string {
-  const valor = (estatusS ?? "").trim().toUpperCase();
-  return valor || "PDT";
-}
-
 function documentoPasaFiltroEstatusSistema(
   doc: ODistribucionDocumento,
   filtroEstatus: Set<EstatusSistemaFiltro>,
 ): boolean {
   if (filtroEstatus.size === 0) return false;
-  const estatus = normalizarEstatusSistema(doc.estatusS);
+  const estatus = normalizarCodigoEstatusSistema(doc.estatusS);
   return filtroEstatus.has(estatus as EstatusSistemaFiltro);
 }
 
@@ -71,6 +74,7 @@ type FiltrosComprobacion = {
   ruta: string;
   fechaDesde: string;
   fechaHasta: string;
+  sucursal: number | "";
 };
 
 function leerFiltrosGuardados(): FiltrosComprobacion | null {
@@ -83,21 +87,20 @@ function leerFiltrosGuardados(): FiltrosComprobacion | null {
 
     if (!parsed || typeof parsed !== "object") return null;
 
+    const fechasMes = filtrosODistribucionPorDefecto();
+
     return {
       repartidor:
         typeof parsed.repartidor === "string" ? parsed.repartidor : "",
 
       ruta: typeof parsed.ruta === "string" ? parsed.ruta : "",
 
-      fechaDesde:
-        typeof parsed.fechaDesde === "string"
-          ? parsed.fechaDesde
-          : filtrosODistribucionPorDefecto().fechaDesde,
-
-      fechaHasta:
-        typeof parsed.fechaHasta === "string"
-          ? parsed.fechaHasta
-          : filtrosODistribucionPorDefecto().fechaHasta,
+      fechaDesde: fechasMes.fechaDesde,
+      fechaHasta: fechasMes.fechaHasta,
+      sucursal:
+        typeof parsed.sucursal === "number" && parsed.sucursal > 0
+          ? parsed.sucursal
+          : "",
     };
   } catch {
     return null;
@@ -110,9 +113,19 @@ function guardarFiltros(filtros: FiltrosComprobacion): void {
 
 export default function ComprobacionRutas() {
   const { user } = useAuth();
+  const { menuLoading, puedeVerSucursalIncidencia } =
+    useListadoOperacionesPermisos();
 
   const defaults = useMemo(() => {
-    return leerFiltrosGuardados() ?? filtrosODistribucionPorDefecto();
+    const fechas = filtrosODistribucionPorDefecto();
+    const saved = leerFiltrosGuardados();
+    return {
+      repartidor: saved?.repartidor ?? "",
+      ruta: saved?.ruta ?? "",
+      fechaDesde: fechas.fechaDesde,
+      fechaHasta: fechas.fechaHasta,
+      sucursal: saved?.sucursal ?? ("" as number | ""),
+    };
   }, []);
 
   const [repartidor, setRepartidor] = useState(defaults.repartidor);
@@ -122,6 +135,12 @@ export default function ComprobacionRutas() {
   const [fechaDesde, setFechaDesde] = useState(defaults.fechaDesde);
 
   const [fechaHasta, setFechaHasta] = useState(defaults.fechaHasta);
+
+  const [filtroSucursal, setFiltroSucursal] = useState<number | "">(
+    defaults.sucursal,
+  );
+
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
 
   const [rutas, setRutas] = useState<Ruta[]>([]);
 
@@ -313,6 +332,8 @@ export default function ComprobacionRutas() {
         fechaDesde,
 
         fechaHasta,
+
+        sucursal: filtroSucursal,
       };
 
       const lista = await oDistribucionService.getDocumentos({
@@ -341,7 +362,7 @@ export default function ComprobacionRutas() {
     } finally {
       setLoading(false);
     }
-  }, [repartidor, ruta, fechaDesde, fechaHasta]);
+  }, [repartidor, ruta, fechaDesde, fechaHasta, filtroSucursal]);
 
   useEffect(() => {
     const cargarCatalogos = async () => {
@@ -349,17 +370,23 @@ export default function ComprobacionRutas() {
       const fallos: string[] = [];
 
       try {
-        const [rutasResult, repartidoresResult] = await Promise.allSettled([
-          rutasService.getRutas(),
-          oDistribucionService.getRepartidores(),
-        ]);
+        const [sucursalesResult, repartidoresResult] = await Promise.allSettled(
+          [
+            bitacoraCobranzaService.getSucursales(),
+            oDistribucionService.getRepartidores(),
+          ],
+        );
 
-        if (rutasResult.status === "fulfilled") {
-          setRutas((rutasResult.value ?? []).filter((r) => r.activo));
+        if (sucursalesResult.status === "fulfilled") {
+          setSucursales(
+            (sucursalesResult.value ?? []).filter((s) =>
+              empresaVisibleEnCombo(s.idEmpresa),
+            ),
+          );
         } else {
-          console.error(rutasResult.reason);
-          setRutas([]);
-          fallos.push("rutas");
+          console.error(sucursalesResult.reason);
+          setSucursales([]);
+          fallos.push("sucursales");
         }
 
         if (repartidoresResult.status === "fulfilled") {
@@ -382,10 +409,70 @@ export default function ComprobacionRutas() {
   }, []);
 
   useEffect(() => {
+    if (menuLoading || loadingCatalogos) return;
+    if (puedeVerSucursalIncidencia) return;
+    const id = contextoOperativo?.idSucursal ?? 0;
+    if (id > 0 && filtroSucursal !== id) {
+      setFiltroSucursal(id);
+    }
+  }, [
+    menuLoading,
+    loadingCatalogos,
+    puedeVerSucursalIncidencia,
+    contextoOperativo?.idSucursal,
+    filtroSucursal,
+  ]);
+
+  useEffect(() => {
+    if (loadingCatalogos) return;
+    let cancelled = false;
+    const idSucursal =
+      typeof filtroSucursal === "number" && filtroSucursal > 0
+        ? filtroSucursal
+        : 0;
+
+    void (async () => {
+      try {
+        const lista = idSucursal
+          ? await rutasService.getRutasPorSucursal(idSucursal)
+          : await rutasService.getRutas();
+        if (cancelled) return;
+        setRutas((lista ?? []).filter((r) => r.activo));
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setRutas([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filtroSucursal, loadingCatalogos]);
+
+  useEffect(() => {
     if (loadingCatalogos || !repartidor) return;
     const existe = repartidores.some((v) => v.nomUser === repartidor);
     if (!existe) setRepartidor("");
   }, [loadingCatalogos, repartidores, repartidor]);
+
+  useEffect(() => {
+    if (!ruta) return;
+    const existe = rutas.some((item) => item.codigo === ruta);
+    if (!existe) setRuta("");
+  }, [rutas, ruta]);
+
+  const sucursalSeleccionada = useMemo(() => {
+    if (!filtroSucursal) return null;
+    return sucursales.find((s) => s.idSucursal === filtroSucursal) ?? null;
+  }, [filtroSucursal, sucursales]);
+
+  const idSucursalOperacion =
+    sucursalSeleccionada?.idSucursal ??
+    contextoOperativo?.idSucursal ??
+    null;
+
+  const idEmpresaOperacion =
+    sucursalSeleccionada?.idEmpresa ?? contextoOperativo?.idEmpresa ?? null;
 
   useEffect(() => {
     void cargarDocumentos();
@@ -431,12 +518,38 @@ export default function ComprobacionRutas() {
           </h1>
 
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Consulta de documentos por repartidor, ruta y fechas. Optimizado
-            para uso en celular y escritorio.
+            Consulta de documentos por sucursal, repartidor, ruta y fechas.
+            El rango de fechas inicia en el mes actual.
           </p>
         </div>
 
-        <div className="mb-4 w-full max-w-full min-w-0 space-y-3 overflow-hidden rounded-xl border border-gray-200 bg-white p-3 sm:p-4 lg:grid lg:grid-cols-5 lg:gap-4 lg:space-y-0 dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-4 w-full max-w-full min-w-0 space-y-3 overflow-hidden rounded-xl border border-gray-200 bg-white p-3 sm:p-4 lg:grid lg:grid-cols-6 lg:items-end lg:gap-4 lg:space-y-0 dark:border-gray-700 dark:bg-gray-800">
+          <div className="min-w-0 max-w-full lg:col-span-1">
+            <label className={labelClass} htmlFor="comprobacion-sucursal">
+              Sucursal
+            </label>
+            <select
+              id="comprobacion-sucursal"
+              className={selectClass}
+              value={filtroSucursal}
+              onChange={(e) =>
+                setFiltroSucursal(e.target.value ? Number(e.target.value) : "")
+              }
+              disabled={
+                loadingCatalogos || menuLoading || !puedeVerSucursalIncidencia
+              }
+            >
+              {puedeVerSucursalIncidencia ? (
+                <option value="">Todas</option>
+              ) : null}
+              {sucursales.map((s) => (
+                <option key={s.idSucursal} value={s.idSucursal}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="min-w-0 max-w-full lg:col-span-1">
             <label className={labelClass}>Repartidor</label>
 
@@ -480,28 +593,24 @@ export default function ComprobacionRutas() {
             </select>
           </div>
 
-          <div className="grid min-w-0 max-w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:col-span-2 lg:gap-4">
-            <div className="min-w-0 max-w-full">
-              <label className={labelClass}>Fecha desde</label>
+          <div className="min-w-0 max-w-full lg:col-span-1">
+            <label className={labelClass}>Fecha Inicio</label>
+            <BasicDatePicker
+              compact={false}
+              value={fechaDesde}
+              onChange={setFechaDesde}
+              className="w-full"
+            />
+          </div>
 
-              <input
-                type="date"
-                className={inputClass}
-                value={fechaDesde}
-                onChange={(e) => setFechaDesde(e.target.value)}
-              />
-            </div>
-
-            <div className="min-w-0 max-w-full">
-              <label className={labelClass}>Fecha hasta</label>
-
-              <input
-                type="date"
-                className={inputClass}
-                value={fechaHasta}
-                onChange={(e) => setFechaHasta(e.target.value)}
-              />
-            </div>
+          <div className="min-w-0 max-w-full lg:col-span-1">
+            <label className={labelClass}>Fecha Fin</label>
+            <BasicDatePicker
+              compact={false}
+              value={fechaHasta}
+              onChange={setFechaHasta}
+              className="w-full"
+            />
           </div>
 
           <div className="min-w-0 max-w-full lg:col-span-1 lg:flex lg:items-end">
@@ -708,8 +817,8 @@ export default function ComprobacionRutas() {
         detalleRefreshKey={detalleRefreshKey}
         mensajeExito={mensajeIncidencia}
         idUsuarioCreacion={user?.idUsuario ?? null}
-        idEmpresa={contextoOperativo?.idEmpresa ?? null}
-        idSucursal={contextoOperativo?.idSucursal ?? null}
+        idEmpresa={idEmpresaOperacion}
+        idSucursal={idSucursalOperacion}
         onCerrar={cerrarModalDetalle}
         onCrearIncidencia={abrirModalIncidencia}
         onVerIncidenciaCompleta={abrirVerIncidenciaCompleta}
@@ -721,8 +830,8 @@ export default function ComprobacionRutas() {
         abierto={modalIncidenciaAbierto}
         contexto={contextoIncidencia}
         idUsuarioCreacion={user?.idUsuario ?? null}
-        idEmpresa={contextoOperativo?.idEmpresa ?? null}
-        idSucursal={contextoOperativo?.idSucursal ?? null}
+        idEmpresa={idEmpresaOperacion}
+        idSucursal={idSucursalOperacion}
         onCerrar={cerrarModalIncidencia}
         onGuardado={(mensaje) => {
           setMensajeIncidencia(mensaje);

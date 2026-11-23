@@ -47,7 +47,9 @@ export function useReportesBiPermisos() {
       puedePorSurtir,
       puedeTendenciaCompra,
       puedeVerTab: (tabId: string) => {
-        if (tabId === "vendedores") return puedeVendedores;
+        if (tabId === "vendedores" || tabId === "ccv-zero") {
+          return puedeVendedores;
+        }
         if (tabId === "por-surtir") return puedePorSurtir;
         if (tabId === "tendencia-compra") return puedeTendenciaCompra;
         return tieneAccesoCompleto;

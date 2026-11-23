@@ -138,15 +138,14 @@ export function ordenarDocumentosPorCondicion(
 export function bloquearCrearIncidenciaPorEstatus(
   estatusS: string | null | undefined,
 ): boolean {
-  const estatus = (estatusS ?? "").trim().toUpperCase();
-  return estatus === ESTATUS_FINALIZADO;
+  return esEstatusFinalizado(estatusS);
 }
 
 /** T / R-AM / R-COD / R-F / I — no aplica marcar Sin Incidencias de nuevo. */
 export function bloquearSinIncidenciasPorEstatus(
   estatusS: string | null | undefined,
 ): boolean {
-  const estatus = (estatusS ?? "").trim().toUpperCase();
+  const estatus = normalizarCodigoEstatusSistema(estatusS);
   return (
     estatus === "T" ||
     estatus === "I" ||
@@ -160,24 +159,42 @@ export function bloquearSinIncidenciasPorEstatus(
 export function bloquearRCobranzaPorEstatus(
   estatusS: string | null | undefined,
 ): boolean {
-  const estatus = (estatusS ?? "").trim().toUpperCase();
-  return estatus !== ESTATUS_PROCESADO;
+  return normalizarCodigoEstatusSistema(estatusS) !== ESTATUS_PROCESADO;
 }
 
 /** Solo habilitado cuando la orden ya fue revisada por cobranza (R-COD). */
 export function bloquearFinalizadoPorEstatus(
   estatusS: string | null | undefined,
 ): boolean {
-  const estatus = (estatusS ?? "").trim().toUpperCase();
-  return estatus !== ESTATUS_COBRANZA;
+  return normalizarCodigoEstatusSistema(estatusS) !== ESTATUS_COBRANZA;
+}
+
+/** Normaliza PDT / R-AM / R-COD / R-F (acepta RF, R_F, etc.). */
+export function normalizarCodigoEstatusSistema(
+  estatusS: string | null | undefined,
+): string {
+  const valor = (estatusS ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_]/g, "-");
+  if (!valor) return ESTATUS_PENDIENTE;
+  if (valor === "RF" || valor === "R-F") return ESTATUS_FINALIZADO;
+  if (valor === "RAM" || valor === "R-AM") return ESTATUS_PROCESADO;
+  if (valor === "RCOD" || valor === "R-COD") return ESTATUS_COBRANZA;
+  return valor;
+}
+
+export function esEstatusFinalizado(
+  estatusS: string | null | undefined,
+): boolean {
+  return normalizarCodigoEstatusSistema(estatusS) === ESTATUS_FINALIZADO;
 }
 
 /** Badge de Estatus Sistema en el listado: PDT rojo, R-F verde (como cobranza Creado). */
 export function claseBadgeEstatusSistema(
   estatusS: string | null | undefined,
 ): string {
-  const valor = (estatusS ?? "").trim().toUpperCase();
-  const codigo = valor === "RF" ? ESTATUS_FINALIZADO : valor || ESTATUS_PENDIENTE;
+  const codigo = normalizarCodigoEstatusSistema(estatusS);
 
   if (codigo === ESTATUS_FINALIZADO) {
     return "inline-flex rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200";

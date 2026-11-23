@@ -15,18 +15,24 @@ import ReportesArticulos from "./reportes/ReportesArticulos";
 import ReportePlataforma from "./reportes/ReportePlataforma";
 import ReportesPorSurtir from "./reportes/ReportesPorSurtir";
 import ReportesTendenciaCompraCliente from "./reportes/ReportesTendenciaCompraCliente";
+import ReportesCcvZero from "./reportes/ReportesCcvZero";
 
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: "📊" },
   { id: "vendedores", label: "Vendedores", icon: "👥" },
   { id: "clientes", label: "Clientes", icon: "🏢" },
+  { id: "ccv-zero", label: "CCV Zero", icon: "📉" },
   { id: "articulos", label: "Artículos", icon: "📦" },
   { id: "plataforma", label: "Plataforma", icon: "💻" },
   { id: "por-surtir", label: "Por Surtir", icon: "🚚" },
   { id: "tendencia-compra", label: "Tendencia compra", icon: "📈" },
 ];
 
-const TABS_SIN_FILTROS_GLOBALES = new Set(["por-surtir", "tendencia-compra"]);
+const TABS_SIN_FILTROS_GLOBALES = new Set([
+  "por-surtir",
+  "tendencia-compra",
+  "ccv-zero",
+]);
 
 export default function Reportes() {
   const { puedeVerTab, menuLoading, tieneAccesoCompleto } =
@@ -185,6 +191,8 @@ export default function Reportes() {
             key={`tendencia-compra-${filterKey}`}
           />
         );
+      case "ccv-zero":
+        return <ReportesCcvZero key={`ccv-zero-${filterKey}`} />;
       default:
         return null;
     }

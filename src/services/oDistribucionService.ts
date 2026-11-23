@@ -32,6 +32,7 @@ export interface DocODistribucionDetalle {
   tipoOD: string | null;
   tipoRegistro: string | null;
   folio: number;
+  sucursal: string | null;
   entrega: number;
   documento: number | null;
   facturaReserva: number | null;
@@ -188,6 +189,7 @@ function normalizeDetalle(raw: unknown): DocODistribucionDetalle {
     tipoOD: pickString(o, "tipoOD", "TipoOD", "tipoOd"),
     tipoRegistro: pickString(o, "tipoRegistro", "TipoRegistro"),
     folio: pickNumber(o, "folio", "Folio") ?? 0,
+    sucursal: pickString(o, "sucursal", "Sucursal"),
     entrega: pickNumber(o, "entrega", "Entrega") ?? 0,
     documento: pickNumber(o, "documento", "Documento"),
     facturaReserva: pickNumber(o, "facturaReserva", "FacturaReserva"),
@@ -200,7 +202,13 @@ function normalizeDetalle(raw: unknown): DocODistribucionDetalle {
     tienePago: pickString(o, "tienePago", "TienePago"),
     efectivo: pickNumber(o, "efectivo", "Efectivo") ?? 0,
     transferencia:
-      pickNumber(o, "transferencia", "Transferencia", "transferencias", "Transferencias") ?? 0,
+      pickNumber(
+        o,
+        "transferencia",
+        "Transferencia",
+        "transferencias",
+        "Transferencias",
+      ) ?? 0,
     otros: pickNumber(o, "otros", "Otros") ?? 0,
     idIncidencia: pickNumber(o, "idIncidencia", "IdIncidencia"),
     cantidadIncidencias:
@@ -266,10 +274,17 @@ export function fechaInputInicioAnio(anio = new Date().getFullYear()): string {
   return `${anio}-01-01`;
 }
 
+/** Primer día del mes en curso (mismo criterio que Reportes KPI). */
+export function fechaInputInicioMes(ref = new Date()): string {
+  const y = ref.getFullYear();
+  const m = String(ref.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}-01`;
+}
+
 export const filtrosODistribucionPorDefecto = () => ({
   repartidor: "",
   ruta: "",
-  fechaDesde: fechaInputInicioAnio(),
+  fechaDesde: fechaInputInicioMes(),
   fechaHasta: fechaInputHoy(),
 });
 

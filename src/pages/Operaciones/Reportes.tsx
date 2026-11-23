@@ -4,11 +4,13 @@ import ReportesTabs from "../../components/reportes/ReportesTabs";
 import ReportesPorSurtir from "../Dashboard/reportes/ReportesPorSurtir";
 import ReportesTraspasos from "../Dashboard/reportes/ReportesTraspasos";
 import ReportesEfectividad from "../Dashboard/reportes/ReportesEfectividad";
+import ReportesCancelaciones from "../Dashboard/reportes/ReportesCancelaciones";
 
 const tabs = [
   { id: "por-surtir", label: "Por surtir", icon: "🚚" },
   { id: "traspasos", label: "Traspasos", icon: "📦" },
   { id: "efectividad", label: "Efectividad", icon: "🎯" },
+  { id: "cancelaciones", label: "% Cancelaciones", icon: "🚫" },
 ];
 
 export default function ReportesOperaciones() {
@@ -18,14 +20,15 @@ export default function ReportesOperaciones() {
     <div className="min-w-0 space-y-6">
       <PageMeta
         title="Reportes Operaciones"
-        description="Por surtir, traspasos y efectividad a la primera entrega"
+        description="Por surtir, traspasos, efectividad y % de cancelaciones"
       />
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Reportes Operaciones
         </h1>
         <p className="mt-1 text-gray-500 dark:text-gray-400">
-          Por surtir, traspasos y efectividad a la primera entrega.
+          Por surtir, traspasos, efectividad a la primera entrega y % de
+          cancelaciones.
         </p>
       </div>
 
@@ -39,6 +42,8 @@ export default function ReportesOperaciones() {
         <ReportesTraspasos />
       ) : activeTab === "efectividad" ? (
         <ReportesEfectividad />
+      ) : activeTab === "cancelaciones" ? (
+        <ReportesCancelaciones />
       ) : (
         <ReportesPorSurtir />
       )}
