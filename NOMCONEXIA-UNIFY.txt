@@ -1,0 +1,10 @@
+NOMCONEXIA-UNIFY (frontend Client-App)
+=====================================
+Cómo revertir:
+  - Borrar src/pages/Nomina, src/pages/Nominas, src/pages/GPS
+  - Borrar src/components/nomina
+  - Borrar servicios con comentario NOMCONEXIA-UNIFY en src/services
+  - Borrar src/utils/validacionFiscal.ts, checadorReporte.ts, escalaPuntualidad.ts, xlsxGrid.ts
+    (solo si se agregaron con este cambio)
+  - Quitar bloques NOMCONEXIA-UNIFY en src/App.tsx y src/layout/AppSidebar.tsx
+  - Quitar leaflet / react-leaflet / @types/leaflet si se instalaron solo para esto

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { VscCommentDiscussionSparkle } from "react-icons/vsc";
 import { MdOutlineCrisisAlert, MdPhotoLibrary, MdViewList } from "react-icons/md";
-import { TbTruckDelivery } from "react-icons/tb";
+import { TbFileInvoice, TbTruckDelivery } from "react-icons/tb";
 import AppLogo from "../components/logo/AppLogo";
 import { SiCivicrm } from "react-icons/si";
 import { FcDataConfiguration } from "react-icons/fc";
@@ -22,7 +22,7 @@ import {
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
 import { useAuth } from "../context/useAuth";
-import { BoxIcon } from "lucide-react";
+import { BoxIcon, Clock } from "lucide-react";
 import {
   permisoActivo,
   permisoActivoPorClaveORuta,
@@ -172,6 +172,12 @@ const navItems: NavItem[] = [
         icon: <MdViewList className="w-4 h-4 shrink-0" />,
         pro: false,
       },
+      {
+        name: "Control de Facturas",
+        path: "/operaciones/ControlFacturas",
+        icon: <TbFileInvoice className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
     ],
   },
   {
@@ -210,6 +216,80 @@ const navItems: NavItem[] = [
       },
     ],
   },
+  // NOMCONEXIA-UNIFY
+  {
+    name: "NomConexia",
+    icon: <Clock className="w-5 h-5 shrink-0" />,
+    subItems: [
+      {
+        name: "Inicio",
+        path: "/nomina",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Empresas nómina",
+        path: "/nomina/empresas",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Empleados",
+        path: "/nomina/empleados",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Catálogos",
+        path: "/nomina/catalogos",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Incidencias RH",
+        path: "/nomina/incidencias",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Reloj oficina",
+        path: "/nomina/reloj",
+        icon: <Clock className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Checador Excel",
+        path: "/nomina/incidencias/checador",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Solicitudes",
+        path: "/nomina/solicitudes",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Percepciones/Deducciones",
+        path: "/nomina/percepciones",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "Nómina",
+        path: "/nomina/nominas",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+      {
+        name: "GPS",
+        path: "/nomina/gps",
+        icon: <BoxIcon className="w-4 h-4 shrink-0" />,
+        pro: false,
+      },
+    ],
+  },
+  // /NOMCONEXIA-UNIFY
 
   /*
   {
@@ -354,6 +434,36 @@ const AppSidebar: React.FC = () => {
           return { ...item, subItems };
         }
 
+        // NOMCONEXIA-UNIFY
+        if (item.name === "NomConexia" && item.subItems) {
+          const moduloNom = menu.find((m) => {
+            const clave = (m.clave ?? "").trim().toLowerCase();
+            return clave === "nomconexia" || clave === "nomina";
+          });
+          if (!moduloNom?.activo) return null;
+          const clavePorRuta: Record<string, string> = {
+            "/nomina": "NomConexia.Inicio",
+            "/nomina/empresas": "NomConexia.Empresas",
+            "/nomina/empleados": "NomConexia.Empleados",
+            "/nomina/catalogos": "NomConexia.Catalogos",
+            "/nomina/incidencias": "NomConexia.Incidencias",
+            "/nomina/reloj": "NomConexia.Reloj",
+            "/nomina/incidencias/checador": "NomConexia.Checador",
+            "/nomina/solicitudes": "NomConexia.Solicitudes",
+            "/nomina/percepciones": "NomConexia.Percepciones",
+            "/nomina/nominas": "NomConexia.Nominas",
+            "/nomina/gps": "NomConexia.GPS",
+          };
+          const subItems = item.subItems.filter((sub) =>
+            permisoActivoPorClaveORuta(moduloNom.permisos, {
+              claves: clavePorRuta[sub.path] ? [clavePorRuta[sub.path]] : [],
+              ruta: sub.path,
+            }),
+          );
+          if (subItems.length === 0) return null;
+          return { ...item, subItems };
+        }
+
         if (item.name === "Operaciones" && item.subItems) {
           const moduloOperaciones = menu.find((m) => {
             const clave = (m.clave ?? "").trim().toLowerCase();
@@ -379,6 +489,7 @@ const AppSidebar: React.FC = () => {
             rutasAlt?: string[];
             entry: NonNullable<NavItem["subItems"]>[number];
             permisosExtra?: typeof menu[number]["permisos"];
+            siempreVisible?: boolean;
           }[] = [
             {
               claves: ["bitacora.ver", "bitacora.operar"],
@@ -446,6 +557,12 @@ const AppSidebar: React.FC = () => {
                 ? moduloCedis.permisos
                 : undefined,
             },
+            {
+              claves: ["Reportes.Ver", "ControlFacturas.Ver"],
+              ruta: "/operaciones/ControlFacturas",
+              entry: item.subItems[8],
+              siempreVisible: true,
+            },
           ];
 
           const permisosBase = moduloOperaciones?.activo
@@ -453,7 +570,8 @@ const AppSidebar: React.FC = () => {
             : [];
 
           const subItems = operacionesSubs
-            .filter(({ claves, ruta, rutasAlt, permisosExtra }) => {
+            .filter(({ claves, ruta, rutasAlt, permisosExtra, siempreVisible }) => {
+              if (siempreVisible && moduloOperaciones?.activo) return true;
               const permisos = [...permisosBase, ...(permisosExtra ?? [])];
               if (permisoActivoPorClaveORuta(permisos, { claves, ruta })) {
                 return true;

@@ -178,3 +178,18 @@ api.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+// NOMCONEXIA-UNIFY
+export function asArray<T>(data: unknown): T[] {
+  return Array.isArray(data) ? data : [];
+}
+
+export function apiError(data: unknown, fallback = "Ocurrió un error inesperado"): string {
+  if (typeof data === "string" && data.trim()) return data;
+  const obj = data as { message?: string; title?: string; detail?: string } | null;
+  if (obj && typeof obj === "object") {
+    return obj.message || obj.detail || obj.title || fallback;
+  }
+  return fallback;
+}
+// /NOMCONEXIA-UNIFY

@@ -40,7 +40,22 @@ import ListadoFotosDistribucion from "./pages/Operaciones/ListadoFotosDistribuci
 import ReportesOperaciones from "./pages/Operaciones/Reportes";
 import ControlCedis from "./pages/Operaciones/ControlCedis";
 import ListaEntregasMercancia from "./pages/Operaciones/ListaEntregasMercancia";
+import ControlFacturas from "./pages/Operaciones/ControlFacturas";
 import Cotizador from "./pages/Ventas/Cotizador";
+
+/* NOMCONEXIA-UNIFY */
+const NominaHome = lazy(() => import("./pages/Nomina/Home"));
+const NominaEmpleados = lazy(() => import("./pages/Nomina/Empleados"));
+const NominaEmpresas = lazy(() => import("./pages/Nomina/Empresas"));
+const NominaCatalogos = lazy(() => import("./pages/Nomina/Catalogos"));
+const NominaIncidencias = lazy(() => import("./pages/Nomina/Incidencias"));
+const NominaSolicitudes = lazy(() => import("./pages/Nomina/Solicitudes"));
+const ReporteChecador = lazy(() => import("./pages/Nomina/ReporteChecador"));
+const RelojAdmin = lazy(() => import("./pages/Nomina/RelojAdmin"));
+const NominaPercepciones = lazy(() => import("./pages/Nomina/Percepciones"));
+const NominasPage = lazy(() => import("./pages/Nominas/Nominas"));
+const NominaGps = lazy(() => import("./pages/GPS/GPSPage"));
+/* /NOMCONEXIA-UNIFY */
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -208,6 +223,29 @@ export default function App() {
               path="/operaciones/ListaEntregasMercancia"
               element={<ListaEntregasMercancia />}
             />
+            <Route
+              path="/operaciones/ControlFacturas"
+              element={<ControlFacturas />}
+            />
+            {/* NOMCONEXIA-UNIFY */}
+            <Route path="/nomina" element={<NominaHome />} />
+            <Route path="/nomina/empleados" element={<NominaEmpleados />} />
+            <Route path="/nomina/empresas" element={<NominaEmpresas />} />
+            <Route path="/nomina/catalogos" element={<NominaCatalogos />} />
+            <Route path="/nomina/incidencias" element={<NominaIncidencias />} />
+            <Route
+              path="/nomina/incidencias/checador"
+              element={<ReporteChecador />}
+            />
+            <Route path="/nomina/reloj" element={<RelojAdmin />} />
+            <Route path="/nomina/solicitudes" element={<NominaSolicitudes />} />
+            <Route
+              path="/nomina/percepciones"
+              element={<NominaPercepciones />}
+            />
+            <Route path="/nomina/nominas" element={<NominasPage />} />
+            <Route path="/nomina/gps" element={<NominaGps />} />
+            {/* /NOMCONEXIA-UNIFY */}
           </Route>
         </Routes>
       </Suspense>

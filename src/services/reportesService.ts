@@ -301,6 +301,46 @@ export interface CancelacionDocumentosParams {
   detalle?: boolean;
 }
 
+/** Fila de GET /api/Reportes/ControlFacturas */
+export interface ControlFacturaItem {
+  sociedad: string;
+  docNum: number;
+  docDate: string;
+  cardCode: string;
+  cardName: string;
+  ruta: string;
+  slpName: string;
+  docTotal: number;
+  whsCode: string;
+}
+
+export interface ControlFacturasResult {
+  fechaInicio: string;
+  fechaFin: string;
+  sociedad: string | null;
+  facturas: ControlFacturaItem[];
+}
+
+export interface ControlFacturasParams {
+  fechaInicio: string;
+  fechaFin: string;
+  sociedad?: SociedadEfectividad | "" | null;
+}
+
+/** Body de POST /api/ControFacturas */
+export interface ControlFacturaGuardar {
+  docNum: number;
+  docDate: string;
+  sociedad: string;
+  cardCode: string;
+  cardName: string;
+  ruta: string;
+  slpName: string;
+  docTotal: number;
+  almacen: string;
+  validar: boolean;
+}
+
 export interface ComparativoAnual {
   AnioActual: number;
   AnioAnterior: number;
@@ -1007,6 +1047,49 @@ function normalizeCancelacionResult(
   };
 }
 
+function normalizeControlFacturaItem(raw: unknown): ControlFacturaItem | null {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const docNum = pickNumber(o, "docNum", "DocNum");
+  const cardCode = pickString(o, "cardCode", "CardCode") ?? "";
+  if (docNum == null && !cardCode) return null;
+  return {
+    sociedad: pickString(o, "sociedad", "Sociedad") ?? "",
+    docNum: docNum ?? 0,
+    docDate: pickString(o, "docDate", "DocDate") ?? "",
+    cardCode,
+    cardName: pickString(o, "cardName", "CardName") ?? "",
+    ruta: pickString(o, "ruta", "Ruta") ?? "",
+    slpName: pickString(o, "slpName", "SlpName") ?? "",
+    docTotal: pickNumber(o, "docTotal", "DocTotal") ?? 0,
+    whsCode: pickString(o, "whsCode", "WhsCode") ?? "",
+  };
+}
+
+function normalizeControlFacturasResult(raw: unknown): ControlFacturasResult {
+  const o = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const listRaw =
+    o.facturas ??
+    o.Facturas ??
+    o.data ??
+    o.Data ??
+    (Array.isArray(raw) ? raw : []);
+  const facturas = (Array.isArray(listRaw) ? listRaw : [])
+    .map(normalizeControlFacturaItem)
+    .filter((r): r is ControlFacturaItem => r != null);
+  return {
+    fechaInicio: pickString(o, "fechaInicio", "FechaInicio") ?? "",
+    fechaFin: pickString(o, "fechaFin", "FechaFin") ?? "",
+    sociedad: pickString(o, "sociedad", "Sociedad") ?? null,
+    facturas,
+  };
+}
+
 const appendFechas = (
   params: URLSearchParams,
   fechaInicio?: string,
@@ -1622,5 +1705,57 @@ export const getReportesService = {
       );
     }
     return normalizeCancelacionResult(response.data);
+  },
+
+  /**
+   * GET /api/Reportes/ControlFacturas
+   * Fechas en yyyy-MM-dd.
+   */
+  getControlFacturas: async (
+    opts: ControlFacturasParams,
+  ): Promise<ControlFacturasResult> => {
+    const params = new URLSearchParams();
+    const inicio = (opts.fechaInicio ?? "").trim();
+    const fin = (opts.fechaFin ?? "").trim();
+    if (inicio) params.set("fechaInicio", inicio);
+    if (fin) params.set("fechaFin", fin);
+    const sociedad = opts.sociedad?.trim() ?? "";
+    if (sociedad) params.set("sociedad", sociedad);
+
+    const response = await api.get<unknown>(
+      `/api/Reportes/ControlFacturas?${params.toString()}`,
+      { timeout: 90_000 },
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        mensajeErrorReporte(
+          response.data,
+          `No se pudo cargar Control de Facturas (HTTP ${response.status}).`,
+        ),
+      );
+    }
+    return normalizeControlFacturasResult(response.data);
+  },
+
+  /**
+   * POST /api/ControFacturas
+   * Guarda las facturas validadas (seleccionadas).
+   */
+  guardarControlFacturas: async (
+    facturas: ControlFacturaGuardar[],
+  ): Promise<void> => {
+    const response = await api.post<unknown>(
+      "/api/ControFacturas",
+      facturas,
+      { timeout: 90_000 },
+    );
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(
+        mensajeErrorReporte(
+          response.data,
+          `No se pudieron guardar las facturas (HTTP ${response.status}).`,
+        ),
+      );
+    }
   },
 };
