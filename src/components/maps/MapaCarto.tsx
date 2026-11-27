@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { useEffect, type ReactNode } from "react";
+import { MapContainer, useMap, useMapEvents } from "react-leaflet";
 import type { LatLngExpression } from "leaflet";
-import { CAPAS_TESELA, boundsGeocercas, MEXICO_CENTER } from "./leafletSafe";
+import { maplibreGL } from "@maplibre/maplibre-gl-leaflet";
+import "./maplibreSetup";
+import { ESTILO_OPENFREEMAP, TILE_SEGURO, boundsGeocercas, MEXICO_CENTER } from "./leafletSafe";
 
 type PuntoGeo = { latitud: number; longitud: number; radioMetros?: number };
 
@@ -9,34 +11,20 @@ const SIN_PUNTOS: PuntoGeo[] = [];
 
 function TeselaSegura() {
   const map = useMap();
-  const [idx, setIdx] = useState(0);
-  const fallos = useRef(0);
-  const capa = CAPAS_TESELA[idx] ?? CAPAS_TESELA[0];
-
   useEffect(() => {
-    fallos.current = 0;
-    const onError = () => {
-      fallos.current += 1;
-      if (fallos.current >= 3 && idx < CAPAS_TESELA.length - 1) {
-        setIdx((n) => n + 1);
-      }
-    };
-    map.on("tileerror", onError);
+    const attr = TILE_SEGURO.attribution;
+    map.attributionControl?.addAttribution(attr);
+    const layer = maplibreGL({
+      style: ESTILO_OPENFREEMAP,
+      attributionControl: false,
+    });
+    layer.addTo(map);
     return () => {
-      map.off("tileerror", onError);
+      map.attributionControl?.removeAttribution(attr);
+      map.removeLayer(layer);
     };
-  }, [map, idx]);
-
-  return (
-    <TileLayer
-      key={capa.id}
-      url={capa.url}
-      attribution={capa.attribution}
-      subdomains={capa.subdomains ?? "abc"}
-      maxZoom={19}
-      maxNativeZoom={capa.maxNativeZoom ?? 19}
-    />
-  );
+  }, [map]);
+  return null;
 }
 
 function ClicMapa({ onPick }: { onPick?: (lat: number, lng: number) => void }) {
@@ -93,9 +81,11 @@ export default function MapaCarto({
     <MapContainer
       center={center}
       zoom={zoom}
+      minZoom={1}
       maxZoom={19}
       className={className}
       scrollWheelZoom
+      attributionControl
       style={{ zIndex: 0, background: "#e8eef2" }}
     >
       <TeselaSegura />

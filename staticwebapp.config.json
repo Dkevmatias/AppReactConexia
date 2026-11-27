@@ -16,7 +16,8 @@
     }
   },
   "globalHeaders": {
-    "content-security-policy": "default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; img-src 'self' https: data: blob:",
+    "content-security-policy": "default-src 'self' https: blob: data: 'unsafe-inline' 'unsafe-eval'; img-src 'self' https: data: blob:; worker-src 'self' blob:; child-src 'self' blob:; connect-src 'self' https:; style-src 'self' 'unsafe-inline' https:",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "SAMEORIGIN",
     "X-XSS-Protection": "1; mode=block"

@@ -5,10 +5,9 @@ import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 
 /**
- * OSM.org suele responder 403 en apps. CARTO exige API key.
- * Esri World Street Map a zoom de geocerca (16–17) pinta “Map data not yet available”.
- * HOT OSM (Francia) sí tiene calles a ese zoom; OSM.de e imagen Esri son respaldo.
- * Iconos van empaquetados: no se pide nada a unpkg.
+ * Teselas raster públicas (OSM.org, OSM.fr, Esri streets) se bloquean o
+ * degradan en el dominio de producción. OpenFreeMap + MapLibre no pide API key
+ * y permite uso comercial. Iconos van empaquetados (no unpkg).
  */
 const proto = L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown };
 delete proto._getIconUrl;
@@ -28,38 +27,13 @@ export const iconMarcador = new L.Icon({
   shadowSize: [41, 41],
 });
 
-export type TeselaCfg = {
-  id: string;
-  url: string;
-  attribution: string;
-  subdomains?: string;
-  maxNativeZoom?: number;
+export const ESTILO_OPENFREEMAP = "https://tiles.openfreemap.org/styles/liberty";
+
+export const TILE_SEGURO = {
+  url: ESTILO_OPENFREEMAP,
+  attribution:
+    '<a href="https://openfreemap.org/" target="_blank" rel="noreferrer">OpenFreeMap</a> © <a href="https://openmaptiles.org/" target="_blank" rel="noreferrer">OpenMapTiles</a> · <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
 };
-
-export const CAPAS_TESELA: TeselaCfg[] = [
-  {
-    id: "osm-hot",
-    url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · HOT',
-    subdomains: "abc",
-    maxNativeZoom: 20,
-  },
-  {
-    id: "osm-de",
-    url: "https://tile.openstreetmap.de/{z}/{x}/{y}.png",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxNativeZoom: 18,
-  },
-  {
-    id: "esri-img",
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    attribution: "Teselas &copy; Esri — Earthstar Geographics",
-    maxNativeZoom: 19,
-  },
-];
-
-export const TILE_SEGURO = CAPAS_TESELA[0];
 
 export const MEXICO_CENTER: [number, number] = [19.4326, -99.1332];
 
