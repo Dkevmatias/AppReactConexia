@@ -8,6 +8,7 @@ import Select from "../../components/form/Select";
 import RelojGeocercasPanel from "../../components/nomina/RelojGeocercasPanel";
 import RelojDispositivosPanel from "../../components/nomina/RelojDispositivosPanel";
 import RelojChecadasPanel from "../../components/nomina/RelojChecadasPanel";
+import RelojAnalisisGeocercasPanel from "../../components/nomina/RelojAnalisisGeocercasPanel";
 import { empresaService, Empresa } from "../../services/empresaService";
 import {
   horaToInput,
@@ -16,7 +17,7 @@ import {
 } from "../../services/politicaRetardoService";
 import { RelojPersonal, RelojSucursal, relojService } from "../../services/relojService";
 
-type Tab = "geocercas" | "dispositivos" | "checadas";
+type Tab = "geocercas" | "dispositivos" | "checadas" | "analisis";
 
 function limiteRetardo(hora: string, tolerancia: number) {
   const [h, m] = horaToInput(hora).split(":").map(Number);
@@ -191,6 +192,7 @@ export default function RelojAdmin() {
             ["geocercas", "Geocercas"],
             ["dispositivos", "Dispositivos y personal"],
             ["checadas", "Checadas"],
+            ["analisis", "Análisis Geocercas"],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -218,6 +220,13 @@ export default function RelojAdmin() {
       )}
       {idEmpresa > 0 && tab === "checadas" && (
         <RelojChecadasPanel idEmpresa={idEmpresa} idSucursal={idSucursal} personal={personalSucursal} />
+      )}
+      {idEmpresa > 0 && tab === "analisis" && (
+        <RelojAnalisisGeocercasPanel
+          empresas={empresas}
+          idEmpresaInicial={idEmpresa}
+          idSucursalInicial={idSucursal}
+        />
       )}
     </div>
   );

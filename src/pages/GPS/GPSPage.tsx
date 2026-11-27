@@ -1,20 +1,10 @@
 /* NOMCONEXIA-UNIFY */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { traccarService, TraccarDevice } from '../../services/traccarService';
 import { MapPin, Phone, Clock, Navigation, List, Map } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-
-const iconMarker = new L.Icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
-});
+import { Marker, Popup } from 'react-leaflet';
+import MapaCarto from '../../components/maps/MapaCarto';
+import { iconMarcador } from '../../components/maps/leafletSafe';
 
 const GPSPage = () => {
   const [devices, setDevices] = useState<TraccarDevice[]>([]);
@@ -52,14 +42,21 @@ const GPSPage = () => {
     return Math.round(speed * 1.852).toString();
   };
 
-  const devicesWithPosition = devices.filter(d => d.position);
-
-  const getMapCenter = () => {
-    if (devicesWithPosition.length === 0) return [16.7335, -93.099] as [number, number];
+  const devicesWithPosition = useMemo(() => devices.filter(d => d.position), [devices]);
+  const puntosMapa = useMemo(
+    () =>
+      devicesWithPosition.map((d) => ({
+        latitud: d.position!.latitude,
+        longitud: d.position!.longitude,
+      })),
+    [devicesWithPosition],
+  );
+  const mapCenter = useMemo<[number, number]>(() => {
+    if (devicesWithPosition.length === 0) return [16.7335, -93.099];
     const avgLat = devicesWithPosition.reduce((sum, d) => sum + d.position!.latitude, 0) / devicesWithPosition.length;
     const avgLng = devicesWithPosition.reduce((sum, d) => sum + d.position!.longitude, 0) / devicesWithPosition.length;
-    return [avgLat, avgLng] as [number, number];
-  };
+    return [avgLat, avgLng];
+  }, [devicesWithPosition]);
 
   if (loading) {
     return (
@@ -212,20 +209,17 @@ const GPSPage = () => {
             Mapa de Dispositivos
           </h2>
           <div className="h-[500px] rounded-lg overflow-hidden">
-            <MapContainer
-              center={getMapCenter()}
+            <MapaCarto
+              key={`gps-${devicesWithPosition.length}`}
+              center={mapCenter}
               zoom={13}
-              style={{ height: '100%', width: '100%' }}
+              puntosAjuste={puntosMapa}
             >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
               {devicesWithPosition.map((device) => (
                 <Marker
                   key={device.id}
                   position={[device.position!.latitude, device.position!.longitude]}
-                  icon={iconMarker}
+                  icon={iconMarcador}
                 >
                   <Popup>
                     <div className="text-sm">
@@ -236,7 +230,7 @@ const GPSPage = () => {
                   </Popup>
                 </Marker>
               ))}
-            </MapContainer>
+            </MapaCarto>
           </div>
         </div>
       )}

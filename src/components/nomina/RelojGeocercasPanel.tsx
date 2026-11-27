@@ -1,30 +1,19 @@
 /* NOMCONEXIA-UNIFY */
 import { useEffect, useMemo, useState } from "react";
-import { Circle, MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { Circle, CircleMarker, Marker, Popup } from "react-leaflet";
 import Button from "../ui/button/Button";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import { Modal } from "../ui/modal";
 import { PlusIcon, PencilIcon } from "../../icons";
+import MapaCarto from "../maps/MapaCarto";
+import { iconMarcador, MEXICO_CENTER } from "../maps/leafletSafe";
 import {
+  RelojChecada,
   RelojGeocerca,
   RelojGeocercaSave,
   relojService,
 } from "../../services/relojService";
-
-const iconMarker = new L.Icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
-
-const MEXICO: [number, number] = [19.4326, -99.1332];
 
 type FormState = {
   nombre: string;
@@ -48,27 +37,6 @@ const emptyForm = (): FormState => ({
   activo: true,
 });
 
-function MapClick({ onPick }: { onPick: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click(e) {
-      onPick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-}
-
-function FitMap({ center, open }: { center: [number, number]; open: boolean }) {
-  const map = useMap();
-  useEffect(() => {
-    const t = setTimeout(() => {
-      map.invalidateSize();
-      map.setView(center, map.getZoom() || 16);
-    }, 250);
-    return () => clearTimeout(t);
-  }, [center, map, open]);
-  return null;
-}
-
 type Props = {
   idEmpresa: number;
   idSucursal: number;
@@ -84,6 +52,7 @@ export default function RelojGeocercasPanel({ idEmpresa, idSucursal, sucursalNom
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RelojGeocerca | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [checadas, setChecadas] = useState<RelojChecada[]>([]);
 
   const load = async () => {
     const data = await relojService.getGeocercas(idEmpresa, idSucursal, false);
@@ -96,6 +65,18 @@ export default function RelojGeocercasPanel({ idEmpresa, idSucursal, sucursalNom
     load()
       .catch((e) => setError(e instanceof Error ? e.message : "No se pudieron cargar las geocercas"))
       .finally(() => setLoading(false));
+
+    const hasta = new Date();
+    const desde = new Date(Date.now() - 2 * 86400000);
+    relojService
+      .getChecadas({
+        idEmpresa,
+        idSucursal,
+        desde: desde.toISOString(),
+        hasta: hasta.toISOString(),
+      })
+      .then(setChecadas)
+      .catch(() => setChecadas([]));
   }, [idEmpresa, idSucursal]);
 
   const openNew = () => {
@@ -124,8 +105,19 @@ export default function RelojGeocercasPanel({ idEmpresa, idSucursal, sucursalNom
   const radio = Number(form.radioMetros) || 100;
   const hasPoint = Number.isFinite(lat) && Number.isFinite(lng) && form.latitud !== "" && form.longitud !== "";
   const center = useMemo<[number, number]>(
-    () => (hasPoint ? [lat, lng] : MEXICO),
+    () => (hasPoint ? [lat, lng] : MEXICO_CENTER),
     [hasPoint, lat, lng]
+  );
+  const puntosVista = useMemo(
+    () =>
+      rows
+        .filter((g) => Number.isFinite(g.latitud) && Number.isFinite(g.longitud))
+        .map((g) => ({
+          latitud: g.latitud,
+          longitud: g.longitud,
+          radioMetros: g.radioMetros,
+        })),
+    [rows],
   );
 
   const save = async () => {
@@ -227,6 +219,59 @@ export default function RelojGeocercasPanel({ idEmpresa, idSucursal, sucursalNom
           {notice}
         </div>
       )}
+
+      <div className="h-72 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+        <MapaCarto
+          key={`geo-${idEmpresa}-${idSucursal}-${rows.length}`}
+          puntosAjuste={puntosVista}
+          zoom={puntosVista.length ? 16 : 5}
+        >
+          {rows.map((g) =>
+            Number.isFinite(g.latitud) && Number.isFinite(g.longitud) ? (
+              <Circle
+                key={g.idGeocerca}
+                center={[g.latitud, g.longitud]}
+                radius={g.radioMetros}
+                pathOptions={{
+                  color: g.activo ? "#2563eb" : "#9ca3af",
+                  fillColor: g.activo ? "#3b82f6" : "#d1d5db",
+                  fillOpacity: 0.18,
+                }}
+                eventHandlers={{ click: () => openEdit(g) }}
+              >
+                <Popup>
+                  <div className="text-sm">
+                    <strong>{g.nombre}</strong>
+                    <div>{g.radioMetros} m · {g.activo ? "Activa" : "Inactiva"}</div>
+                  </div>
+                </Popup>
+              </Circle>
+            ) : null,
+          )}
+          {checadas
+            .filter((c) => Number.isFinite(c.latitud) && Number.isFinite(c.longitud))
+            .slice(0, 80)
+            .map((c) => (
+              <CircleMarker
+                key={c.idChecada}
+                center={[c.latitud, c.longitud]}
+                radius={6}
+                pathOptions={{ color: "#0f766e", fillColor: "#14b8a6", fillOpacity: 0.9 }}
+              >
+                <Popup>
+                  <div className="text-sm">
+                    <strong>{c.nombrePersona || "Checada"}</strong>
+                    <div>{c.tipo}</div>
+                    <div>{c.geocercaNombre || "Sin geocerca"}</div>
+                  </div>
+                </Popup>
+              </CircleMarker>
+            ))}
+        </MapaCarto>
+      </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        Azul: geocerca. Puntos verdes: checadas de los últimos 2 días. Clic en el círculo para editar.
+      </p>
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
         <table className="min-w-full text-sm">
@@ -342,31 +387,34 @@ export default function RelojGeocercasPanel({ idEmpresa, idSucursal, sucursalNom
           </div>
         </div>
         <div className="mt-3 h-64 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
-          {open && (
-            <MapContainer center={center} zoom={hasPoint ? 16 : 5} className="h-full w-full" scrollWheelZoom>
-              <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <FitMap center={center} open={open} />
-              <MapClick
-                onPick={(nextLat, nextLng) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    latitud: nextLat.toFixed(6),
-                    longitud: nextLng.toFixed(6),
-                  }))
-                }
-              />
-              {hasPoint && (
+          {open ? (
+            <MapaCarto
+              key={`edit-${editing?.idGeocerca ?? "nueva"}-${hasPoint ? "p" : "m"}`}
+              center={center}
+              zoom={hasPoint ? 16 : 5}
+              puntosAjuste={
+                hasPoint ? [{ latitud: lat, longitud: lng, radioMetros: radio }] : []
+              }
+              onPick={(nextLat, nextLng) =>
+                setForm((prev) => ({
+                  ...prev,
+                  latitud: nextLat.toFixed(6),
+                  longitud: nextLng.toFixed(6),
+                }))
+              }
+            >
+              {hasPoint ? (
                 <>
-                  <Marker position={[lat, lng]} icon={iconMarker} />
+                  <Marker position={[lat, lng]} icon={iconMarcador} />
                   <Circle
                     center={[lat, lng]}
                     radius={radio}
                     pathOptions={{ color: "#2563eb", fillColor: "#3b82f6", fillOpacity: 0.15 }}
                   />
                 </>
-              )}
-            </MapContainer>
-          )}
+              ) : null}
+            </MapaCarto>
+          ) : null}
         </div>
         <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-700 dark:text-gray-300">
           <label className="flex items-center gap-2">
