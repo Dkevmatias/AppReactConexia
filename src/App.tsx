@@ -223,10 +223,6 @@ export default function App() {
               path="/operaciones/ListaEntregasMercancia"
               element={<ListaEntregasMercancia />}
             />
-            <Route
-              path="/operaciones/ControlFacturas"
-              element={<ControlFacturas />}
-            />
             {/* NOMCONEXIA-UNIFY */}
             <Route path="/nomina" element={<NominaHome />} />
             <Route path="/nomina/empleados" element={<NominaEmpleados />} />

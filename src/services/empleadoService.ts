@@ -80,6 +80,76 @@ export interface EmpleadoUpdate extends EmpleadoCreate {
   fechaBaja?: string | null;
 }
 
+function vacioANull(value: string | number | null | undefined): string | null {
+  const t = String(value ?? "").trim();
+  return t ? t : null;
+}
+
+function mensajeErrorEmpleado(data: unknown, fallback: string): string {
+  if (typeof data === "string" && data.trim()) return data.trim();
+  if (!data || typeof data !== "object") return fallback;
+  const o = data as Record<string, unknown>;
+  const errors = o.errors ?? o.Errors ?? o.modelState ?? o.ModelState;
+  if (errors && typeof errors === "object") {
+    const msgs = Object.entries(errors as Record<string, unknown>).flatMap(
+      ([campo, valor]) => {
+        const lista = Array.isArray(valor) ? valor : [valor];
+        return lista
+          .filter((item): item is string => typeof item === "string" && !!item.trim())
+          .map((item) => {
+            const nombre = campo.replace(/^\$\.?/, "").trim();
+            return nombre && nombre !== "$" ? `${nombre}: ${item.trim()}` : item.trim();
+          });
+      },
+    );
+    if (msgs.length > 0) return msgs.join(" ");
+  }
+  for (const key of ["mensaje", "Mensaje", "message", "Message", "detail", "Detail", "title", "Title"]) {
+    const v = o[key];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return fallback;
+}
+
+/** Convierte strings vacíos a null para que ASP.NET no rechace fechas/correo. */
+function payloadEmpleado<T extends EmpleadoCreate>(empleado: T): T {
+  const nss = vacioANull(
+    empleado.nss == null ? "" : String(empleado.nss).replace(/\D/g, ""),
+  );
+  return {
+    ...empleado,
+    nombre: empleado.nombre.trim(),
+    primerApellido: empleado.primerApellido.trim(),
+    segundoApellido: vacioANull(empleado.segundoApellido),
+    nss,
+    correo: vacioANull(empleado.correo),
+    rfc: vacioANull(empleado.rfc)?.toUpperCase() ?? null,
+    curp: vacioANull(empleado.curp)?.toUpperCase() ?? null,
+    fechaNacimiento: vacioANull(empleado.fechaNacimiento),
+    tipoContrato: vacioANull(empleado.tipoContrato),
+    numeroEmpleado: vacioANull(empleado.numeroEmpleado),
+    claveSucursal: vacioANull(empleado.claveSucursal),
+    claveTipoContrato: vacioANull(empleado.claveTipoContrato),
+    claveTipoRegimen: vacioANull(empleado.claveTipoRegimen),
+    claveTipoJornada: vacioANull(empleado.claveTipoJornada),
+    claveRiesgoPuesto: vacioANull(empleado.claveRiesgoPuesto),
+    claveBanco: vacioANull(empleado.claveBanco),
+    claveEntidadFederativa: vacioANull(empleado.claveEntidadFederativa),
+    clavePeriodicidadPago: vacioANull(empleado.clavePeriodicidadPago),
+    claveRegimenFiscal: vacioANull(empleado.claveRegimenFiscal),
+    cuentaBancaria: vacioANull(empleado.cuentaBancaria),
+    clabe: vacioANull(empleado.clabe),
+    fechaIngreso: empleado.fechaIngreso,
+    fechaBaja:
+      "fechaBaja" in empleado
+        ? vacioANull((empleado as EmpleadoUpdate).fechaBaja)
+        : undefined,
+    idJefe: empleado.idJefe && empleado.idJefe > 0 ? empleado.idJefe : null,
+    sdi: empleado.sdi ?? 0,
+    sbc: empleado.sbc ?? 0,
+  };
+}
+
 export interface Departamento {
   idDepartamento: number;
   idEmpresa: number;
@@ -113,17 +183,22 @@ export const empleadoService = {
   },
 
   createEmpleado: async (empleado: EmpleadoCreate): Promise<{ idEmpleado: number }> => {
-    const res = await api.post<{ idEmpleado: number }>("/api/Empleados", empleado);
+    const res = await api.post<{ idEmpleado: number }>(
+      "/api/Empleados",
+      payloadEmpleado(empleado),
+    );
     if (res.status >= 400) {
-      throw new Error((res.data as { message?: string })?.message || "No se pudo crear el empleado");
+      throw new Error(mensajeErrorEmpleado(res.data, "No se pudo crear el empleado"));
     }
     return res.data;
   },
 
   updateEmpleado: async (empleado: EmpleadoUpdate): Promise<void> => {
-    const res = await api.put("/api/Empleados", empleado);
+    const res = await api.put("/api/Empleados", payloadEmpleado(empleado));
     if (res.status >= 400) {
-      throw new Error((res.data as { message?: string })?.message || "No se pudo actualizar el empleado");
+      throw new Error(
+        mensajeErrorEmpleado(res.data, "No se pudo actualizar el empleado"),
+      );
     }
   },
 
