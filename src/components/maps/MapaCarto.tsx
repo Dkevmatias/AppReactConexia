@@ -1,14 +1,42 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import type { LatLngExpression } from "leaflet";
-import { TILE_SEGURO, boundsGeocercas, MEXICO_CENTER } from "./leafletSafe";
+import { CAPAS_TESELA, boundsGeocercas, MEXICO_CENTER } from "./leafletSafe";
 
 type PuntoGeo = { latitud: number; longitud: number; radioMetros?: number };
 
 const SIN_PUNTOS: PuntoGeo[] = [];
 
 function TeselaSegura() {
-  return <TileLayer url={TILE_SEGURO.url} attribution={TILE_SEGURO.attribution} />;
+  const map = useMap();
+  const [idx, setIdx] = useState(0);
+  const fallos = useRef(0);
+  const capa = CAPAS_TESELA[idx] ?? CAPAS_TESELA[0];
+
+  useEffect(() => {
+    fallos.current = 0;
+    const onError = () => {
+      fallos.current += 1;
+      if (fallos.current >= 3 && idx < CAPAS_TESELA.length - 1) {
+        setIdx((n) => n + 1);
+      }
+    };
+    map.on("tileerror", onError);
+    return () => {
+      map.off("tileerror", onError);
+    };
+  }, [map, idx]);
+
+  return (
+    <TileLayer
+      key={capa.id}
+      url={capa.url}
+      attribution={capa.attribution}
+      subdomains={capa.subdomains ?? "abc"}
+      maxZoom={19}
+      maxNativeZoom={capa.maxNativeZoom ?? 19}
+    />
+  );
 }
 
 function ClicMapa({ onPick }: { onPick?: (lat: number, lng: number) => void }) {
@@ -65,6 +93,7 @@ export default function MapaCarto({
     <MapContainer
       center={center}
       zoom={zoom}
+      maxZoom={19}
       className={className}
       scrollWheelZoom
       style={{ zIndex: 0, background: "#e8eef2" }}
